@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800" height="600" viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="800" height="600" fill="#f8fafc"/>
+  
+  <!-- Room outlines -->
+  <g stroke="#94a3b8" stroke-width="2" fill="none">
+    <!-- Living Room -->
+    <rect x="100" y="100" width="300" height="200"/>
+    <text x="150" y="200" fill="#64748b" font-family="sans-serif">Living Room</text>
+    
+    <!-- Kitchen -->
+    <rect x="400" y="100" width="200" height="150"/>
+    <text x="450" y="175" fill="#64748b" font-family="sans-serif">Kitchen</text>
+    
+    <!-- Bedroom -->
+    <rect x="100" y="300" width="250" height="200"/>
+    <text x="150" y="400" fill="#64748b" font-family="sans-serif">Bedroom</text>
+    
+    <!-- Bathroom -->
+    <rect x="350" y="300" width="150" height="100"/>
+    <text x="375" y="350" fill="#64748b" font-family="sans-serif">Bath</text>
+  </g>
+  
+  <!-- Grid pattern -->
+  <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#e2e8f0" stroke-width="0.5"/>
+  </pattern>
+  <rect width="800" height="600" fill="url(#grid)"/>
+</svg> 
