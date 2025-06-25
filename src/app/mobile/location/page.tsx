@@ -25,8 +25,18 @@ export default function MobileLocationPage() {
 
       {/* Map Container - Flexible height */}
       <section className="flex-1 relative overflow-hidden">
-        {/* Setup Rooms Button */}
-        <div className="absolute top-4 right-4 z-[1000]">
+        {/* Action Buttons */}
+        <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
+          <button
+            onClick={() => window.location.href = '/mobile/zones'}
+            className="bg-gradient-to-r from-orange-500 to-amber-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 text-sm font-medium hover:from-orange-600 hover:to-amber-700 transition-all duration-200"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+              <circle cx="12" cy="10" r="3"/>
+            </svg>
+            Safety Zones
+          </button>
           <button
             onClick={() => window.location.href = '/mobile/setup/rooms'}
             className="bg-gradient-to-r from-violet-500 to-purple-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 text-sm font-medium hover:from-violet-600 hover:to-purple-700 transition-all duration-200"

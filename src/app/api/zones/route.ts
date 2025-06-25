@@ -3,10 +3,17 @@ import { auth } from '@clerk/nextjs'
 import { ZoneSchema, ZoneCreateSchema } from '@/lib/types'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Check if Supabase is configured
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+if (!supabaseUrl || !supabaseKey) {
+  console.warn('⚠️ Supabase not configured, using mock data')
+}
+
+const supabase = supabaseUrl && supabaseKey 
+  ? createClient(supabaseUrl, supabaseKey)
+  : null
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,6 +27,36 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('📋 Fetching zones for user:', userId)
+
+    // Return mock data if Supabase is not configured
+    if (!supabase) {
+      console.log('📝 Using mock zones data')
+      const mockZones = [
+        {
+          id: 'demo_zone_1',
+          user_id: userId,
+          name: 'Demo Living Room',
+          type: 'SAFE',
+          polygon_json: [
+            { x: 20, y: 20 },
+            { x: 80, y: 20 },
+            { x: 80, y: 60 },
+            { x: 20, y: 60 }
+          ],
+          color: '#10B981',
+          active: true,
+          alert_settings: {
+            entry_alert: false,
+            exit_alert: true,
+            sound_enabled: true,
+            notification_enabled: true,
+          },
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }
+      ]
+      return NextResponse.json(mockZones)
+    }
 
     // Fetch user's zones
     const { data: zones, error: fetchError } = await supabase
@@ -92,6 +129,18 @@ export async function POST(request: NextRequest) {
         sound_enabled: true,
         notification_enabled: true,
       },
+    }
+
+    // Return mock data if Supabase is not configured
+    if (!supabase) {
+      console.log('📝 Creating mock zone')
+      const mockZone = {
+        id: `zone_${Date.now()}`,
+        ...newZone,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+      return NextResponse.json(mockZone, { status: 201 })
     }
 
     const { data: zone, error: insertError } = await supabase

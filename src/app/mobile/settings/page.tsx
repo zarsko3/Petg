@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { Plus, Bluetooth, Zap, MapPin, Bell, Palette, Info } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -144,7 +144,7 @@ export default function MobileSettingsPage() {
             <Card 
               key={section.id} 
               className="p-4 hover:shadow-md transition-all duration-200 cursor-pointer border-l-4 border-l-orange-400"
-              onClick={() => section.path && window.location.href = section.path}
+              onClick={() => section.path && (window.location.href = section.path)}
             >
               <div className="flex items-center gap-4">
                 <div className="flex-shrink-0">

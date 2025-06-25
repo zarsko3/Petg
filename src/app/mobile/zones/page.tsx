@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Plus, MapPin, Edit2, Trash2, Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { ZoneEditor } from '@/components/mobile/zone-editor'
+import { AdvancedZoneEditor } from '@/components/mobile/advanced-zone-editor'
 import { Zone, ZONE_TYPES } from '@/lib/types'
 
 export default function MobileZonesPage() {
@@ -14,6 +14,7 @@ export default function MobileZonesPage() {
   const [error, setError] = useState<string | null>(null)
   const [showEditor, setShowEditor] = useState(false)
   const [editingZone, setEditingZone] = useState<Zone | null>(null)
+  const wsRef = useRef<WebSocket | null>(null)
 
   const fetchZones = async () => {
     try {
@@ -104,8 +105,22 @@ export default function MobileZonesPage() {
     setEditingZone(null)
   }
 
+  // Initialize real-time sync
   useEffect(() => {
+    // Listen for zone updates via custom events (simulated WebSocket)
+    const handleZoneUpdate = (event: CustomEvent) => {
+      console.log('📡 Received zone update:', event.detail)
+      fetchZones() // Refresh zones list
+    }
+
+    window.addEventListener('zoneUpdated', handleZoneUpdate as EventListener)
+    
+    // Initial fetch
     fetchZones()
+
+    return () => {
+      window.removeEventListener('zoneUpdated', handleZoneUpdate as EventListener)
+    }
   }, [])
 
   const getZoneTypeColor = (type: string) => {
@@ -188,10 +203,10 @@ export default function MobileZonesPage() {
           <Card className="p-8 text-center border-dashed border-2 border-gray-200 dark:border-gray-700">
             <MapPin className="h-16 w-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-              No Safety Zones
+              No Safety Zones Yet
             </h3>
             <p className="text-gray-500 dark:text-gray-400 mb-6">
-              Create your first safety zone to start monitoring your pet's location
+              No safety zones yet—tap ➕ to add one.
             </p>
             <Button
               onClick={() => {
@@ -299,8 +314,9 @@ export default function MobileZonesPage() {
 
       {/* Zone Editor Modal */}
       {showEditor && (
-        <ZoneEditor
+        <AdvancedZoneEditor
           zone={editingZone}
+          existingZones={zones}
           onSave={handleZoneSaved}
           onCancel={() => {
             setShowEditor(false)
