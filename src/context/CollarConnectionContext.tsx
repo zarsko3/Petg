@@ -156,7 +156,7 @@ export function CollarConnectionProvider({ children }: CollarConnectionProviderP
 
   // Connect to specific collar IP
   const connectToCollar = useCallback(async (ip: string) => {
-    console.log(`🔗 Connecting to collar at ${ip}...`);
+    console.log(`🔗 Connecting to collar at ${ip}... (current status: ${status}, connectedIP: ${connectedIP})`);
     
     // Avoid duplicate connections
     if (connectedIP === ip && status === 'connected') {
@@ -230,10 +230,13 @@ export function CollarConnectionProvider({ children }: CollarConnectionProviderP
       if (discoveryWsRef.current) return;
       
       try {
-        const discoveryWs = new WebSocket('ws://localhost:3001');
+        // Use the current host for WebSocket connection
+        const wsHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+        console.log(`🔄 Attempting to connect to discovery WebSocket at ws://${wsHost}:3001`);
+        const discoveryWs = new WebSocket(`ws://${wsHost}:3001`);
         
         discoveryWs.onopen = () => {
-          console.log('🔌 Connected to discovery WebSocket');
+          console.log(`🔌 Connected to discovery WebSocket at ws://${wsHost}:3001`);
           discoveryWsRef.current = discoveryWs;
         };
         
@@ -259,7 +262,7 @@ export function CollarConnectionProvider({ children }: CollarConnectionProviderP
         };
         
         discoveryWs.onerror = (error) => {
-          console.error('❌ Discovery WebSocket error:', error);
+          console.error(`❌ Discovery WebSocket error connecting to ws://${wsHost}:3001:`, error);
         };
         
       } catch (error) {
