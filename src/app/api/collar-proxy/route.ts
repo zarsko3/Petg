@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as dgram from 'dgram';
 import { readFileSync } from 'fs';
 import path from 'path';
+import { WebSocketServer } from 'ws';
 
 // Comprehensive IP range discovery for collar detection
 const COMMON_IP_RANGES = [
@@ -39,9 +40,75 @@ const DISCOVERY_PORT = 47808;
 let udpServer: dgram.Socket | null = null;
 let lastCollarBroadcast = 0;
 
+// WebSocket server for broadcasting discovery events
+let wsServer: WebSocketServer | null = null;
+const WS_PORT = 3001;
+
+// Initialize WebSocket server for discovery broadcasting
+function initWebSocketServer() {
+  if (wsServer) return;
+  
+  try {
+    wsServer = new WebSocketServer({ 
+      port: WS_PORT,
+      clientTracking: true 
+    });
+    
+    wsServer.on('connection', (ws) => {
+      console.log('🔌 Proxy: Client connected to discovery WebSocket');
+      
+      ws.on('close', () => {
+        console.log('🔌 Proxy: Client disconnected from discovery WebSocket');
+      });
+      
+      ws.on('error', (error) => {
+        console.error('❌ Proxy: WebSocket client error:', error.message);
+      });
+    });
+    
+    wsServer.on('error', (error) => {
+      console.error('❌ Proxy: WebSocket server error:', error.message);
+    });
+    
+    console.log(`✅ Proxy: WebSocket server started on port ${WS_PORT}`);
+  } catch (error) {
+    console.error('❌ Proxy: Failed to start WebSocket server:', error);
+  }
+}
+
+// Broadcast discovery event to all connected clients
+function broadcastCollarDiscovered(ip: string) {
+  if (!wsServer) {
+    initWebSocketServer();
+    return;
+  }
+  
+  const message = JSON.stringify({
+    type: 'COLLAR_DISCOVERED',
+    ip: ip,
+    timestamp: Date.now()
+  });
+  
+  console.log(`📢 Proxy: Broadcasting collar discovery: ${ip}`);
+  
+  wsServer.clients.forEach((client) => {
+    if (client.readyState === 1) { // WebSocket.OPEN
+      try {
+        client.send(message);
+        console.log('📡 Proxy: Sent COLLAR_DISCOVERED to client');
+      } catch (error) {
+        console.error('❌ Proxy: Failed to send to client:', error);
+      }
+    }
+  });
+}
+
 // Start UDP listener for collar announcements
 function startCollarListener() {
   if (udpServer) return; // Already started
+  
+  // Initialize WebSocket server first
+  initWebSocketServer();
   
   console.log(`🔊 Proxy: Starting UDP listener on port ${DISCOVERY_PORT} for collar announcements...`);
   
@@ -60,11 +127,17 @@ function startCollarListener() {
         console.log(`   Battery: ${data.battery_percent}%`);
         
         // Cache the collar IP
+        const previousIP = cachedCollarIP;
         cachedCollarIP = data.ip_address;
         lastDiscoveryTime = Date.now();
         lastCollarBroadcast = Date.now();
         
         console.log(`✅ Proxy: Collar IP cached from broadcast: ${cachedCollarIP}`);
+        
+        // Only broadcast if this is a new discovery or IP change
+        if (previousIP !== cachedCollarIP && cachedCollarIP) {
+          broadcastCollarDiscovered(cachedCollarIP);
+        }
       }
     } catch (error) {
       // Ignore non-JSON messages or invalid data

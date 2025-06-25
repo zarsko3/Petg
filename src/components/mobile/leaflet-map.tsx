@@ -177,7 +177,13 @@ export function MobileLeafletMap({
   }, [])
 
   useEffect(() => {
-    if (!mounted || !mapRef.current || mapInstance.current) return
+    if (!mounted || !mapRef.current) return
+    
+    // Clean up existing map instance first
+    if (mapInstance.current) {
+      mapInstance.current.remove()
+      mapInstance.current = null
+    }
 
     // Initialize map with enhanced rendering quality and performance
     const map = L.map(mapRef.current, {

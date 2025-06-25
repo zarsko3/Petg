@@ -22,6 +22,7 @@ interface CollarConnectionContextType {
   disconnect: () => void
   isLive: boolean
   connectionDuration: number
+  connectedIP: string | null
 }
 
 const CollarConnectionContext = createContext<CollarConnectionContextType | undefined>(undefined)
@@ -35,8 +36,10 @@ export function CollarConnectionProvider({ children }: CollarConnectionProviderP
   const [collarData, setCollarData] = useState<CollarData | null>(null)
   const [lastHeartbeat, setLastHeartbeat] = useState<Date | null>(null)
   const [connectionDuration, setConnectionDuration] = useState(0)
+  const [connectedIP, setConnectedIP] = useState<string | null>(null)
   
   const wsRef = useRef<WebSocket | null>(null)
+  const discoveryWsRef = useRef<WebSocket | null>(null)
   const heartbeatIntervalRef = useRef<number | null>(null)
   const connectionTimerRef = useRef<number | null>(null)
   const failoverTimeoutRef = useRef<number | null>(null)
@@ -49,6 +52,10 @@ export function CollarConnectionProvider({ children }: CollarConnectionProviderP
     if (wsRef.current) {
       wsRef.current.close()
       wsRef.current = null
+    }
+    if (discoveryWsRef.current) {
+      discoveryWsRef.current.close()
+      discoveryWsRef.current = null
     }
     if (heartbeatIntervalRef.current) {
       clearInterval(heartbeatIntervalRef.current)
@@ -147,6 +154,132 @@ export function CollarConnectionProvider({ children }: CollarConnectionProviderP
     }
   }, [status, resetFailoverTimeout])
 
+  // Connect to specific collar IP
+  const connectToCollar = useCallback(async (ip: string) => {
+    console.log(`🔗 Connecting to collar at ${ip}...`);
+    
+    // Avoid duplicate connections
+    if (connectedIP === ip && status === 'connected') {
+      console.log('💡 Already connected to this collar, ignoring');
+      return;
+    }
+    
+    setStatus('connecting');
+    setConnectedIP(ip);
+    
+    try {
+      const wsUrl = `ws://${ip}:8080`;
+      console.log(`📡 Establishing WebSocket connection to ${wsUrl}`);
+      
+      const ws = new WebSocket(wsUrl);
+      
+      ws.onopen = () => {
+        console.log('✅ WebSocket connection established');
+        wsRef.current = ws;
+        setStatus('connected');
+        connectStartTime.current = new Date();
+        toast.success(`Connected to collar at ${ip}`);
+      };
+      
+      ws.onmessage = (event) => {
+        handleMessage(event);
+      };
+      
+      ws.onclose = () => {
+        console.log('🔌 WebSocket connection closed');
+        setStatus('disconnected');
+        setConnectedIP(null);
+        setCollarData(null);
+        setLastHeartbeat(null);
+        cleanup();
+        
+        setTimeout(() => {
+          toast.error(`Lost connection to collar at ${ip} – showing demo data`);
+        }, 1000);
+      };
+      
+      ws.onerror = (error) => {
+        console.error('❌ WebSocket connection error:', error);
+        setStatus('disconnected');
+        setConnectedIP(null);
+        cleanup();
+        toast.error(`Couldn't reach collar at ${ip} – retrying`);
+      };
+      
+      // 5 second connection timeout
+      setTimeout(() => {
+        if (status === 'connecting') {
+          ws.close();
+          setStatus('disconnected');
+          setConnectedIP(null);
+          toast.error(`Connection timeout to collar at ${ip}`);
+        }
+      }, 5000);
+      
+    } catch (error) {
+      console.error('❌ Failed to create WebSocket connection:', error);
+      setStatus('disconnected');
+      setConnectedIP(null);
+      toast.error(`Failed to connect to collar at ${ip}`);
+    }
+  }, [connectedIP, status, handleMessage, cleanup]);
+
+  // Listen for collar discovery events
+  useEffect(() => {
+    const connectToDiscoveryServer = () => {
+      if (discoveryWsRef.current) return;
+      
+      try {
+        const discoveryWs = new WebSocket('ws://localhost:3001');
+        
+        discoveryWs.onopen = () => {
+          console.log('🔌 Connected to discovery WebSocket');
+          discoveryWsRef.current = discoveryWs;
+        };
+        
+        discoveryWs.onmessage = (event) => {
+          try {
+            const message = JSON.parse(event.data);
+            console.log('📡 Discovery message received:', message);
+            
+            if (message.type === 'COLLAR_DISCOVERED' && message.ip) {
+              console.log(`🎯 Collar discovered at ${message.ip}, attempting connection...`);
+              connectToCollar(message.ip);
+            }
+          } catch (error) {
+            console.error('❌ Error parsing discovery message:', error);
+          }
+        };
+        
+        discoveryWs.onclose = () => {
+          console.log('🔌 Discovery WebSocket closed, will retry...');
+          discoveryWsRef.current = null;
+          // Retry connection after 5 seconds
+          setTimeout(connectToDiscoveryServer, 5000);
+        };
+        
+        discoveryWs.onerror = (error) => {
+          console.error('❌ Discovery WebSocket error:', error);
+        };
+        
+      } catch (error) {
+        console.error('❌ Failed to connect to discovery server:', error);
+        // Retry after 5 seconds
+        setTimeout(connectToDiscoveryServer, 5000);
+      }
+    };
+    
+    // Start discovery connection
+    connectToDiscoveryServer();
+    
+    return () => {
+      if (discoveryWsRef.current) {
+        discoveryWsRef.current.close();
+        discoveryWsRef.current = null;
+      }
+    };
+  }, [connectToCollar]);
+
   // Connection duration counter
   useEffect(() => {
     if (status === 'connected' && connectStartTime.current) {
@@ -169,87 +302,43 @@ export function CollarConnectionProvider({ children }: CollarConnectionProviderP
     }
   }, [status])
 
-  // Connect function
+  // Connect function (manual trigger)
   const connect = useCallback(async () => {
-    console.log('🔄 Initiating collar connection...')
-    setStatus('connecting')
+    console.log('🔄 Initiating manual collar connection...')
     
     try {
-      // Try to get collar IP from proxy
+      // Try to get collar IP from proxy first
       const proxyResponse = await fetch('/api/collar-proxy?endpoint=/api/discover')
       
-      if (!proxyResponse.ok) {
-        throw new Error('Failed to discover collar')
+      if (proxyResponse.ok) {
+        console.log('✅ Collar discovery via proxy successful');
+        toast.info('Searching for collar on network...');
+        // The discovery WebSocket listener will handle the actual connection
+        return;
       }
-
-      // For demo purposes, simulate WebSocket connection
-      // In production, this would connect to the actual collar WebSocket
-      const wsUrl = 'ws://192.168.1.35:8080' // From the logs, this is the collar IP
       
-      console.log('🔗 Connecting to collar WebSocket:', wsUrl)
+      // Fallback: try common collar IPs
+      const commonIPs = ['192.168.1.35', '192.168.0.35', '10.0.0.35'];
+      console.log('🔍 Trying common collar IPs...');
       
-      // Simulate connection for demo
-      setTimeout(() => {
-        console.log('🎭 Demo: Simulating collar connection...')
-        
-        // Create mock WebSocket for demo
-        const mockWs = {
-          readyState: WebSocket.OPEN,
-          send: (data: string) => {
-            console.log('📤 Sent to collar:', data)
-          },
-          close: () => {
-            console.log('🔌 Mock WebSocket closed')
-          }
-        } as WebSocket
-
-        wsRef.current = mockWs
-
-        // Simulate heartbeat from collar
-        const simulateHeartbeat = () => {
-          if (status === 'connecting' || status === 'connected') {
-            handleMessage({
-              data: JSON.stringify({
-                type: 'HEARTBEAT',
-                timestamp: Date.now()
-              })
-            } as MessageEvent)
-            
-            // Send some demo live data periodically
-            setTimeout(() => {
-              if (status === 'connected') {
-                handleMessage({
-                  data: JSON.stringify({
-                    type: 'COLLAR_DATA',
-                    data: {
-                      position: { 
-                        x: 45 + Math.random() * 10 - 5, 
-                        y: 50 + Math.random() * 10 - 5 
-                      },
-                      battery: Math.floor(Math.random() * 100),
-                      rssi: -45 - Math.floor(Math.random() * 30),
-                      temperature: 22 + Math.random() * 8,
-                      humidity: 45 + Math.random() * 20
-                    }
-                  })
-                } as MessageEvent)
-              }
-            }, 1000)
-          }
+      for (const ip of commonIPs) {
+        try {
+          await connectToCollar(ip);
+          return; // Success, exit
+        } catch (error) {
+          console.log(`❌ Failed to connect to ${ip}`);
+          continue;
         }
-
-        // Start heartbeat simulation
-        heartbeatIntervalRef.current = setInterval(simulateHeartbeat, 2000)
-        simulateHeartbeat() // Initial heartbeat
-        
-      }, 1000) // 1 second delay to show connecting state
-
+      }
+      
+      throw new Error('No collar found on common IPs');
+      
     } catch (error) {
       console.error('❌ Failed to connect to collar:', error)
       setStatus('disconnected')
-      toast.error('Failed to connect to collar')
+      toast.error('Failed to find collar - make sure it\'s powered on and connected to WiFi')
     }
-  }, [status, handleMessage])
+  }, [connectToCollar])
 
   // Disconnect function
   const disconnect = useCallback(() => {
@@ -257,6 +346,7 @@ export function CollarConnectionProvider({ children }: CollarConnectionProviderP
     setStatus('disconnected')
     setCollarData(null)
     setLastHeartbeat(null)
+    setConnectedIP(null)
     connectStartTime.current = null
     cleanup()
     
@@ -277,7 +367,8 @@ export function CollarConnectionProvider({ children }: CollarConnectionProviderP
     connect,
     disconnect,
     isLive,
-    connectionDuration
+    connectionDuration,
+    connectedIP
   }
 
   return (
