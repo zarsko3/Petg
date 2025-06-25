@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Buzzer Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        button { padding: 12px 24px; margin: 8px; font-size: 16px; border: none; border-radius: 5px; cursor: pointer; }
+        .success { background-color: #4CAF50; color: white; }
+        .error { background-color: #f44336; color: white; }
+        .info { background-color: #2196F3; color: white; }
+        .warning { background-color: #ff9800; color: white; }
+        .log { background-color: #f8f9fa; padding: 15px; margin: 15px 0; border-radius: 5px; border-left: 4px solid #007bff; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .status.connected { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .status.disconnected { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .status.connecting { background-color: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        pre { white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+        input[type="text"] { padding: 8px; font-size: 16px; border: 1px solid #ddd; border-radius: 4px; width: 200px; }
+        .control-group { margin: 15px 0; }
+        label { display: inline-block; width: 120px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔌 Direct WebSocket Buzzer Test</h1>
+        <p>Test WebSocket connection and buzzer commands directly with the collar.</p>
+        
+        <div class="control-group">
+            <label>Collar IP:</label>
+            <input type="text" id="collarIP" value="10.0.0.6">
+            <button onclick="updateURL()" class="info">Update URL</button>
+        </div>
+        
+        <div class="control-group">
+            <label>WebSocket URL:</label>
+            <span id="wsUrl" style="font-family: monospace;">ws://10.0.0.6:8080</span>
+        </div>
+        
+        <div id="connectionStatus" class="status disconnected">
+            Status: Disconnected
+        </div>
+        
+        <div style="margin: 20px 0;">
+            <button onclick="connectWS()" class="success">🔌 Connect WebSocket</button>
+            <button onclick="disconnectWS()" class="error">❌ Disconnect</button>
+            <button onclick="sendBuzzer()" class="info" id="buzzerBtn" disabled>🔊 Test Buzzer</button>
+            <button onclick="sendVibration()" class="warning" id="vibrationBtn" disabled>📳 Test Vibration</button>
+            <button onclick="sendHardwareTest()" class="warning" id="hardwareBtn" disabled>🔧 Hardware Test</button>
+            <button onclick="clearLog()" class="info">🗑️ Clear Log</button>
+        </div>
+        
+        <div class="log">
+            <h3>📋 Connection & Command Log:</h3>
+            <pre id="logOutput">Ready to test WebSocket connection...\n</pre>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let currentUrl = 'ws://10.0.0.6:8080';
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const output = document.getElementById('logOutput');
+            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚠️' : 'ℹ️';
+            output.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+        
+        function updateStatus(status, message) {
+            const statusDiv = document.getElementById('connectionStatus');
+            statusDiv.className = `status ${status}`;
+            statusDiv.textContent = `Status: ${message}`;
+            
+            // Enable/disable buttons based on connection status
+            const buzzerBtn = document.getElementById('buzzerBtn');
+            const vibrationBtn = document.getElementById('vibrationBtn');
+            const hardwareBtn = document.getElementById('hardwareBtn');
+            buzzerBtn.disabled = status !== 'connected';
+            vibrationBtn.disabled = status !== 'connected';
+            hardwareBtn.disabled = status !== 'connected';
+        }
+        
+        function updateURL() {
+            const ip = document.getElementById('collarIP').value;
+            currentUrl = `ws://${ip}:8080`;
+            document.getElementById('wsUrl').textContent = currentUrl;
+            log(`Updated WebSocket URL to: ${currentUrl}`);
+        }
+        
+        function connectWS() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                log('WebSocket is already connected', 'warning');
+                return;
+            }
+            
+            log(`Attempting to connect to: ${currentUrl}`);
+            updateStatus('connecting', 'Connecting...');
+            
+            try {
+                ws = new WebSocket(currentUrl);
+                
+                ws.onopen = function(event) {
+                    log('WebSocket connected successfully!', 'success');
+                    updateStatus('connected', 'Connected');
+                };
+                
+                ws.onmessage = function(event) {
+                    log(`Received: ${event.data}`, 'success');
+                    
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.type === 'response') {
+                            log(`🎯 COMMAND RESPONSE: ${data.command} - Status: ${data.status || 'executed'}`, 'success');
+                            
+                            // Specifically handle buzzer/vibration responses
+                            if (data.command === 'test_buzzer' && data.status === 'triggered') {
+                                log('🔊 BUZZER TRIGGERED! Check if you can hear it on the collar.', 'success');
+                            } else if (data.command === 'test_vibration' && data.status === 'triggered') {
+                                log('📳 VIBRATION TRIGGERED! Check if you can feel it on the collar.', 'success');
+                            } else if (data.command === 'test_hardware' && data.status === 'completed') {
+                                log('🔧 HARDWARE TEST COMPLETED! You should have heard clicks and beeps.', 'success');
+                            }
+                        } else if (data.type === 'welcome') {
+                            log(`🎉 Welcome message: ${data.message}`, 'info');
+                        } else if (data.type === 'error') {
+                            log(`❌ Collar error: ${data.message}`, 'error');
+                        } else if (data.device) {
+                            // This is status data - don't log every update to avoid spam
+                            // log(`📊 Status update (uptime: ${data.uptime}ms, beacons: ${data.beacons_detected || 0})`, 'info');
+                        }
+                    } catch (e) {
+                        log(`Non-JSON response: ${event.data}`, 'info');
+                    }
+                };
+                
+                ws.onerror = function(error) {
+                    log(`WebSocket error: ${error.message || 'Connection failed'}`, 'error');
+                    updateStatus('disconnected', 'Error - Connection failed');
+                };
+                
+                ws.onclose = function(event) {
+                    log(`WebSocket closed. Code: ${event.code}, Reason: ${event.reason || 'No reason provided'}`, 'warning');
+                    updateStatus('disconnected', 'Disconnected');
+                };
+                
+                // Set timeout for connection attempt
+                setTimeout(() => {
+                    if (ws.readyState === WebSocket.CONNECTING) {
+                        log('Connection timeout after 5 seconds', 'error');
+                        ws.close();
+                        updateStatus('disconnected', 'Connection timeout');
+                    }
+                }, 5000);
+                
+            } catch (error) {
+                log(`Failed to create WebSocket: ${error.message}`, 'error');
+                updateStatus('disconnected', 'Failed to create connection');
+            }
+        }
+        
+        function disconnectWS() {
+            if (ws) {
+                ws.close();
+                log('WebSocket disconnected by user');
+                updateStatus('disconnected', 'Disconnected');
+            }
+        }
+        
+        function sendBuzzer() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('WebSocket not connected! Connect first.', 'error');
+                return;
+            }
+            
+            const command = { command: 'test_buzzer' };
+            log(`Sending buzzer command: ${JSON.stringify(command)}`);
+            log('Expected response: {"type":"response","command":"test_buzzer","status":"triggered"}', 'info');
+            
+            try {
+                ws.send(JSON.stringify(command));
+                log('✅ Command sent successfully - listening for response...', 'success');
+                
+                // Set a timeout to check if we get a response
+                setTimeout(() => {
+                    log('💡 If no response received above, check collar serial output for debugging', 'warning');
+                }, 2000);
+            } catch (error) {
+                log(`Failed to send command: ${error.message}`, 'error');
+            }
+        }
+        
+        function sendVibration() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('WebSocket not connected! Connect first.', 'error');
+                return;
+            }
+            
+            const command = { command: 'test_vibration' };
+            log(`Sending vibration command: ${JSON.stringify(command)}`);
+            log('Expected response: {"type":"response","command":"test_vibration","status":"triggered"}', 'info');
+            
+            try {
+                ws.send(JSON.stringify(command));
+                log('✅ Command sent successfully - listening for response...', 'success');
+                
+                // Set a timeout to check if we get a response
+                setTimeout(() => {
+                    log('💡 If no response received above, check collar serial output for debugging', 'warning');
+                }, 2000);
+            } catch (error) {
+                log(`Failed to send command: ${error.message}`, 'error');
+            }
+        }
+        
+        function sendHardwareTest() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('WebSocket not connected! Connect first.', 'error');
+                return;
+            }
+            
+            const command = { command: 'test_hardware' };
+            log(`Sending hardware test command: ${JSON.stringify(command)}`);
+            log('This will test buzzer with different frequencies and digital pulses', 'info');
+            
+            try {
+                ws.send(JSON.stringify(command));
+                log('✅ Hardware test command sent - check collar for sounds!', 'success');
+                
+                setTimeout(() => {
+                    log('💡 Hardware test should be complete. Did you hear clicking or beeping sounds?', 'warning');
+                }, 5000);
+            } catch (error) {
+                log(`Failed to send command: ${error.message}`, 'error');
+            }
+        }
+        
+        function clearLog() {
+            document.getElementById('logOutput').textContent = 'Log cleared...\n';
+        }
+        
+        // Auto-update URL when IP changes
+        document.getElementById('collarIP').addEventListener('input', updateURL);
+        
+        log('WebSocket test page loaded successfully');
+        log('Click "Connect WebSocket" to establish connection with collar');
+    </script>
+</body>
+</html> 

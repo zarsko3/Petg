@@ -1,0 +1,451 @@
+/* Mobile-first CSS overrides with Pet-Centric Design */
+.mobile-layout {
+  /* Prevent scroll bounce on iOS */
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+  background: hsl(var(--pet-surface));
+  
+  /* Critical mobile device fixes */
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh; /* Dynamic viewport height */
+  
+  /* iOS Safari address bar handling */
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  
+  /* Prevent horizontal scroll on mobile */
+  overflow-x: hidden;
+}
+
+/* Ensure full viewport height on mobile */
+.mobile-screen {
+  min-height: 100vh;
+  min-height: 100dvh; /* Dynamic viewport height for mobile browsers */
+  background: hsl(var(--pet-surface));
+}
+
+/* Safe areas for devices with notches */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+  padding-top: max(env(safe-area-inset-top), 0px);
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: max(env(safe-area-inset-bottom), 0px);
+}
+
+/* Critical mobile header positioning fixes */
+header.fixed {
+  /* Ensure header stays at top on all devices */
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  z-index: 1000 !important;
+  
+  /* iOS Safari specific fixes */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  
+  /* Support for devices with notch */
+  padding-top: env(safe-area-inset-top);
+  padding-top: max(env(safe-area-inset-top), 0px);
+}
+
+/* Critical mobile navigation positioning fixes */
+.mobile-nav {
+  background: hsl(var(--pet-surface-elevated));
+  backdrop-filter: blur(12px);
+  border-top: 1px solid hsl(var(--border));
+  padding: 8px 0;
+  
+  /* Ensure bottom nav stays at bottom on all devices */
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  z-index: 1000 !important;
+  
+  /* iOS Safari specific fixes */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  
+  /* Support for devices with home indicator */
+  padding-bottom: calc(8px + env(safe-area-inset-bottom));
+  padding-bottom: calc(8px + max(env(safe-area-inset-bottom), 0px));
+}
+
+/* Enhanced touch-optimized interactive elements */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+
+/* Smooth scrolling for mobile */
+.mobile-scroll {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Hide scrollbars on mobile while maintaining functionality */
+.mobile-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.mobile-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Enhanced mobile button interactions */
+.mobile-button {
+  -webkit-appearance: none;
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  border-radius: 12px; /* Rounded corners */
+  transition: all 0.2s ease-in-out;
+}
+
+.mobile-button:active {
+  transform: scale(0.95);
+}
+
+/* Pet-themed button styles */
+.mobile-button-primary {
+  background: linear-gradient(135deg, hsl(var(--pet-primary)), hsl(var(--pet-primary) / 0.8));
+  color: white;
+  box-shadow: 0 4px 12px hsl(var(--pet-primary) / 0.25);
+}
+
+.mobile-button-accent {
+  background: linear-gradient(135deg, hsl(var(--pet-accent)), hsl(var(--pet-accent) / 0.8));
+  color: white;
+  box-shadow: 0 4px 12px hsl(var(--pet-accent) / 0.25);
+}
+
+/* Enhanced hover states for mobile */
+@media (hover: hover) {
+  .mobile-button:hover {
+    transform: translateY(-1px) scale(1.02);
+    box-shadow: 0 8px 24px hsl(var(--pet-primary) / 0.3);
+  }
+  
+  .mobile-button-accent:hover {
+    box-shadow: 0 8px 24px hsl(var(--pet-accent) / 0.3);
+  }
+}
+
+/* Pet-themed cards */
+.mobile-card {
+  background: hsl(var(--pet-surface-elevated));
+  border-radius: 16px; /* More rounded for friendly feel */
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mobile-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
+}
+
+/* Enhanced status indicators with pet theme */
+.status-indicator {
+  padding: 8px 16px;
+  border-radius: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-connected {
+  background: hsl(var(--pet-success) / 0.1);
+  color: hsl(var(--pet-success));
+  border: 1px solid hsl(var(--pet-success) / 0.2);
+}
+
+.status-warning {
+  background: hsl(var(--pet-warning) / 0.1);
+  color: hsl(var(--pet-warning));
+  border: 1px solid hsl(var(--pet-warning) / 0.2);
+}
+
+/* Prevent zoom on form inputs */
+input, select, textarea {
+  font-size: 16px;
+  -webkit-appearance: none;
+  appearance: none;
+  border-radius: 12px; /* Rounded inputs */
+  transition: all 0.2s ease;
+}
+
+/* Enhanced focus states */
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: hsl(var(--pet-primary));
+  box-shadow: 0 0 0 4px hsl(var(--pet-primary) / 0.15);
+}
+
+/* Enhanced mobile map rendering with device pixel ratio support */
+.mobile-map {
+  touch-action: pan-x pan-y;
+  /* Ensure map content fills container and respects safe areas */
+  height: 100% !important;
+  width: 100% !important;
+  position: relative;
+  /* Improve rendering quality */
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+/* Map specific safe area handling with enhanced container settings */
+.mobile-map .leaflet-container {
+  height: 100% !important;
+  width: 100% !important;
+  /* Respect safe area insets for full-screen map */
+  padding-top: env(safe-area-inset-top, 0);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  /* Enhanced pixel ratio support */
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+  /* Smooth zooming and panning */
+  transform-origin: center center;
+  will-change: transform;
+}
+
+/* Enhanced marker visibility on touch devices */
+.mobile-map .custom-marker {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  /* Better touch response */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Ensure popups are visible above content */
+.mobile-map .leaflet-popup {
+  z-index: 10000 !important;
+}
+
+.mobile-map .leaflet-popup-pane {
+  z-index: 10000 !important;
+}
+
+/* Enhanced video feed container with proper aspect ratio */
+.mobile-video {
+  /* Ensure proper scaling and aspect ratio */
+  object-fit: cover;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  /* Constrain maximum height to prevent viewport overflow */
+  max-height: calc(40vh - env(safe-area-inset-bottom, 0px));
+  width: 100%;
+  /* Smooth transitions */
+  transition: all 0.3s ease;
+}
+
+/* Video aspect ratio container */
+.aspect-video {
+  aspect-ratio: 16 / 9;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Ensure video content fills container properly */
+.aspect-video > * {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Safe area inset handling for main layout */
+.pt-\[48px\] {
+  padding-top: max(48px, env(safe-area-inset-top, 0px));
+}
+
+.pb-\[64px\] {
+  padding-bottom: max(64px, env(safe-area-inset-bottom, 0px));
+}
+
+/* Enhanced pulse animation for live indicators */
+.pulse-ring {
+  animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.pulse-dot {
+  animation: pulse-dot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}
+
+@keyframes pulse-dot {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+/* PWA Install Prompt Animation */
+.animate-slide-up {
+  animation: slideUp 0.4s ease-out forwards;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Pet-themed navigation - moved to top for mobile device fixes */
+
+.mobile-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.mobile-nav-item.active {
+  color: hsl(var(--pet-primary));
+  background: hsl(var(--pet-primary) / 0.1);
+}
+
+.mobile-nav-item:not(.active) {
+  color: hsl(var(--muted-foreground));
+}
+
+.mobile-nav-item:hover:not(.active) {
+  color: hsl(var(--foreground));
+  background: hsl(var(--muted) / 0.5);
+}
+
+/* Loading animations */
+.loading-shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 0%,
+    hsl(var(--muted) / 0.8) 50%,
+    hsl(var(--muted)) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Enhanced spacing system */
+.spacing-comfortable {
+  padding: 16px; /* Increased breathing room */
+}
+
+.spacing-cozy {
+  padding: 12px;
+}
+
+.spacing-tight {
+  padding: 8px;
+}
+
+/* Dark mode optimizations */
+@media (prefers-color-scheme: dark) {
+  .mobile-layout, .mobile-screen {
+    background: hsl(var(--pet-surface));
+  }
+  
+  .mobile-card {
+    background: hsl(var(--pet-surface-elevated));
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+  
+  .mobile-card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  }
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  
+  .mobile-button:hover,
+  .mobile-button:active {
+    transform: none !important;
+  }
+  
+  .animate-slide-up {
+    animation: none !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .mobile-card {
+    border-width: 2px;
+  }
+  
+  .mobile-button {
+    border: 2px solid currentColor;
+  }
+  
+  .status-indicator {
+    border-width: 2px;
+  }
+}
+
+/* Focus visible for keyboard navigation */
+.mobile-button:focus-visible,
+.mobile-nav-item:focus-visible {
+  outline: 2px solid hsl(var(--pet-primary));
+  outline-offset: 2px;
+} 

@@ -1,21 +1,52 @@
 import './globals.css'
-import type { Metadata } from 'next'
-import Link from 'next/link'
-import Image from 'next/image'
+import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
-import { Wifi, MapPin, Settings, Home } from 'lucide-react'
 import { ThemeProvider } from '@/components/theme-provider'
+import { ToastProvider } from '@/components/toast-provider'
+import { ErrorBoundary } from '@/components/error-boundary'
 import { Header } from '@/components/header'
+import { SidebarNav } from '@/components/sidebar-nav'
+import { CollarServiceProvider } from '@/components/collar-service-provider'
+import { ClerkProviderWrapper } from '@/components/clerk-provider-wrapper'
+import { RootLayoutClient } from '@/components/root-layout-client'
 
 const inter = Inter({ subsets: ['latin'] })
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+  viewportFit: 'cover',
+  themeColor: '#4CC9C8',
+}
+
 export const metadata: Metadata = {
-  title: 'Petg Dashboard',
-  description: 'Dashboard for Petg BLE-based smart collar',
-  icons: {
-    icon: '/images/logo.png',
-    apple: '/images/logo.png',
+  title: 'Pet Collar - Smart Pet Monitoring',
+  description: 'Keep your pet safe with real-time monitoring and location tracking',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Petg',
   },
+  icons: {
+    icon: [
+      { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/icons/icon-152.png', sizes: '152x152', type: 'image/png' },
+      { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+    ],
+  },
+  other: {
+    'mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-status-bar-style': 'default',
+    'format-detection': 'telephone=no',
+    'msapplication-TileColor': '#4CC9C8',
+  } as Record<string, string>,
 }
 
 export default function RootLayout({
@@ -24,51 +55,24 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" dir="ltr" suppressHydrationWarning>
       <body className={inter.className} suppressHydrationWarning>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-          storageKey="petg-theme"
-        >
-          <div className="h-screen flex flex-col overflow-hidden">
-            <Header />
-            <div className="flex flex-1 pt-16 h-[calc(100vh-4rem)] overflow-hidden">
-              {/* Sidebar Navigation */}
-              <div className="w-16 md:w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 overflow-y-auto">
-                <div className="p-4 md:p-6">
-                  <nav className="space-y-2">
-                    <Link href="/" className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
-                      <Home className="h-5 w-5 text-gray-500" />
-                      <span className="hidden md:inline">Status</span>
-                    </Link>
-                    <Link href="/location" className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
-                      <MapPin className="h-5 w-5 text-gray-500" />
-                      <span className="hidden md:inline">Location</span>
-                    </Link>
-                    <Link href="/beacons" className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
-                      <Wifi className="h-5 w-5 text-gray-500" />
-                      <span className="hidden md:inline">Beacons</span>
-                    </Link>
-                    <Link href="/settings" className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
-                      <Settings className="h-5 w-5 text-gray-500" />
-                      <span className="hidden md:inline">Settings</span>
-                    </Link>
-                  </nav>
-                </div>
-              </div>
-              
-              {/* Main Content */}
-              <div className="flex-1 bg-gray-50 dark:bg-gray-950 overflow-hidden">
-                <main className="h-full overflow-auto p-6">
-                  {children}
-                </main>
-              </div>
-            </div>
-          </div>
-        </ThemeProvider>
+        <ClerkProviderWrapper>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+            storageKey="petg-theme"
+          >
+            <ToastProvider />
+            <CollarServiceProvider>
+              <RootLayoutClient>
+                {children}
+              </RootLayoutClient>
+            </CollarServiceProvider>
+          </ThemeProvider>
+        </ClerkProviderWrapper>
       </body>
     </html>
   )

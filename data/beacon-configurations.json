@@ -1,0 +1,26 @@
+[
+  {
+    "id": "auto-1749223876044-jhixsfotx",
+    "name": "PetZone-Home-01",
+    "location": "01",
+    "zone": "",
+    "macAddress": "08:d1:f9:53:9c:82",
+    "alertMode": "buzzer",
+    "proximityThreshold": -65,
+    "alertDelay": 3000,
+    "alertTimeout": 10000,
+    "safeZone": false,
+    "boundaryAlert": false,
+    "position": {
+      "x": 50,
+      "y": 50
+    },
+    "isAutoDetected": true,
+    "lastSeen": "2025-06-06T15:31:16.044Z",
+    "batteryLevel": 100,
+    "signalStrength": 68.57142857142857,
+    "status": "offline",
+    "createdAt": "2025-06-06T15:31:17.347Z",
+    "updatedAt": "2025-06-06T15:31:17.347Z"
+  }
+]

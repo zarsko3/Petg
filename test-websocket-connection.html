@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32-S3 Pet Collar WebSocket Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .connected { background-color: #d4edda; color: #155724; }
+        .disconnected { background-color: #f8d7da; color: #721c24; }
+        .connecting { background-color: #fff3cd; color: #856404; }
+        input, button {
+            padding: 10px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover { background-color: #0056b3; }
+        .data-display {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🐕 ESP32-S3 Pet Collar WebSocket Test</h1>
+        
+        <div class="button-group">
+            <input type="text" id="websocketUrl" placeholder="ws://192.168.1.100:8080" style="flex: 1;">
+            <button onclick="connect()">Connect</button>
+            <button onclick="disconnect()">Disconnect</button>
+            <button onclick="testCollar()">Test Collar</button>
+        </div>
+        
+        <div id="status" class="status disconnected">Disconnected</div>
+        
+        <h3>📊 Real-time Collar Data:</h3>
+        <div id="dataDisplay" class="data-display">Waiting for data...</div>
+        
+        <h3>📝 Connection Log:</h3>
+        <div id="logDisplay" class="data-display">Ready to connect...</div>
+        
+        <div class="button-group">
+            <button onclick="clearLog()">Clear Log</button>
+            <button onclick="sendCommand('test_buzzer')">🔊 Test Buzzer</button>
+            <button onclick="sendCommand('test_vibration')">📳 Test Vibration</button>
+            <button onclick="sendCommand('status')">📋 Get Status</button>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let reconnectInterval = null;
+        let heartbeatInterval = null;
+
+        function log(message) {
+            const logElement = document.getElementById('logDisplay');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.textContent += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(message);
+        }
+
+        function updateStatus(status, className) {
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = status;
+            statusElement.className = `status ${className}`;
+        }
+
+        function updateDataDisplay(data) {
+            const dataElement = document.getElementById('dataDisplay');
+            dataElement.textContent = JSON.stringify(data, null, 2);
+        }
+
+        function connect() {
+            const url = document.getElementById('websocketUrl').value || 'ws://192.168.1.100:8080';
+            
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                log('Already connected');
+                return;
+            }
+
+            log(`Connecting to ${url}...`);
+            updateStatus('Connecting...', 'connecting');
+
+            try {
+                ws = new WebSocket(url);
+
+                ws.onopen = function() {
+                    log('✅ WebSocket connected successfully!');
+                    updateStatus('Connected', 'connected');
+                    
+                    // Start heartbeat
+                    heartbeatInterval = setInterval(() => {
+                        if (ws && ws.readyState === WebSocket.OPEN) {
+                            ws.send('ping');
+                        }
+                    }, 30000);
+
+                    // Request initial data
+                    setTimeout(() => {
+                        sendCommand('refresh');
+                    }, 1000);
+                };
+
+                ws.onmessage = function(event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        log(`📊 Received data: ${JSON.stringify(data, null, 2).substring(0, 100)}...`);
+                        updateDataDisplay(data);
+                        
+                        // Show key info in status
+                        if (data.device_id) {
+                            updateStatus(`Connected - ${data.device_id} (Battery: ${data.battery_percentage || 'N/A'}%)`, 'connected');
+                        }
+                    } catch (e) {
+                        log(`📄 Received text: ${event.data}`);
+                    }
+                };
+
+                ws.onclose = function(event) {
+                    log(`❌ WebSocket disconnected (Code: ${event.code}, Reason: ${event.reason})`);
+                    updateStatus('Disconnected', 'disconnected');
+                    
+                    if (heartbeatInterval) {
+                        clearInterval(heartbeatInterval);
+                        heartbeatInterval = null;
+                    }
+
+                    // Auto-reconnect after 3 seconds
+                    if (!reconnectInterval) {
+                        reconnectInterval = setTimeout(() => {
+                            log('🔄 Attempting to reconnect...');
+                            connect();
+                            reconnectInterval = null;
+                        }, 3000);
+                    }
+                };
+
+                ws.onerror = function(error) {
+                    log(`💥 WebSocket error: ${error.message || 'Connection failed'}`);
+                    updateStatus('Connection Error', 'disconnected');
+                };
+
+            } catch (error) {
+                log(`💥 Failed to create WebSocket: ${error.message}`);
+                updateStatus('Connection Failed', 'disconnected');
+            }
+        }
+
+        function disconnect() {
+            if (reconnectInterval) {
+                clearTimeout(reconnectInterval);
+                reconnectInterval = null;
+            }
+            
+            if (heartbeatInterval) {
+                clearInterval(heartbeatInterval);
+                heartbeatInterval = null;
+            }
+
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+            
+            log('🔌 Manually disconnected');
+            updateStatus('Disconnected', 'disconnected');
+        }
+
+        function sendCommand(command) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('❌ Cannot send command - not connected');
+                return;
+            }
+
+            log(`📤 Sending command: ${command}`);
+            ws.send(command);
+        }
+
+        function testCollar() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('❌ Cannot test collar - not connected');
+                return;
+            }
+
+            log('🧪 Running collar test sequence...');
+            sendCommand('test');
+            
+            setTimeout(() => sendCommand('refresh'), 2000);
+        }
+
+        function clearLog() {
+            document.getElementById('logDisplay').textContent = '';
+            log('Log cleared');
+        }
+
+        // Auto-connect on page load
+        window.onload = function() {
+            // Try common IP addresses
+            const commonIPs = [
+                'ws://192.168.1.100:8080',
+                'ws://10.0.0.8:8080',
+                'ws://192.168.0.100:8080',
+                'ws://192.168.4.1:8080'
+            ];
+
+            document.getElementById('websocketUrl').value = commonIPs[0];
+            log('🚀 WebSocket test page loaded');
+            log('💡 Enter your ESP32-S3 collar WebSocket URL and click Connect');
+            log('📋 Common URLs: ' + commonIPs.join(', '));
+        };
+    </script>
+</body>
+</html> 

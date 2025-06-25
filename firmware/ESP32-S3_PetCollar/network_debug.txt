@@ -1,0 +1,7 @@
+=== NETWORK DIAGNOSTIC CHECKLIST ===
+
+1. Verify collar IP with Serial Monitor command: wifiinfo
+2. Check if both devices are on same network
+3. Test direct browser access: http://[IP]/data
+4. Check Windows Firewall settings
+5. Verify router settings (AP isolation, etc.)

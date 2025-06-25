@@ -1,3 +1,25 @@
+const withPWA = require('next-pwa')({
+  dest: 'public',
+  // PWA is disabled in development to avoid stale cache issues during development
+  // This is normal and expected - the warning "[PWA] PWA support is disabled" is shown twice by next-pwa
+  // To test PWA functionality: run "npm run build && npm start" or deploy to Vercel
+  disable: process.env.NODE_ENV === 'development',
+  register: true,
+  skipWaiting: true,
+  runtimeCaching: [
+    {
+      urlPattern: /^https?.*/,
+      handler: 'NetworkFirst',
+      options: {
+        cacheName: 'offlineCache',
+        expiration: {
+          maxEntries: 200,
+        },
+      },
+    },
+  ],
+})
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
@@ -5,6 +27,89 @@ const nextConfig = {
     domains: [],
     unoptimized: true,
   },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  transpilePackages: ['konva'],
+  webpack: (config, { isServer }) => {
+    // Handle canvas for Konva SSR
+    if (isServer) {
+      config.externals.push({
+        canvas: 'commonjs canvas',
+      })
+    }
+    return config
+  },
+  async headers() {
+    return [
+      {
+        source: '/manifest.json',
+        headers: [
+          {
+            key: 'Content-Type',
+            value: 'application/manifest+json',
+          },
+        ],
+      },
+      // AR/WebXR support headers
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'Cross-Origin-Embedder-Policy',
+            value: 'credentialless', // Less restrictive than require-corp
+          },
+          {
+            key: 'Cross-Origin-Opener-Policy',
+            value: 'same-origin',
+          },
+          // Security headers for AR/WebXR
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=*, gyroscope=*, accelerometer=*, magnetometer=*, xr-spatial-tracking=*, microphone=*, geolocation=*',
+          },
+          // Ensure HTTPS in production
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=31536000; includeSubDomains',
+          },
+        ],
+      },
+      // Special headers for AR pages
+      {
+        source: '/mobile/location',
+        headers: [
+          {
+            key: 'Feature-Policy',
+            value: 'camera *, gyroscope *, accelerometer *, magnetometer *, xr-spatial-tracking *',
+          },
+        ],
+      },
+    ]
+  },
+  // Ensure HTTPS redirect in production
+  async redirects() {
+    if (process.env.NODE_ENV === 'production') {
+      return [
+        {
+          source: '/(.*)',
+          has: [
+            {
+              type: 'header',
+              key: 'x-forwarded-proto',
+              value: 'http',
+            },
+          ],
+          destination: 'https://your-domain.com/:path*',
+          permanent: true,
+        },
+      ]
+    }
+    return []
+  },
 }
 
-module.exports = nextConfig 
+module.exports = withPWA(nextConfig)

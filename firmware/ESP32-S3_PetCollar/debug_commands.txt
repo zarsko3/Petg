@@ -1,0 +1,1 @@
+Type these commands in your collar's Serial Monitor to debug:

@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Collar Alert Test Tool</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .test-section { margin: 20px 0; padding: 20px; border: 1px solid #ddd; border-radius: 8px; }
+        .test-section h3 { margin-top: 0; }
+        .results { margin: 15px 0; padding: 15px; background: #f8f9fa; border-radius: 5px; white-space: pre-wrap; font-family: monospace; max-height: 400px; overflow-y: auto; border: 1px solid #e9ecef; }
+        button { padding: 12px 20px; margin: 5px; background: #007cba; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; }
+        button:hover { background: #005a9b; }
+        button:disabled { background: #6c757d; cursor: not-allowed; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .warning { background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; }
+        input { padding: 10px; margin: 5px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; font-weight: bold; }
+        .connection-info { background: #e7f3ff; padding: 10px; border-radius: 5px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🐕 ESP32 Collar Alert Test Tool</h1>
+        <p>Test collar alert functionality with enhanced debugging</p>
+
+        <!-- Connection Settings -->
+        <div class="test-section">
+            <h3>🔧 Connection Settings</h3>
+            <div class="connection-info">
+                <label>Collar IP: <input type="text" id="collarIP" value="192.168.1.60" placeholder="192.168.1.60"></label>
+                <button onclick="discoverCollar()">🔍 Auto-Discover</button>
+                <button onclick="connectWebSocket()">🔌 Connect WebSocket</button>
+                <button onclick="disconnectWebSocket()">🔌 Disconnect</button>
+            </div>
+            <div id="connectionStatus" class="status"></div>
+            <div id="connectionResults" class="results"></div>
+        </div>
+
+        <!-- Quick Alert Tests -->
+        <div class="test-section">
+            <h3>🚨 Quick Alert Tests</h3>
+            <div>
+                <button onclick="testBuzzer()" id="buzzerBtn">🔊 Test Buzzer</button>
+                <button onclick="testVibration()" id="vibrationBtn">📳 Test Vibration</button>
+                <button onclick="stopAlert()" id="stopBtn">🛑 Stop Alert</button>
+                <button onclick="getStatus()" id="statusBtn">📊 Get Status</button>
+            </div>
+            <div id="alertResults" class="results"></div>
+        </div>
+
+        <!-- WebSocket Message Testing -->
+        <div class="test-section">
+            <h3>📨 Custom WebSocket Commands</h3>
+            <div>
+                <input type="text" id="customCommand" placeholder='{"command":"test_buzzer"}' style="width: 400px;">
+                <button onclick="sendCustomCommand()">📤 Send Command</button>
+            </div>
+            <div id="customResults" class="results"></div>
+        </div>
+
+        <!-- HTTP Fallback Testing -->
+        <div class="test-section">
+            <h3>🌐 HTTP Fallback Tests</h3>
+            <div>
+                <button onclick="testHTTPDiscover()">🔍 HTTP /api/discover</button>
+                <button onclick="testHTTPData()">📊 HTTP /data</button>
+                <button onclick="testHTTPRoot()">🏠 HTTP /</button>
+            </div>
+            <div id="httpResults" class="results"></div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let isConnected = false;
+
+        function log(section, message, type = 'info') {
+            const resultsDiv = document.getElementById(section);
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚠️' : 'ℹ️';
+            resultsDiv.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+            resultsDiv.scrollTop = resultsDiv.scrollHeight;
+        }
+
+        function updateStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('connectionStatus');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+        }
+
+        async function discoverCollar() {
+            log('connectionResults', 'Discovering collar via API...', 'info');
+            updateStatus('Discovering collar...', 'warning');
+
+            try {
+                const response = await fetch('/api/collar-proxy?endpoint=/api/discover');
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const ip = data.local_ip || data.ip_address;
+                    
+                    if (ip) {
+                        document.getElementById('collarIP').value = ip;
+                        log('connectionResults', `Collar discovered at ${ip}`, 'success');
+                        log('connectionResults', `Device: ${data.device || 'Unknown'}`, 'info');
+                        log('connectionResults', `Version: ${data.version || 'Unknown'}`, 'info');
+                        updateStatus(`Collar found at ${ip}`, 'success');
+                    } else {
+                        log('connectionResults', 'Collar responded but no IP address found', 'warning');
+                        updateStatus('Collar found but no IP', 'warning');
+                    }
+                } else {
+                    log('connectionResults', `Discovery failed: ${response.status} ${response.statusText}`, 'error');
+                    updateStatus('Discovery failed', 'error');
+                }
+            } catch (error) {
+                log('connectionResults', `Discovery error: ${error.message}`, 'error');
+                updateStatus('Discovery error', 'error');
+            }
+        }
+
+        function connectWebSocket() {
+            const ip = document.getElementById('collarIP').value;
+            const wsUrl = `ws://${ip}:8080`;
+            
+            log('connectionResults', `Connecting to WebSocket: ${wsUrl}`, 'info');
+            updateStatus('Connecting...', 'warning');
+
+            try {
+                if (ws) {
+                    ws.close();
+                }
+
+                ws = new WebSocket(wsUrl);
+
+                ws.onopen = () => {
+                    isConnected = true;
+                    log('connectionResults', 'WebSocket connected successfully!', 'success');
+                    updateStatus('Connected', 'success');
+                    updateButtonStates(true);
+                };
+
+                ws.onmessage = (event) => {
+                    log('connectionResults', `Received: ${event.data}`, 'info');
+                    
+                    // Also log to specific result areas based on message type
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.command) {
+                            log('alertResults', `Response: ${event.data}`, 'success');
+                        }
+                    } catch (e) {
+                        // Not JSON, just log as text
+                    }
+                };
+
+                ws.onerror = (error) => {
+                    log('connectionResults', `WebSocket error: ${error}`, 'error');
+                    updateStatus('Connection error', 'error');
+                    updateButtonStates(false);
+                };
+
+                ws.onclose = (event) => {
+                    isConnected = false;
+                    log('connectionResults', `WebSocket closed (code: ${event.code})`, 'warning');
+                    updateStatus('Disconnected', 'warning');
+                    updateButtonStates(false);
+                };
+
+                // Connection timeout
+                setTimeout(() => {
+                    if (ws && ws.readyState === WebSocket.CONNECTING) {
+                        ws.close();
+                        log('connectionResults', 'Connection timeout after 5 seconds', 'error');
+                        updateStatus('Connection timeout', 'error');
+                    }
+                }, 5000);
+
+            } catch (error) {
+                log('connectionResults', `Failed to create WebSocket: ${error.message}`, 'error');
+                updateStatus('Connection failed', 'error');
+                updateButtonStates(false);
+            }
+        }
+
+        function disconnectWebSocket() {
+            if (ws) {
+                ws.close();
+                ws = null;
+                isConnected = false;
+                log('connectionResults', 'WebSocket disconnected manually', 'info');
+                updateStatus('Disconnected', 'warning');
+                updateButtonStates(false);
+            }
+        }
+
+        function updateButtonStates(connected) {
+            const buttons = ['buzzerBtn', 'vibrationBtn', 'stopBtn', 'statusBtn'];
+            buttons.forEach(id => {
+                document.getElementById(id).disabled = !connected;
+            });
+        }
+
+        function sendWebSocketCommand(command) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('alertResults', 'WebSocket not connected', 'error');
+                return;
+            }
+
+            const message = JSON.stringify({ command: command });
+            log('alertResults', `Sending: ${message}`, 'info');
+            
+            try {
+                ws.send(message);
+                log('alertResults', `Command sent: ${command}`, 'success');
+            } catch (error) {
+                log('alertResults', `Failed to send command: ${error.message}`, 'error');
+            }
+        }
+
+        function testBuzzer() {
+            sendWebSocketCommand('test_buzzer');
+        }
+
+        function testVibration() {
+            sendWebSocketCommand('test_vibration');
+        }
+
+        function stopAlert() {
+            sendWebSocketCommand('stop_alert');
+        }
+
+        function getStatus() {
+            sendWebSocketCommand('get_status');
+        }
+
+        function sendCustomCommand() {
+            const input = document.getElementById('customCommand');
+            const commandText = input.value.trim();
+            
+            if (!commandText) {
+                log('customResults', 'Please enter a command', 'warning');
+                return;
+            }
+
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('customResults', 'WebSocket not connected', 'error');
+                return;
+            }
+
+            try {
+                // Validate JSON
+                JSON.parse(commandText);
+                
+                log('customResults', `Sending custom command: ${commandText}`, 'info');
+                ws.send(commandText);
+                log('customResults', 'Custom command sent', 'success');
+            } catch (error) {
+                log('customResults', `Invalid JSON: ${error.message}`, 'error');
+            }
+        }
+
+        async function testHTTPDiscover() {
+            const ip = document.getElementById('collarIP').value;
+            const url = `http://${ip}/api/discover`;
+            
+            log('httpResults', `Testing HTTP: ${url}`, 'info');
+            
+            try {
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' },
+                    signal: AbortSignal.timeout(5000)
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    log('httpResults', `HTTP Success: ${JSON.stringify(data, null, 2)}`, 'success');
+                } else {
+                    log('httpResults', `HTTP Error: ${response.status} ${response.statusText}`, 'error');
+                }
+            } catch (error) {
+                log('httpResults', `HTTP Failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testHTTPData() {
+            const ip = document.getElementById('collarIP').value;
+            const url = `http://${ip}/data`;
+            
+            log('httpResults', `Testing HTTP: ${url}`, 'info');
+            
+            try {
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' },
+                    signal: AbortSignal.timeout(5000)
+                });
+
+                if (response.ok) {
+                    const text = await response.text();
+                    log('httpResults', `HTTP Success: ${text}`, 'success');
+                } else {
+                    log('httpResults', `HTTP Error: ${response.status} ${response.statusText}`, 'error');
+                }
+            } catch (error) {
+                log('httpResults', `HTTP Failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testHTTPRoot() {
+            const ip = document.getElementById('collarIP').value;
+            const url = `http://${ip}/`;
+            
+            log('httpResults', `Testing HTTP: ${url}`, 'info');
+            
+            try {
+                const response = await fetch(url, {
+                    method: 'GET',
+                    signal: AbortSignal.timeout(5000)
+                });
+
+                if (response.ok) {
+                    const text = await response.text();
+                    log('httpResults', `HTTP Success: ${text.substring(0, 200)}...`, 'success');
+                } else {
+                    log('httpResults', `HTTP Error: ${response.status} ${response.statusText}`, 'error');
+                }
+            } catch (error) {
+                log('httpResults', `HTTP Failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Initialize
+        updateButtonStates(false);
+        updateStatus('Not connected', 'warning');
+        log('connectionResults', 'Test tool initialized. Click Auto-Discover to find collar.', 'info');
+    </script>
+</body>
+</html> 

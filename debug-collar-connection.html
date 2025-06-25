@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Collar Connection Debug Tool</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 800px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: #f5f5f5; 
+        }
+        .container { 
+            background: white; 
+            padding: 30px; 
+            border-radius: 10px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+        }
+        h1 { color: #333; text-align: center; }
+        .section { 
+            margin: 20px 0; 
+            padding: 15px; 
+            border-radius: 8px; 
+            border-left: 4px solid #007bff; 
+            background: #f8f9fa; 
+        }
+        .error { border-left-color: #dc3545; background: #f8d7da; }
+        .success { border-left-color: #28a745; background: #d4edda; }
+        .warning { border-left-color: #ffc107; background: #fff3cd; }
+        button { 
+            background: #007bff; 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            margin: 5px; 
+        }
+        button:hover { background: #0056b3; }
+        .results { 
+            background: #f8f9fa; 
+            border: 1px solid #dee2e6; 
+            border-radius: 5px; 
+            padding: 15px; 
+            margin: 10px 0; 
+            font-family: monospace; 
+            white-space: pre-wrap; 
+        }
+        input { 
+            width: 300px; 
+            padding: 8px; 
+            border: 1px solid #ddd; 
+            border-radius: 4px; 
+            margin: 5px; 
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🐾 Collar Connection Debug Tool</h1>
+        
+        <div class="section warning">
+            <h3>⚠️ Common Issue: AP Mode vs Connected Mode</h3>
+            <p><strong>Problem:</strong> When collar is at <code>192.168.4.1</code>, it's in <strong>AP (Access Point) mode</strong> serving a WiFi setup page, not the JSON API.</p>
+            <p><strong>Solution:</strong> You need to connect the collar to your WiFi network first!</p>
+        </div>
+
+        <div class="section">
+            <h3>🔍 Step 1: Check Collar Mode</h3>
+            <p>First, let's determine what the collar is serving:</p>
+            <input type="text" id="testIP" value="192.168.4.1" placeholder="Enter collar IP">
+            <button onclick="checkCollarMode()">Test Collar Mode</button>
+            <div id="modeResults" class="results"></div>
+        </div>
+
+        <div class="section">
+            <h3>📡 Step 2: Test API Endpoints</h3>
+            <p>Test the different API endpoints the collar should serve:</p>
+            <button onclick="testEndpoint('/data')">Test /data</button>
+            <button onclick="testEndpoint('/api/data')">Test /api/data</button>
+            <button onclick="testEndpoint('/api/discover')">Test /api/discover</button>
+            <button onclick="testEndpoint('/api/status')">Test /api/status</button>
+            <div id="apiResults" class="results"></div>
+        </div>
+
+        <div class="section">
+            <h3>🌐 Step 3: WebSocket Test</h3>
+            <p>Test WebSocket connection:</p>
+            <button onclick="testWebSocket()">Test WebSocket Connection</button>
+            <button onclick="disconnectWebSocket()">Disconnect</button>
+            <div id="wsResults" class="results"></div>
+        </div>
+
+        <div class="section success">
+            <h3>✅ How to Fix AP Mode Issue</h3>
+            <ol>
+                <li><strong>Connect to collar's WiFi:</strong> Look for a network named "PetCollar_XXXX" and connect to it</li>
+                <li><strong>Open browser to:</strong> <a href="http://192.168.4.1" target="_blank">http://192.168.4.1</a></li>
+                <li><strong>Configure WiFi:</strong> Select your home WiFi network and enter password</li>
+                <li><strong>Wait for connection:</strong> Collar will get a new IP address (like 192.168.1.XXX)</li>
+                <li><strong>Update app:</strong> Use the new IP address for WebSocket connection</li>
+            </ol>
+        </div>
+
+        <div class="section">
+            <h3>🔧 Step 4: Common IP Ranges to Try</h3>
+            <p>If collar is connected to WiFi, try these common IP addresses:</p>
+            <button onclick="scanCommonIPs()">Scan Common IPs</button>
+            <div id="scanResults" class="results"></div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+
+        function log(message) {
+            console.log(message);
+        }
+
+        async function checkCollarMode() {
+            const ip = document.getElementById('testIP').value;
+            const resultsDiv = document.getElementById('modeResults');
+            resultsDiv.textContent = `Testing ${ip}...\n`;
+
+            try {
+                const response = await fetch(`http://${ip}/`, {
+                    method: 'GET',
+                    mode: 'cors',
+                    signal: AbortSignal.timeout(5000)
+                });
+
+                const contentType = response.headers.get('content-type');
+                const text = await response.text();
+
+                if (contentType && contentType.includes('text/html')) {
+                    if (text.includes('PetCollar WiFi Setup')) {
+                        resultsDiv.textContent += `❌ COLLAR IS IN AP MODE (WiFi Setup)\n`;
+                        resultsDiv.textContent += `The collar is serving a WiFi configuration page.\n`;
+                        resultsDiv.textContent += `You need to configure it to connect to your WiFi first!\n\n`;
+                        resultsDiv.textContent += `Response: HTML WiFi Setup Page\n`;
+                    } else {
+                        resultsDiv.textContent += `⚠️  Collar serving HTML (possibly status page)\n`;
+                        resultsDiv.textContent += `First 200 chars: ${text.substring(0, 200)}...\n`;
+                    }
+                } else {
+                    resultsDiv.textContent += `✅ Non-HTML response received\n`;
+                    resultsDiv.textContent += `Content-Type: ${contentType}\n`;
+                    resultsDiv.textContent += `Response: ${text.substring(0, 500)}...\n`;
+                }
+            } catch (error) {
+                resultsDiv.textContent += `❌ Connection failed: ${error.message}\n`;
+                resultsDiv.textContent += `This could mean:\n`;
+                resultsDiv.textContent += `- Collar is not at this IP address\n`;
+                resultsDiv.textContent += `- Collar is offline\n`;
+                resultsDiv.textContent += `- Network connectivity issues\n`;
+            }
+        }
+
+        async function testEndpoint(endpoint) {
+            const ip = document.getElementById('testIP').value;
+            const resultsDiv = document.getElementById('apiResults');
+            resultsDiv.textContent += `\nTesting ${ip}${endpoint}...\n`;
+
+            try {
+                const response = await fetch(`http://${ip}${endpoint}`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    },
+                    mode: 'cors',
+                    signal: AbortSignal.timeout(5000)
+                });
+
+                const contentType = response.headers.get('content-type');
+                const text = await response.text();
+
+                if (contentType && contentType.includes('application/json')) {
+                    resultsDiv.textContent += `✅ JSON Response received\n`;
+                    try {
+                        const json = JSON.parse(text);
+                        resultsDiv.textContent += `Data: ${JSON.stringify(json, null, 2)}\n`;
+                    } catch (e) {
+                        resultsDiv.textContent += `⚠️  Response claims to be JSON but parsing failed\n`;
+                        resultsDiv.textContent += `Raw: ${text}\n`;
+                    }
+                } else {
+                    resultsDiv.textContent += `❌ Non-JSON response (${contentType})\n`;
+                    if (text.includes('<!DOCTYPE')) {
+                        resultsDiv.textContent += `Got HTML instead of JSON - collar likely in AP mode\n`;
+                    }
+                    resultsDiv.textContent += `First 200 chars: ${text.substring(0, 200)}...\n`;
+                }
+            } catch (error) {
+                resultsDiv.textContent += `❌ ${endpoint} failed: ${error.message}\n`;
+            }
+        }
+
+        function testWebSocket() {
+            const ip = document.getElementById('testIP').value;
+            const wsUrl = `ws://${ip}:8080`;
+            const resultsDiv = document.getElementById('wsResults');
+            
+            resultsDiv.textContent = `Connecting to ${wsUrl}...\n`;
+
+            try {
+                ws = new WebSocket(wsUrl);
+
+                ws.onopen = () => {
+                    resultsDiv.textContent += `✅ WebSocket connected successfully!\n`;
+                    resultsDiv.textContent += `Waiting for data...\n`;
+                };
+
+                ws.onmessage = (event) => {
+                    resultsDiv.textContent += `📨 Received: ${event.data}\n`;
+                };
+
+                ws.onerror = (error) => {
+                    resultsDiv.textContent += `❌ WebSocket error: ${error}\n`;
+                };
+
+                ws.onclose = (event) => {
+                    resultsDiv.textContent += `🔌 WebSocket closed (code: ${event.code})\n`;
+                };
+
+                // Set timeout
+                setTimeout(() => {
+                    if (ws.readyState === WebSocket.CONNECTING) {
+                        ws.close();
+                        resultsDiv.textContent += `⏰ Connection timeout\n`;
+                    }
+                }, 5000);
+
+            } catch (error) {
+                resultsDiv.textContent += `❌ WebSocket connection failed: ${error.message}\n`;
+            }
+        }
+
+        function disconnectWebSocket() {
+            if (ws) {
+                ws.close();
+                ws = null;
+                document.getElementById('wsResults').textContent += `🔌 WebSocket disconnected manually\n`;
+            }
+        }
+
+        async function scanCommonIPs() {
+            const resultsDiv = document.getElementById('scanResults');
+            resultsDiv.textContent = `Scanning common IP addresses...\n`;
+
+            const commonIPs = [
+                '192.168.1.100', '192.168.1.101', '192.168.1.102',
+                '192.168.0.100', '192.168.0.101', '192.168.0.102',
+                '10.0.0.100', '10.0.0.101', '10.0.0.102',
+                '172.16.1.100', '172.16.1.101'
+            ];
+
+            for (const ip of commonIPs) {
+                try {
+                    resultsDiv.textContent += `Testing ${ip}...\n`;
+                    
+                    const response = await fetch(`http://${ip}/data`, {
+                        method: 'GET',
+                        headers: { 'Accept': 'application/json' },
+                        mode: 'cors',
+                        signal: AbortSignal.timeout(2000)
+                    });
+
+                    if (response.ok) {
+                        const contentType = response.headers.get('content-type');
+                        if (contentType && contentType.includes('application/json')) {
+                            const data = await response.json();
+                            resultsDiv.textContent += `✅ FOUND COLLAR AT ${ip}!\n`;
+                            resultsDiv.textContent += `Data: ${JSON.stringify(data, null, 2)}\n\n`;
+                            
+                            // Update the test IP field
+                            document.getElementById('testIP').value = ip;
+                            break;
+                        }
+                    }
+                } catch (error) {
+                    // Silent fail for scanning
+                }
+            }
+
+            resultsDiv.textContent += `Scan completed.\n`;
+        }
+    </script>
+</body>
+</html> 

@@ -1,0 +1,149 @@
+{
+  "meta": {
+    "version": "1.0",
+    "description": "Design-system tokens + component blueprints distilled from the provided mobile-app mock-ups, ready for Cursor to ingest and replicate the visual language consistently across iOS and Android."
+  },
+
+  "designStyle": {
+    "vibe": "friendly-modern, pet-centric wellness",
+    "tone": "warm, approachable, high contrast on accent elements",
+    "keywords": ["rounded-corners", "soft-shadow", "card-based-layout", "minimal-iconography"]
+  },
+
+  "tokens": {
+    "colors": {
+      "primaryAccent":   "#FFD84B",       /* warm yellow – buttons, highlights */
+      "backgroundBase":  "#F8F4EF",       /* light cream – app surface */
+      "surfaceCard":     "#FFFFFF",       /* white – cards / modals */
+      "surfaceMuted":    "#F1EFEA",       /* slightly darker cream – alt sections */
+      "textPrimary":     "#151515",       /* almost-black */
+      "textSecondary":   "#6E6E6E",       /* mid-gray copy */
+      "borderSubtle":    "#E5E5E5",       /* card borders / dividers */
+      "iconTint":        "#A0A0A0",       /* placeholder icons */
+      "ratingStar":      "#FFC700",       /* star rating */
+      "infoPositive":    "#4CAF50",       /* (optional) success state */
+      "infoNegative":    "#F44336"        /* (optional) error state */
+    },
+
+    "typography": {
+      "fontFamily": "SF Pro Rounded, Inter, -apple-system, Roboto, sans-serif",
+      "fontSizes": {
+        "display1": 28,
+        "headline": 22,
+        "title":    18,
+        "body":     16,
+        "caption":  14,
+        "helper":   12
+      },
+      "fontWeights": {
+        "regular": 400,
+        "medium":  500,
+        "semibold":600,
+        "bold":    700
+      },
+      "lineHeights": {
+        "tight":   1.1,
+        "regular": 1.3,
+        "loose":   1.5
+      }
+    },
+
+    "spacing": {
+      "xs": 4,
+      "sm": 8,
+      "md": 12,
+      "lg": 16,
+      "xl": 24,
+      "xxl": 32
+    },
+
+    "radii": {
+      "pill": 100,
+      "lgCard": 24,
+      "mdCard": 16,
+      "smElement": 8
+    },
+
+    "shadows": {
+      "card": "0 4px 12px rgba(0,0,0,0.05)",
+      "elevationHigh": "0 8px 24px rgba(0,0,0,0.08)"
+    }
+  },
+
+  "components": {
+    "heroBanner": {
+      "layout": "vertical-split",
+      "elements": ["full-bleed-image", "cta-section"],
+      "ctaSection": {
+        "radii": "$radii.lgCard",
+        "padding": "$spacing.lg",
+        "contains": ["heading@display1", "subheading@body", "primaryButton"]
+      }
+    },
+
+    "searchBar": {
+      "shape": "rounded-rect",
+      "radii": "$radii.mdCard",
+      "icon": "search",
+      "placeholderStyle": "textSecondary"
+    },
+
+    "categoryPill": {
+      "type": "icon-above-label",
+      "size": 72,
+      "radii": "$radii.mdCard",
+      "background": "$surfaceMuted",
+      "activeState": {
+        "background": "$primaryAccent",
+        "iconTint": "$textPrimary"
+      }
+    },
+
+    "contentCard": {
+      "imageRatio": "1:1",
+      "radii": "$radii.mdCard",
+      "shadow": "$shadows.card",
+      "sections": ["thumbnail", "primaryText@title", "secondaryText@caption", "priceBadge"]
+    },
+
+    "listItem": {
+      "layout": "horizontal",
+      "avatar": "circle 56",
+      "content": ["primaryText@title", "secondaryText@caption", "metadataRow"],
+      "trailing": "arrowIconCircle"
+    },
+
+    "primaryButton": {
+      "shape": "pill",
+      "background": "$primaryAccent",
+      "textStyle": "headline",
+      "shadow": "$shadows.card",
+      "interactiveStates": {
+        "pressedOpacity": 0.85,
+        "disabledOpacity": 0.45
+      }
+    },
+
+    "iconButtonCircle": {
+      "diameter": 36,
+      "background": "$primaryAccent",
+      "icon": { "name": "arrow-right", "size": 18, "color": "$textPrimary" }
+    },
+
+    "tabBar": {
+      "position": "bottom",
+      "background": "$surfaceCard",
+      "iconSize": 24,
+      "activeTint": "$primaryAccent",
+      "inactiveTint": "$iconTint"
+    }
+  },
+
+  "layoutPatterns": {
+    "verticalScrollPage": {
+      "safeArea": true,
+      "header": ["greetingText@headline", "profileAvatar 32"],
+      "sectionsOrder": ["searchBar", "featuredBanner", "categoriesCarousel", "contentGrid", "listSection"]
+    }
+  }
+}

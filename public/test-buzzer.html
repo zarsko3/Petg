@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Collar Buzzer Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 600px; margin: 0 auto; }
+        button { padding: 10px 20px; margin: 10px; font-size: 16px; }
+        .success { background-color: #4CAF50; color: white; }
+        .error { background-color: #f44336; color: white; }
+        .info { background-color: #2196F3; color: white; }
+        .log { background-color: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        pre { white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔊 Collar Buzzer Test</h1>
+        
+        <div>
+            <label>Collar IP: </label>
+            <input type="text" id="collarIP" value="10.0.0.6" style="padding: 5px; width: 150px;">
+            <button onclick="connect()">Connect</button>
+            <button onclick="disconnect()">Disconnect</button>
+        </div>
+        
+        <div style="margin: 20px 0;">
+            <button onclick="testBuzzer()" class="success">🔊 Test Buzzer</button>
+            <button onclick="testVibration()" class="info">📳 Test Vibration</button>
+            <button onclick="stopAlert()" class="error">🛑 Stop Alert</button>
+        </div>
+        
+        <div class="log">
+            <h3>Connection Status:</h3>
+            <div id="status">Disconnected</div>
+        </div>
+        
+        <div class="log">
+            <h3>Test Log:</h3>
+            <pre id="log"></pre>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let isConnected = false;
+
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logElement = document.getElementById('log');
+            logElement.textContent += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(message);
+        }
+
+        function updateStatus(message, className = '') {
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = message;
+            statusElement.className = className;
+        }
+
+        function connect() {
+            const ip = document.getElementById('collarIP').value;
+            const wsUrl = `ws://${ip}:8080`;
+            
+            log(`Connecting to ${wsUrl}...`);
+            updateStatus('Connecting...', 'info');
+
+            try {
+                if (ws) {
+                    ws.close();
+                }
+
+                ws = new WebSocket(wsUrl);
+
+                ws.onopen = () => {
+                    isConnected = true;
+                    log('✅ WebSocket connected successfully!');
+                    updateStatus('Connected', 'success');
+                };
+
+                ws.onmessage = (event) => {
+                    log(`📥 Received: ${event.data}`);
+                    
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.type === 'response' && data.command) {
+                            log(`✅ Command response: ${data.command} - ${data.status}`);
+                        }
+                    } catch (e) {
+                        // Non-JSON response
+                        log(`📄 Response: ${event.data}`);
+                    }
+                };
+
+                ws.onerror = (error) => {
+                    log(`❌ WebSocket error: ${error}`);
+                    updateStatus('Connection error', 'error');
+                    isConnected = false;
+                };
+
+                ws.onclose = (event) => {
+                    isConnected = false;
+                    log(`🔌 WebSocket closed (code: ${event.code})`);
+                    updateStatus('Disconnected', '');
+                };
+
+                // Connection timeout
+                setTimeout(() => {
+                    if (ws && ws.readyState === WebSocket.CONNECTING) {
+                        ws.close();
+                        log('❌ Connection timeout after 5 seconds');
+                        updateStatus('Connection timeout', 'error');
+                    }
+                }, 5000);
+
+            } catch (error) {
+                log(`❌ Failed to create WebSocket: ${error.message}`);
+                updateStatus('Connection failed', 'error');
+            }
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+                isConnected = false;
+                log('🔌 Disconnected manually');
+                updateStatus('Disconnected', '');
+            }
+        }
+
+        function sendCommand(command) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('❌ WebSocket not connected');
+                return;
+            }
+
+            const message = JSON.stringify({ command: command });
+            log(`📤 Sending: ${message}`);
+            
+            try {
+                ws.send(message);
+                log(`✅ Command sent: ${command}`);
+            } catch (error) {
+                log(`❌ Failed to send command: ${error.message}`);
+            }
+        }
+
+        function testBuzzer() {
+            sendCommand('test_buzzer');
+        }
+
+        function testVibration() {
+            sendCommand('test_vibration');
+        }
+
+        function stopAlert() {
+            sendCommand('stop_alert');
+        }
+
+        // Auto-connect on page load
+        window.onload = function() {
+            setTimeout(connect, 500);
+        };
+    </script>
+</body>
+</html> 

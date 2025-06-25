@@ -2,82 +2,280 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --radius: 0.5rem;
-  --background: 0 0% 100%;
-  --foreground: 240 10% 3.9%;
-  --card: 0 0% 100%;
-  --card-foreground: 240 10% 3.9%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 240 10% 3.9%;
-  --primary: 240 5.9% 10%;
-  --primary-foreground: 0 0% 98%;
-  --secondary: 240 4.8% 95.9%;
-  --secondary-foreground: 240 5.9% 10%;
-  --muted: 240 4.8% 95.9%;
-  --muted-foreground: 240 3.8% 46.1%;
-  --accent: 240 4.8% 95.9%;
-  --accent-foreground: 240 5.9% 10%;
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 240 5.9% 90%;
-  --input: 240 5.9% 90%;
-  --ring: 240 5.9% 10%;
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
+/* Import Google Fonts for rounded typography */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Nunito:wght@400;500;600;700&display=swap');
 
-.dark {
-  --background: 240 10% 3.9%;
-  --foreground: 0 0% 98%;
-  --card: 240 10% 3.9%;
-  --card-foreground: 0 0% 98%;
-  --popover: 240 10% 3.9%;
-  --popover-foreground: 0 0% 98%;
-  --primary: 0 0% 98%;
-  --primary-foreground: 240 5.9% 10%;
-  --secondary: 240 3.7% 15.9%;
-  --secondary-foreground: 0 0% 98%;
-  --muted: 240 3.7% 15.9%;
-  --muted-foreground: 240 5% 64.9%;
-  --accent: 240 3.7% 15.9%;
-  --accent-foreground: 0 0% 98%;
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 240 3.7% 15.9%;
-  --input: 240 3.7% 15.9%;
-  --ring: 240 4.9% 83.9%;
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+@layer base {
+  :root {
+    /* New warm, pet-centric color palette */
+    --background: 44 33% 98%; /* Off-white/eggshell (#FDFCF9) */
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 179 55% 53%; /* Soft teal (#4CC9C8) */
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 16 84% 67%; /* Warm coral (#FF785A) */
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 179 55% 53%; /* Soft teal for focus rings */
+    --radius: 0.75rem; /* Increased border radius */
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    
+    /* New pet-centric color tokens */
+    --pet-primary: 179 55% 53%; /* Soft teal */
+    --pet-accent: 16 84% 67%; /* Warm coral */
+    --pet-success: 142 71% 45%; /* Gentle green */
+    --pet-warning: 38 92% 50%; /* Warm amber */
+    --pet-surface: 44 33% 98%; /* Off-white surface */
+    --pet-surface-elevated: 0 0% 100%; /* Pure white for cards */
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 179 60% 60%; /* Lighter teal for dark mode */
+    --primary-foreground: 222.2 84% 4.9%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 16 84% 72%; /* Lighter coral for dark mode */
+    --accent-foreground: 222.2 84% 4.9%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 179 60% 60%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+    
+    /* Dark mode pet colors */
+    --pet-primary: 179 60% 60%;
+    --pet-accent: 16 84% 72%;
+    --pet-success: 142 71% 55%;
+    --pet-warning: 38 92% 60%;
+    --pet-surface: 222.2 84% 4.9%;
+    --pet-surface-elevated: 217.2 32.6% 17.5%;
+  }
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
   }
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    line-height: 1.5; /* Improved line height for readability */
+  }
+  
+  /* Rounded font variants */
+  .font-rounded {
+    font-family: 'Nunito', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  
+  /* Enhanced readability */
+  h1, h2, h3, h4, h5, h6 {
+    line-height: 1.4;
+  }
+  
+  p, span, div {
+    line-height: 1.5;
+  }
+}
+
+/* Pet-centric component styles */
+@layer components {
+  /* Rounded, soft components */
+  .pet-card {
+    @apply bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all duration-200;
+  }
+  
+  .pet-button {
+    @apply bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 
+           text-white font-semibold py-3 px-6 rounded-xl 
+           shadow-lg hover:shadow-xl active:shadow-md hover:scale-105
+           transition-all duration-200 transform
+           border-0 touch-target;
+  }
+  
+  .pet-button-accent {
+    @apply bg-gradient-to-r from-orange-400 to-red-400 hover:from-orange-500 hover:to-red-500
+           text-white font-semibold py-3 px-6 rounded-xl 
+           shadow-lg hover:shadow-xl active:shadow-md hover:scale-105
+           transition-all duration-200 transform
+           border-0 touch-target;
+  }
+  
+  .pet-input {
+    @apply border border-gray-200 dark:border-gray-600 
+           focus:border-teal-500 dark:focus:border-teal-400 
+           focus:ring-4 focus:ring-teal-500/20
+           rounded-xl px-4 py-3 text-base w-full
+           bg-white dark:bg-gray-700 
+           text-gray-900 dark:text-gray-100
+           placeholder:text-gray-500 dark:placeholder:text-gray-400
+           transition-all duration-200 shadow-sm;
+  }
+  
+  /* Enhanced micro-interactions */
+  .pet-interactive {
+    @apply hover:scale-105 active:scale-95 transition-transform duration-200;
+  }
+  
+  .pet-glow {
+    @apply shadow-lg hover:shadow-teal-500/25 hover:shadow-xl;
+  }
+}
+
+/* Custom Clerk Styling Overrides with Pet Theme */
+@layer components {
+  /* Override Clerk's default styling with our custom design */
+  .cl-rootBox {
+    @apply w-full;
+  }
+  
+  .cl-card {
+    @apply bg-transparent shadow-none border-0 p-0 w-full;
+  }
+  
+  .cl-headerTitle,
+  .cl-headerSubtitle,
+  .cl-logoBox,
+  .cl-logoImage {
+    @apply hidden !important;
+  }
+  
+  .cl-socialButtonsBlockButton {
+    @apply bg-white border border-gray-200 dark:border-gray-600 
+           hover:bg-gray-50 dark:hover:bg-gray-700 
+           rounded-xl transition-all duration-200 hover:scale-105
+           py-3 px-4 w-full flex items-center justify-center gap-3
+           text-gray-700 dark:text-gray-300 font-medium text-base
+           mb-3 h-12 shadow-sm hover:shadow-md
+           focus:outline-none focus:ring-2 focus:ring-teal-500/20;
+  }
+  
+  .cl-socialButtonsBlockButton:hover {
+    @apply bg-gray-50 dark:bg-gray-700 shadow-md;
+  }
+  
+  .cl-socialButtonsBlockButtonText {
+    @apply text-gray-700 dark:text-gray-300 font-medium text-base
+           flex items-center justify-center gap-2 !important;
+  }
+  
+  .cl-dividerLine {
+    @apply bg-gray-200 dark:bg-gray-600 h-px my-6;
+  }
+  
+  .cl-dividerText {
+    @apply text-gray-500 dark:text-gray-400 text-sm font-medium px-4 bg-white dark:bg-gray-800
+           uppercase tracking-wider;
+  }
+  
+  .cl-formButtonPrimary {
+    @apply bg-gradient-to-r from-teal-500 to-teal-600
+           hover:from-teal-600 hover:to-teal-700 
+           active:from-teal-700 active:to-teal-800
+           text-white font-semibold py-3 px-6 rounded-xl 
+           shadow-lg hover:shadow-xl active:shadow-md hover:scale-105
+           transition-all duration-200 transform
+           border-0 text-base w-full h-12
+           focus:outline-none focus:ring-4 focus:ring-teal-500/20
+           cursor-pointer;
+  }
+  
+  .cl-formFieldInput {
+    @apply border border-gray-200 dark:border-gray-600 
+           focus:border-teal-500 dark:focus:border-teal-400 
+           focus:ring-4 focus:ring-teal-500/20
+           rounded-xl px-4 py-3 text-base w-full h-12
+           bg-white dark:bg-gray-700 
+           text-gray-900 dark:text-gray-100
+           placeholder:text-gray-500 dark:placeholder:text-gray-400
+           transition-all duration-200 shadow-sm;
+  }
+  
+  .cl-formFieldLabel {
+    @apply text-gray-700 dark:text-gray-300 
+           font-semibold text-sm mb-2 block;
+  }
+  
+  .cl-footerActionLink {
+    @apply text-teal-600 hover:text-teal-700 
+           dark:text-teal-400 dark:hover:text-teal-300 
+           font-medium transition-colors duration-200 text-sm;
+  }
+  
+  .cl-formFieldAction {
+    @apply text-teal-600 hover:text-teal-700 
+           dark:text-teal-400 dark:hover:text-teal-300 
+           font-medium text-sm transition-colors duration-200;
+  }
+  
+  .cl-footer,
+  .cl-footerAction {
+    @apply hidden;
+  }
+  
+  .cl-form {
+    @apply space-y-4;
+  }
+  
+  .cl-formFieldSuccessText {
+    @apply text-green-600 dark:text-green-400 text-sm mt-1;
+  }
+  
+  .cl-formFieldErrorText {
+    @apply text-red-600 dark:text-red-400 text-sm mt-1;
+  }
+  
+  .cl-formFieldRow {
+    @apply space-y-2;
+  }
+  
+  .cl-formFieldInputShowPasswordButton {
+    @apply text-gray-500 hover:text-gray-700 
+           dark:text-gray-400 dark:hover:text-gray-200
+           transition-colors duration-200;
+  }
+  
+  /* Remove any box shadows and borders that might interfere */
+  .cl-card,
+  .cl-rootBox,
+  .cl-form {
+    box-shadow: none !important;
+    border: none !important;
+  }
+  
+  /* Ensure proper spacing and layout */
+  .cl-formFieldRow:not(:last-child) {
+    @apply mb-4;
+  }
+  
+  /* Social buttons specific styling */
+  .cl-socialButtonsBlockButton svg {
+    @apply w-5 h-5;
   }
 }

@@ -11,7 +11,8 @@ import {
   Users,
   FileText,
   Bell,
-  Home
+  Home,
+  ChevronRight
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -40,25 +41,34 @@ export function Sidebar({ className }: SidebarProps) {
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
+  const toggleSidebar = () => {
+    setCollapsed(!collapsed)
+  }
+
   return (
     <div
       className={cn(
         "relative flex flex-col h-screen border-r transition-all duration-300 ease-in-out bg-gray-50 dark:bg-gray-900",
-        collapsed ? "w-[70px]" : "w-[240px]",
+        collapsed ? "w-16" : "w-16 md:w-64",
         className
       )}
       style={{
         transition: transitions.default
       }}
     >
-      <div className="p-4 h-16 flex items-center border-b">
-        {!collapsed && (
-          <span className="font-semibold text-lg">Navigation</span>
-        )}
-      </div>
-      
-      <div className="flex-1 overflow-auto pb-10 pt-4">
-        <nav className="grid items-start gap-2 px-2">
+      <div className="p-4 md:p-6">
+        <div className="flex justify-end mb-4">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={toggleSidebar} 
+            className="hidden md:flex"
+          >
+            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+            <span className="sr-only">{collapsed ? "Expand" : "Collapse"} sidebar</span>
+          </Button>
+        </div>
+        <nav className="space-y-2">
           <NavItem
             href="/dashboard"
             icon={LayoutDashboard}
@@ -110,21 +120,6 @@ export function Sidebar({ className }: SidebarProps) {
           />
         </nav>
       </div>
-      
-      {!isMobile && (
-        <Button
-          onClick={() => setCollapsed(!collapsed)}
-          variant="ghost"
-          size="icon"
-          className="absolute right-[-12px] top-20 h-6 w-6 rounded-full border bg-background shadow-md hover:bg-gray-100 dark:hover:bg-gray-800"
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          <ChevronLeft className={cn(
-            "h-3 w-3 transition-transform",
-            collapsed ? "rotate-180" : "rotate-0"
-          )} />
-        </Button>
-      )}
     </div>
   )
 }
@@ -151,7 +146,8 @@ function NavItem({
         "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all relative",
         active 
           ? "bg-white dark:bg-gray-800 text-purple-600 font-medium shadow-sm" 
-          : "text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800 hover:text-purple-600"
+          : "text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800 hover:text-purple-600",
+        collapsed && "justify-center"
       )}
     >
       <Icon 

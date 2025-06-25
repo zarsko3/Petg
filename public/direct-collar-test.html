@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Direct Collar Connection Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .test-section { background: #f8f9fa; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        button { background: #007bff; color: white; border: none; padding: 10px 15px; border-radius: 5px; margin: 5px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        pre { background: #e9ecef; padding: 10px; border-radius: 5px; overflow-x: auto; font-size: 12px; }
+        .ws-url { font-family: monospace; background: #fff3cd; padding: 5px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>🎯 Direct Collar Connection Test</h1>
+    <p>This page tests direct connection to the collar without any network scanning.</p>
+    
+    <div class="test-section">
+        <h3>Step 1: Connect Directly to Known IP</h3>
+        <p>Collar should be at: <code>10.0.0.6</code></p>
+        <button onclick="testDirectHTTP()">Test HTTP Connection</button>
+        <div id="httpResult"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Step 2: Test WebSocket Connection</h3>
+        <p>WebSocket should be: <code>ws://10.0.0.6:8080</code></p>
+        <button onclick="testDirectWebSocket()" id="wsBtn" disabled>Test WebSocket</button>
+        <div id="wsResult"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Step 3: Send Test Command</h3>
+        <button onclick="sendTestCommand()" id="cmdBtn" disabled>Send Buzzer Test</button>
+        <div id="cmdResult"></div>
+    </div>
+
+    <script>
+        let wsConnection = null;
+        let collarIP = '10.0.0.6';
+        let wsUrl = `ws://${collarIP}:8080`;
+
+        function log(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            const div = document.createElement('div');
+            div.className = `test-section ${type}`;
+            div.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong>: ${message}`;
+            element.appendChild(div);
+        }
+
+        async function testDirectHTTP() {
+            log('httpResult', '🔗 Testing direct HTTP connection to collar...', 'info');
+            
+            try {
+                const response = await fetch(`http://${collarIP}/api/discover`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                log('httpResult', '✅ HTTP connection successful!', 'success');
+                log('httpResult', `📱 Device: ${data.device}`, 'info');
+                log('httpResult', `🏷️ Version: ${data.version}`, 'info');
+                log('httpResult', `📡 IP: ${data.local_ip}`, 'info');
+                
+                // Check for WebSocket URL in response
+                if (data.websocket_url) {
+                    wsUrl = data.websocket_url;
+                    log('httpResult', `🎯 WebSocket URL from collar: <span class="ws-url">${data.websocket_url}</span>`, 'success');
+                } else {
+                    log('httpResult', `⚠️ WebSocket URL not provided - using constructed: <span class="ws-url">${wsUrl}</span>`, 'info');
+                    log('httpResult', '💡 Update firmware to get WebSocket URL directly from collar', 'info');
+                }
+                
+                log('httpResult', `<pre>${JSON.stringify(data, null, 2)}</pre>`, 'info');
+                
+                // Enable WebSocket test
+                document.getElementById('wsBtn').disabled = false;
+                
+            } catch (error) {
+                log('httpResult', `❌ HTTP connection failed: ${error.message}`, 'error');
+                log('httpResult', '🔍 Check if collar is powered on and connected to WiFi', 'info');
+            }
+        }
+
+        async function testDirectWebSocket() {
+            log('wsResult', `🔌 Connecting to WebSocket: ${wsUrl}`, 'info');
+            
+            try {
+                wsConnection = new WebSocket(wsUrl);
+                
+                wsConnection.onopen = () => {
+                    log('wsResult', '✅ WebSocket connected successfully!', 'success');
+                    log('wsResult', '📤 Sending status request...', 'info');
+                    
+                    // Send a status request
+                    wsConnection.send(JSON.stringify({ command: 'get_status' }));
+                    
+                    // Enable command test
+                    document.getElementById('cmdBtn').disabled = false;
+                };
+                
+                wsConnection.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        log('wsResult', '📥 Received data from collar:', 'success');
+                        log('wsResult', `<pre>${JSON.stringify(data, null, 2)}</pre>`, 'info');
+                    } catch (e) {
+                        log('wsResult', `📥 Received: ${event.data}`, 'info');
+                    }
+                };
+                
+                wsConnection.onerror = (error) => {
+                    log('wsResult', `❌ WebSocket error: ${error}`, 'error');
+                    wsConnection = null;
+                };
+                
+                wsConnection.onclose = (event) => {
+                    log('wsResult', `🔌 WebSocket closed (code: ${event.code}, reason: ${event.reason})`, 'info');
+                    wsConnection = null;
+                    document.getElementById('cmdBtn').disabled = true;
+                };
+                
+            } catch (error) {
+                log('wsResult', `❌ WebSocket test failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function sendTestCommand() {
+            if (!wsConnection || wsConnection.readyState !== WebSocket.OPEN) {
+                log('cmdResult', '❌ WebSocket not connected', 'error');
+                return;
+            }
+            
+            log('cmdResult', '📤 Sending buzzer test command...', 'info');
+            
+            try {
+                wsConnection.send(JSON.stringify({ 
+                    command: 'test_buzzer' 
+                }));
+                
+                log('cmdResult', '✅ Test command sent successfully!', 'success');
+                log('cmdResult', '🔊 Listen for buzzer sound from collar', 'info');
+                
+                // Listen for response
+                const originalOnMessage = wsConnection.onmessage;
+                wsConnection.onmessage = (event) => {
+                    originalOnMessage(event); // Call original handler
+                    
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.type === 'response' && data.command === 'test_buzzer') {
+                            log('cmdResult', '✅ Collar confirmed test command execution!', 'success');
+                        }
+                    } catch (e) {
+                        // Ignore parsing errors
+                    }
+                };
+                
+            } catch (error) {
+                log('cmdResult', `❌ Failed to send command: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html> 
