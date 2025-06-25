@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { LiveCameraFrame } from '@/components/mobile/live-camera-frame'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useCollarPosition, useBeacons } from '@/hooks/useSmartCollarData'
 import dynamic from 'next/dynamic'
 
 // Dynamically import components that use browser APIs
@@ -16,6 +17,9 @@ const MobileLeafletMap = dynamic(() => import('@/components/mobile/leaflet-map')
 })
 
 export default function MobileLocationPage() {
+  const { position } = useCollarPosition()
+  const { beacons } = useBeacons()
+  
   return (
     <main className="flex flex-col h-screen bg-gradient-to-br from-slate-50 to-blue-50 overflow-hidden">
       {/* Camera Frame - Fixed height */}
@@ -67,12 +71,8 @@ export default function MobileLocationPage() {
         {/* Map takes full remaining space */}
         <div className="w-full h-full">
           <MobileLeafletMap 
-            beacons={[
-              { id: 1, name: 'Living Room', x: 30, y: 40, connected: true, rssi: -45, distance: 3 },
-              { id: 2, name: 'Kitchen', x: 70, y: 30, connected: true, rssi: -62, distance: 7 },
-              { id: 3, name: 'Bedroom', x: 50, y: 70, connected: true, rssi: -71, distance: 9 },
-            ]}
-            petPosition={{ x: 45, y: 50 }}
+            beacons={beacons}
+            petPosition={position}
             petName="Buddy"
           />
         </div>

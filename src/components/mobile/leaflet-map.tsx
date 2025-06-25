@@ -5,6 +5,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { Radio, PawPrint } from 'lucide-react'
 import { Point2D } from '@/lib/floorPlan'
+import { useCollarConnection } from '@/context/CollarConnectionContext'
 
 // Fix for default markers in Leaflet with Next.js
 delete (L.Icon.Default.prototype as any)._getIconUrl
@@ -38,7 +39,7 @@ interface MobileLeafletMapProps {
 }
 
 // Helper to create responsive marker icons based on zoom level
-const createMarkerIcon = (type: 'collar' | 'beacon', size: number, connected: boolean = true) => {
+const createMarkerIcon = (type: 'collar' | 'beacon', size: number, connected: boolean = true, isLive: boolean = false) => {
   // Increased base sizes for better visibility
   const displaySize = Math.max(size * 1.5, 36) // Minimum 36px for touch targets
   const iconSize = Math.max(displaySize * 0.6, 20) // Icon within the marker
@@ -111,14 +112,14 @@ const createMarkerIcon = (type: 'collar' | 'beacon', size: number, connected: bo
               animation: pulse 2s infinite;
             "></div>` : ''
           }
-          ${type === 'collar' ? 
+          ${type === 'collar' && isLive ? 
             `<div style="
               position: absolute;
               top: -6px;
               left: 50%;
               transform: translateX(-50%);
-              background: rgba(255, 255, 255, 0.9);
-              color: #1F2937;
+              background: rgba(16, 185, 129, 0.95);
+              color: white;
               padding: 2px 6px;
               border-radius: 8px;
               font-size: 10px;
@@ -126,6 +127,7 @@ const createMarkerIcon = (type: 'collar' | 'beacon', size: number, connected: bo
               white-space: nowrap;
               box-shadow: 0 2px 4px rgba(0,0,0,0.1);
               pointer-events: none;
+              animation: pulse 2s infinite;
             ">LIVE</div>` : ''
           }
         </div>
@@ -167,6 +169,7 @@ export function MobileLeafletMap({
   const markersRef = useRef<{ pet?: L.Marker; beacons: L.Marker[] }>({ beacons: [] })
   const [activePopup, setActivePopup] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
+  const { isLive } = useCollarConnection()
 
   // Only run on client side
   useEffect(() => {
@@ -303,7 +306,7 @@ export function MobileLeafletMap({
 
     // Update pet marker
     if (markersRef.current.pet) {
-      const newIcon = createMarkerIcon('collar', newSize, true)
+      const newIcon = createMarkerIcon('collar', newSize, true, isLive)
       markersRef.current.pet.setIcon(newIcon)
     }
   }
@@ -508,7 +511,7 @@ export function MobileLeafletMap({
     })
 
     // Add pet marker (always on top)
-    const petIcon = createMarkerIcon('collar', markerSize, true)
+    const petIcon = createMarkerIcon('collar', markerSize, true, isLive)
 
     const petMarker = L.marker([petPosition.y, petPosition.x], { 
       icon: petIcon,
@@ -567,7 +570,7 @@ export function MobileLeafletMap({
     
     console.log(`🗺️ Map updated with ${markersRef.current.beacons.length} beacons + 1 collar marker`)
 
-  }, [mounted, beacons, petPosition, petName, activePopup, customFloorPlan])
+  }, [mounted, beacons, petPosition, petName, activePopup, customFloorPlan, isLive])
 
   // Close popup when activePopup changes to null
   useEffect(() => {

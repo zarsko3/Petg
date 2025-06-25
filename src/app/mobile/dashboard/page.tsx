@@ -22,7 +22,7 @@ import {
   Smartphone,
   Target
 } from 'lucide-react'
-import { useCollarData } from '@/hooks/useCollarData'
+import { useCollarStats } from '@/hooks/useSmartCollarData'
 import { 
   formatTimeAgo, 
   getBatteryColor, 
@@ -34,7 +34,21 @@ import {
 
 export default function MobileDashboard() {
   const [mounted, setMounted] = useState(false)
-  const { data: collarData, isConnected, isLoading, lastUpdate, refetch } = useCollarData(3000)
+  const { stats: collarStats, isLive, status } = useCollarStats()
+  
+  // Map new hook data to old variable names for compatibility
+  const collarData = {
+    battery_level: collarStats.battery,
+    signal_strength: collarStats.rssi,
+    activity_level: 85, // Mock activity level
+    temperature: collarStats.temperature,
+    location: 'Living Room',
+    last_seen: new Date().toISOString()
+  }
+  const lastUpdate = new Date()
+  const isConnected = isLive
+  const isLoading = status === 'connecting'
+  const refetch = () => window.location.reload()
 
   
   // Use try-catch for Clerk to handle context issues gracefully

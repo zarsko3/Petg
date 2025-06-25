@@ -9,6 +9,7 @@ import { useTheme } from 'next-themes'
 import { CollarPairDialog } from '@/components/mobile/collar-pair-dialog'
 import { CollarSettingsCard } from '@/components/mobile/collar-settings-card'
 import { useMobileCollars } from '@/hooks/useMobileCollars'
+import { useCollarConnection } from '@/context/CollarConnectionContext'
 
 interface SettingsSection {
   id: string
@@ -24,6 +25,7 @@ export default function MobileSettingsPage() {
   const [showPairDialog, setShowPairDialog] = useState(false)
   const [notificationsEnabled, setNotificationsEnabled] = useState(true)
   const { collars, isLoading, refresh } = useMobileCollars()
+  const { status, connect, disconnect } = useCollarConnection()
 
   const handleThemeToggle = () => {
     setTheme(theme === 'dark' ? 'light' : 'dark')
@@ -134,6 +136,65 @@ export default function MobileSettingsPage() {
                 <Plus className="h-4 w-4 mr-2" />
                 Pair First Collar
               </Button>
+            </Card>
+          )}
+
+          {/* Connection Test Section */}
+          {status === 'disconnected' && (
+            <Card className="p-4 border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                    Collar Connection Test
+                  </h3>
+                  <p className="text-sm text-amber-600 dark:text-amber-300 mt-1">
+                    Try reconnecting to your collar for live data
+                  </p>
+                </div>
+                <Button
+                  onClick={connect}
+                  className="bg-amber-500 hover:bg-amber-600 text-white"
+                  size="sm"
+                >
+                  Reconnect Collar
+                </Button>
+              </div>
+            </Card>
+          )}
+
+          {status === 'connecting' && (
+            <Card className="p-4 border-yellow-200 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-900/20">
+              <div className="flex items-center justify-center">
+                <div className="flex items-center gap-3">
+                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-yellow-500 border-t-transparent"></div>
+                  <span className="text-sm font-medium text-yellow-700 dark:text-yellow-300">
+                    Connecting to collar...
+                  </span>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {status === 'connected' && (
+            <Card className="p-4 border-green-200 dark:border-green-700 bg-green-50 dark:bg-green-900/20">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-medium text-green-800 dark:text-green-200">
+                    Collar Connected
+                  </h3>
+                  <p className="text-sm text-green-600 dark:text-green-300 mt-1">
+                    Receiving live data from your pet's collar
+                  </p>
+                </div>
+                <Button
+                  onClick={disconnect}
+                  variant="outline"
+                  className="border-green-300 text-green-700 hover:bg-green-100 dark:border-green-600 dark:text-green-300"
+                  size="sm"
+                >
+                  Disconnect
+                </Button>
+              </div>
             </Card>
           )}
         </div>
