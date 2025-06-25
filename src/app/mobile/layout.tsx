@@ -8,7 +8,6 @@ import { Toaster } from 'sonner'
 import BottomNavBar from '@/components/mobile/bottom-nav-bar'
 import HeaderBar from '@/components/mobile/header-bar'
 import { PWAInstallPrompt } from '@/components/pwa-install-prompt'
-import { DebugConnectionTest } from '@/components/debug-connection-test'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -34,9 +33,6 @@ export default function MobileLayout({
           
           {/* PWA Install Prompt */}
           <PWAInstallPrompt />
-          
-          {/* Debug Connection Test */}
-          <DebugConnectionTest />
           
           {/* Toast Notifications */}
           <Toaster 
