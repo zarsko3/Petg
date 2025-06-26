@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { getCollarService } from '@/lib/collar-websocket-service';
+import { collarIntegration } from '@/lib/collar-integration';
 
 interface CollarServiceProviderProps {
   children: React.ReactNode;
@@ -9,14 +10,29 @@ interface CollarServiceProviderProps {
 
 export function CollarServiceProvider({ children }: CollarServiceProviderProps) {
   useEffect(() => {
-    console.log('🛑 CollarServiceProvider: Manual mode - auto-connection disabled');
-    console.log('💡 CollarServiceProvider: Use manual configuration page to connect to collar');
+    console.log('🚀 CollarServiceProvider: Starting auto-initialization...');
     
-    // Initialize service but don't auto-connect (manual mode)
-    const service = getCollarService();
+    // Auto-initialize collar integration
+    const initializeCollar = async () => {
+      try {
+        // Initialize both collar integration and WebSocket service
+        await collarIntegration.autoInit();
+        console.log('✅ CollarServiceProvider: Collar integration auto-initialized');
+      } catch (error) {
+        console.error('❌ CollarServiceProvider: Auto-initialization failed:', error);
+        // Continue with WebSocket service anyway
+      }
+      
+      // Initialize WebSocket service
+      const service = getCollarService();
+      console.log('📡 CollarServiceProvider: WebSocket service initialized');
+    };
+    
+    initializeCollar();
     
     return () => {
-      console.log('🧹 CollarServiceProvider: Cleaning up WebSocket service...');
+      console.log('🧹 CollarServiceProvider: Cleaning up services...');
+      const service = getCollarService();
       service.disconnect();
     };
   }, []);

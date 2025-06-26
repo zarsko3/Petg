@@ -32,26 +32,21 @@ export function MinimalManualConnection() {
     setLastResult('');
 
     try {
-      // First test the IP to make sure it's a collar
-      const testResponse = await fetch(`/api/collar-proxy?endpoint=/api/discover&ip=${collarIP}`);
-      if (!testResponse.ok) {
-        throw new Error('Could not connect to collar at this IP address');
-      }
+      // Cache the WebSocket URL in localStorage for other components
+      const wsUrl = `ws://${collarIP}:8080`;
+      localStorage.setItem('petg.wsUrl', wsUrl);
+      console.log(`✅ Manual IP ${collarIP} cached in localStorage`);
 
       // Connect via WebSocket service
       await collarService.connectToIP(collarIP);
-      
-      // Cache the IP in the collar-proxy for other components to use
-      const cacheResponse = await fetch(`/api/collar-proxy?endpoint=/api/discover&ip=${collarIP}`);
-      if (cacheResponse.ok) {
-        console.log(`✅ Manual IP ${collarIP} cached for other components`);
-      }
       
       setManualConnectionActive(true);
       setLastResult('✅ Connected successfully');
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Connection failed';
       setLastResult(`❌ ${errorMsg}`);
+      // Remove failed URL from cache
+      localStorage.removeItem('petg.wsUrl');
     } finally {
       setIsConnecting(false);
     }

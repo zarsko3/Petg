@@ -1,0 +1,16 @@
+{
+  "name": "petg-discovery-server",
+  "version": "1.0.0",
+  "description": "UDP to WebSocket relay for Pet Collar discovery",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js"
+  },
+  "keywords": ["udp", "websocket", "collar", "discovery"],
+  "author": "PETG Project",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.14.2"
+  }
+} 

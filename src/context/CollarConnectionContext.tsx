@@ -43,7 +43,9 @@ export function CollarConnectionProvider({ children }: CollarConnectionProviderP
   const heartbeatIntervalRef = useRef<number | null>(null)
   const connectionTimerRef = useRef<number | null>(null)
   const failoverTimeoutRef = useRef<number | null>(null)
+  const retryTimeoutRef = useRef<number | null>(null)
   const connectStartTime = useRef<Date | null>(null)
+  const connectionFailureCount = useRef<{ [ip: string]: number }>({})
 
   const isLive = status === 'connected'
 
@@ -68,6 +70,10 @@ export function CollarConnectionProvider({ children }: CollarConnectionProviderP
     if (failoverTimeoutRef.current) {
       clearTimeout(failoverTimeoutRef.current)
       failoverTimeoutRef.current = null
+    }
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current)
+      retryTimeoutRef.current = null
     }
   }, [])
 
@@ -177,8 +183,8 @@ export function CollarConnectionProvider({ children }: CollarConnectionProviderP
     }
   }, [status, resetFailoverTimeout])
 
-  // Connect to specific collar IP
-  const connectToCollar = useCallback(async (ip: string) => {
+  // Connect to specific collar IP with failure tracking
+  const connectToCollar = useCallback(async (ip: string): Promise<void> => {
     console.log(`🔗 Connecting to collar at ${ip}... (current status: ${status}, connectedIP: ${connectedIP})`);
     
     // Avoid duplicate connections
@@ -190,139 +196,212 @@ export function CollarConnectionProvider({ children }: CollarConnectionProviderP
     setStatus('connecting');
     setConnectedIP(ip);
     
-    try {
-      const wsUrl = `ws://${ip}:8080`;
-      console.log(`📡 Establishing WebSocket connection to ${wsUrl}`);
-      
-      const ws = new WebSocket(wsUrl);
-      
-      ws.onopen = () => {
-        console.log('✅ WebSocket connection established');
-        wsRef.current = ws;
-        setStatus('connected');
-        connectStartTime.current = new Date();
-        toast.success(`Connected to collar at ${ip}`);
-      };
-      
-      ws.onmessage = (event) => {
-        handleMessage(event);
-      };
-      
-      ws.onclose = () => {
-        console.log('🔌 WebSocket connection closed');
-        setStatus('disconnected');
-        setConnectedIP(null);
-        setCollarData(null);
-        setLastHeartbeat(null);
-        cleanup();
+    return new Promise((resolve, reject) => {
+      try {
+        const wsUrl = `ws://${ip}:8080`;
+        console.log(`📡 Establishing WebSocket connection to ${wsUrl}`);
         
-        setTimeout(() => {
-          toast.error(`Lost connection to collar at ${ip} – showing demo data`);
-        }, 1000);
-      };
-      
-      ws.onerror = (error) => {
-        console.error('❌ WebSocket connection error:', error);
-        setStatus('disconnected');
-        setConnectedIP(null);
-        cleanup();
-        toast.error(`Couldn't reach collar at ${ip} – retrying`);
-      };
-      
-      // 5 second connection timeout
-      setTimeout(() => {
-        if (status === 'connecting') {
-          ws.close();
+        const ws = new WebSocket(wsUrl);
+        
+        ws.onopen = () => {
+          console.log('✅ WebSocket connection established');
+          wsRef.current = ws;
+          
+          // Reset failure count on successful connection
+          connectionFailureCount.current[ip] = 0;
+          
+          // Start heartbeat interval
+          heartbeatIntervalRef.current = setInterval(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({
+                type: 'PING',
+                timestamp: Date.now()
+              }));
+            }
+          }, 2000);
+          
+          resolve();
+        };
+        
+        ws.onmessage = handleMessage;
+        
+        ws.onclose = (event) => {
+          console.log(`🔌 WebSocket connection closed (code: ${event.code})`);
+          if (wsRef.current === ws) {
+            wsRef.current = null;
+            setStatus('disconnected');
+            setConnectedIP(null);
+            if (heartbeatIntervalRef.current) {
+              clearInterval(heartbeatIntervalRef.current);
+              heartbeatIntervalRef.current = null;
+            }
+          }
+        };
+        
+        ws.onerror = (error) => {
+          console.error(`❌ WebSocket connection error to ${ip}:`, error);
+          
+          // Track failure count
+          connectionFailureCount.current[ip] = (connectionFailureCount.current[ip] || 0) + 1;
+          console.log(`📊 Connection failures for ${ip}: ${connectionFailureCount.current[ip]}`);
+          
+          // If failed twice, clear from localStorage and restart UDP discovery
+          if (connectionFailureCount.current[ip] >= 2) {
+            console.log(`🚫 ${ip} failed ${connectionFailureCount.current[ip]} times, removing from cache`);
+            localStorage.removeItem('petg.wsUrl');
+            connectionFailureCount.current[ip] = 0; // Reset counter
+          }
+          
           setStatus('disconnected');
           setConnectedIP(null);
-          toast.error(`Connection timeout to collar at ${ip}`);
-        }
-      }, 5000);
-      
-    } catch (error) {
-      console.error('❌ Failed to create WebSocket connection:', error);
-      setStatus('disconnected');
-      setConnectedIP(null);
-      toast.error(`Failed to connect to collar at ${ip}`);
-    }
-  }, [connectedIP, status, handleMessage, cleanup]);
-
-  // Listen for collar discovery events - ensure only one connection per tab
-  useEffect(() => {
-    const connectToDiscoveryServer = () => {
-      // Prevent multiple connections
-      if (discoveryWsRef.current?.readyState === WebSocket.CONNECTING || 
-          discoveryWsRef.current?.readyState === WebSocket.OPEN) {
-        console.log('🔄 Discovery WebSocket already connected/connecting, skipping...');
-        return;
-      }
-      
-      try {
-        // Use localhost for discovery WebSocket connection
-        const wsUrl = 'ws://localhost:3001/discovery';
-        console.log(`🔄 Connecting to discovery WebSocket: ${wsUrl}`);
-        const discoveryWs = new WebSocket(wsUrl);
-        
-        discoveryWs.onopen = () => {
-          console.log(`🔌 Connected to discovery WebSocket: ${wsUrl}`);
-          discoveryWsRef.current = discoveryWs;
+          reject(error);
         };
         
-        discoveryWs.onmessage = (event) => {
-          try {
-            const message = JSON.parse(event.data);
-            console.log('📡 Discovery message received (raw):', event.data);
-            console.log('📡 Discovery message parsed:', message);
+        // 5 second connection timeout
+        setTimeout(() => {
+          if (ws.readyState === WebSocket.CONNECTING) {
+            ws.close();
             
-            if (message.type === 'COLLAR_DISCOVERED' && message.ip) {
-              console.log(`🎯 Collar discovered at ${message.ip}, setting state to connecting...`);
-              setStatus('connecting');
-              
-              // Use the discovered IP to build WebSocket URL
-              const collarWsUrl = `ws://${message.ip}:8080`;
-              console.log(`🔗 Connecting to collar WebSocket: ${collarWsUrl}`);
-              connectToCollar(message.ip);
+            // Track timeout as failure
+            connectionFailureCount.current[ip] = (connectionFailureCount.current[ip] || 0) + 1;
+            console.log(`⏰ Connection timeout for ${ip} (failure #${connectionFailureCount.current[ip]})`);
+            
+            // If failed twice, clear from localStorage
+            if (connectionFailureCount.current[ip] >= 2) {
+              console.log(`🚫 ${ip} timed out ${connectionFailureCount.current[ip]} times, removing from cache`);
+              localStorage.removeItem('petg.wsUrl');
+              connectionFailureCount.current[ip] = 0; // Reset counter
             }
-          } catch (error) {
-            console.error('❌ Error parsing discovery message:', error);
-            console.error('❌ Raw message data:', event.data);
+            
+            setStatus('disconnected');
+            setConnectedIP(null);
+            reject(new Error(`Connection timeout to collar at ${ip}`));
           }
-        };
-        
-        discoveryWs.onclose = (event) => {
-          console.log(`🔌 Discovery WebSocket closed (code: ${event.code}, reason: ${event.reason})`);
-          discoveryWsRef.current = null;
-          
-          // Only retry if not a clean close
-          if (event.code !== 1000) {
-            console.log('🔄 Will retry discovery connection in 5 seconds...');
-            setTimeout(connectToDiscoveryServer, 5000);
-          }
-        };
-        
-        discoveryWs.onerror = (error) => {
-          console.error(`❌ Discovery WebSocket error:`, error);
-          discoveryWsRef.current = null;
-        };
+        }, 5000);
         
       } catch (error) {
-        console.error('❌ Failed to create discovery WebSocket connection:', error);
-        setTimeout(connectToDiscoveryServer, 5000);
+        console.error('❌ Failed to create WebSocket connection:', error);
+        setStatus('disconnected');
+        setConnectedIP(null);
+        reject(error);
       }
-    };
+    });
+  }, [connectedIP, status, handleMessage]);
+
+  // Retry UDP discovery every 3 seconds
+  const retryUntilFound = useCallback(() => {
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+    }
+
+    retryTimeoutRef.current = setTimeout(() => {
+      console.log('🔄 UDP scan retry (waiting for collar broadcasts)...');
+      
+      // Check if we got a connection via UDP
+      if (status !== 'connected') {
+        retryUntilFound(); // Continue retrying every 3 seconds
+      }
+    }, 3000);
+  }, [status]);
+
+  // Handle UDP discovery packet
+  const handleUDPPacket = useCallback((event: MessageEvent) => {
+    try {
+      const data = JSON.parse(event.data);
+      console.log('📡 UDP discovery packet received:', data);
+      
+      // Extract WebSocket URL from collar broadcast
+      const ws = data.websocket_url || data.ws;
+      if (ws) {
+        console.log(`📡 UDP discovery found WebSocket URL: ${ws}`);
+        localStorage.setItem('petg.wsUrl', ws);
+        
+        // Extract IP from WebSocket URL (e.g., "ws://192.168.1.35:8080" -> "192.168.1.35")
+        const ipMatch = ws.match(/ws:\/\/([^:]+):/);
+        if (ipMatch) {
+          const ip = ipMatch[1];
+          
+          // Try connection with automatic retry on failure
+          connectToCollar(ip).catch(() => {
+            console.log(`❌ Failed to connect to ${ip} from UDP discovery`);
+            retryUntilFound(); // Continue UDP scanning
+          });
+        }
+      }
+    } catch (error) {
+      console.log('⚠️ Invalid UDP packet received');
+    }
+  }, [connectToCollar, retryUntilFound]);
+
+  // Connect to discovery server for UDP-to-WebSocket relay
+  const connectToDiscoveryServer = useCallback(() => {
+    console.log('🔊 Connecting to discovery server...');
     
-    // Start discovery connection
+    const discoveryWsUrl = 'ws://localhost:3001/discovery';
+    try {
+      console.log(`🔗 Connecting to discovery WebSocket: ${discoveryWsUrl}`);
+      const discoveryWs = new WebSocket(discoveryWsUrl);
+      discoveryWsRef.current = discoveryWs;
+      
+      discoveryWs.onopen = () => {
+        console.log('✅ Connected to UDP discovery service');
+      };
+      
+      discoveryWs.onmessage = handleUDPPacket;
+      
+      discoveryWs.onerror = (error) => {
+        console.log('❌ Discovery WebSocket error:', error);
+      };
+      
+      discoveryWs.onclose = () => {
+        console.log('🔌 Discovery WebSocket closed');
+        discoveryWsRef.current = null;
+        
+        // Retry connection after 5 seconds
+        setTimeout(() => {
+          if (status !== 'connected') {
+            connectToDiscoveryServer();
+          }
+        }, 5000);
+      };
+    } catch (error) {
+      console.error('❌ Failed to connect to discovery server:', error);
+    }
+  }, [handleUDPPacket, status]);
+
+  // Auto-initialize on mount
+  useEffect(() => {
+    console.log('🚀 CollarConnectionProvider: Starting auto-initialization...');
+
+    // Try cached URL first (don't clear immediately)
+    const cachedUrl = localStorage.getItem('petg.wsUrl');
+    if (cachedUrl) {
+      console.log(`🔄 Trying cached WebSocket URL: ${cachedUrl}`);
+      const ipMatch = cachedUrl.match(/ws:\/\/([^:]+):/);
+      if (ipMatch) {
+        const ip = ipMatch[1];
+        connectToCollar(ip).catch(() => {
+          console.log(`❌ Cached URL ${cachedUrl} failed, starting UDP discovery...`);
+          // Don't remove here - let the failure counter handle it
+          retryUntilFound();
+        });
+      }
+    } else {
+      console.log('🔍 No cached URL found, starting UDP discovery...');
+    }
+
+    // Always start discovery server connection
     connectToDiscoveryServer();
-    
+
+    // Start retry logic for UDP scanning
+    retryUntilFound();
+
     // Cleanup on unmount
     return () => {
-      console.log('🧹 Cleaning up discovery WebSocket...');
-      if (discoveryWsRef.current) {
-        discoveryWsRef.current.close(1000, 'Component unmounting');
-        discoveryWsRef.current = null;
-      }
+      console.log('🧹 Cleaning up collar connection...');
+      cleanup();
     };
-  }, [connectToCollar]);
+  }, [connectToDiscoveryServer, connectToCollar, retryUntilFound, cleanup]);
 
   // Connection duration counter
   useEffect(() => {
@@ -346,43 +425,30 @@ export function CollarConnectionProvider({ children }: CollarConnectionProviderP
     }
   }, [status])
 
-  // Connect function (manual trigger)
+  // Connect function (manual trigger) - Use cached URL
   const connect = useCallback(async () => {
     console.log('🔄 Initiating manual collar connection...')
     
-    try {
-      // Try to get collar IP from proxy first
-      const proxyResponse = await fetch('/api/collar-proxy?endpoint=/api/discover')
-      
-      if (proxyResponse.ok) {
-        console.log('✅ Collar discovery via proxy successful');
-        toast.info('Searching for collar on network...');
-        // The discovery WebSocket listener will handle the actual connection
-        return;
-      }
-      
-      // Fallback: try common collar IPs
-      const commonIPs = ['192.168.1.35', '192.168.0.35', '192.168.1.100'];
-      console.log('🔍 Trying common collar IPs...');
-      
-      for (const ip of commonIPs) {
+    const wsUrl = localStorage.getItem('petg.wsUrl');
+    if (wsUrl) {
+      console.log(`🔗 Using cached WebSocket URL: ${wsUrl}`);
+      const ipMatch = wsUrl.match(/ws:\/\/([^:]+):/);
+      if (ipMatch) {
+        const ip = ipMatch[1];
         try {
           await connectToCollar(ip);
-          return; // Success, exit
+          return;
         } catch (error) {
-          console.log(`❌ Failed to connect to ${ip}`);
-          continue;
+          console.log(`❌ Cached URL ${wsUrl} failed, waiting for UDP discovery...`);
         }
       }
-      
-      throw new Error('No collar found on common IPs');
-      
-    } catch (error) {
-      console.error('❌ Failed to connect to collar:', error)
-      setStatus('disconnected')
-      toast.error('Failed to find collar - make sure it\'s powered on and connected to WiFi')
     }
-  }, [connectToCollar])
+    
+    // Fallback: show toast if no cached URL
+    toast.error('Collar not discovered — save it once on the dashboard first.');
+    console.log('🔍 No cached URL available, waiting for UDP discovery...');
+    retryUntilFound();
+  }, [connectToCollar, retryUntilFound])
 
   // Disconnect function
   const disconnect = useCallback(() => {
@@ -397,11 +463,6 @@ export function CollarConnectionProvider({ children }: CollarConnectionProviderP
     setTimeout(() => {
       toast.info('Disconnected from collar – showing demo data')
     }, 500)
-  }, [cleanup])
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return cleanup
   }, [cleanup])
 
   const value: CollarConnectionContextType = {

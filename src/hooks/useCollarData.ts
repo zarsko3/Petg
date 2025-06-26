@@ -79,7 +79,7 @@ export function useCollarData(refreshInterval: number = 5000): UseCollarDataRetu
   const lastDataReceived = usePetgStore((state) => state.lastDataReceived);
   const rawCollarData = usePetgStore((state) => state.lastCollarData);
   
-  // Transform raw collar data to our expected format
+  // Switch between live and mock data based on connection status
   const data: CollarData | null = isConnected && rawCollarData ? {
     device_id: rawCollarData.device_id || rawCollarData.id || 'PetCollar-S3',
     battery_level: rawCollarData.battery?.level || rawCollarData.battery_level || rawCollarData.battery || rawCollarData.power || 0,
@@ -116,10 +116,10 @@ export function useCollarData(refreshInterval: number = 5000): UseCollarDataRetu
       type: rawCollarData.alerts?.type,
       message: rawCollarData.alerts?.message
     }
-  } : (isConnected ? null : {
+  } : (!isConnected ? {
     ...DEMO_DATA,
     last_seen: new Date().toISOString()
-  });
+  } : null);
   
   // Create status object
   const status: CollarStatus = {

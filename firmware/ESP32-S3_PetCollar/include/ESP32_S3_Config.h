@@ -16,11 +16,11 @@
 // ==========================================
 // FIRMWARE INFORMATION
 // ==========================================
-#define FIRMWARE_VERSION_MAJOR 3
+#define FIRMWARE_VERSION_MAJOR 4
 #define FIRMWARE_VERSION_MINOR 0
-#define FIRMWARE_VERSION_PATCH 0
+#define FIRMWARE_VERSION_PATCH 1
 #define FIRMWARE_BUILD "ESP32-S3"
-#define FIRMWARE_VERSION "3.0.0-ESP32-S3"
+#define FIRMWARE_VERSION "4.0.1-ESP32-S3"
 
 #define HARDWARE_PLATFORM "ESP32-S3"
 #define DEVICE_FAMILY "PetCollar"

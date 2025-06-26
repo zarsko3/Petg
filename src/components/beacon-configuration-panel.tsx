@@ -148,51 +148,11 @@ export function BeaconConfigurationPanel({
 
       console.log(`🔊 Sending WebSocket command: ${collarCommand}`);
 
-      // First discover the collar IP
-      const discoveryResponse = await fetch('/api/collar-proxy?endpoint=/api/discover');
-      if (!discoveryResponse.ok) {
-        const errorData = await discoveryResponse.json().catch(() => ({}));
-        
-        // Provide specific error messages based on the response
-        if (errorData.troubleshooting) {
-          const troubleshooting = errorData.troubleshooting;
-          const message = [
-            '❌ Collar Discovery Failed',
-            '',
-            '🔍 Possible causes:',
-            ...troubleshooting.possible_causes?.map((cause: string) => `• ${cause}`) || [],
-            '',
-            '🛠️ Solutions:',
-            ...troubleshooting.steps?.map((step: string) => `${step}`) || [],
-            '',
-            '💡 Quick check: Look at your collar\'s display for the current IP address.',
-            'Then go to Settings → Advanced Connection to update the configuration.'
-          ].join('\n');
-          
-          alert(message);
-          return;
-        }
-        
-        throw new Error('Could not discover collar IP - please configure manually in Settings → Advanced Connection Settings');
-      }
-      
-      const discoveryData = await discoveryResponse.json();
-      
-      // Get collar IP and construct WebSocket URL
-      const collarIP = discoveryData.local_ip || discoveryData.ip_address;
-      if (!collarIP) {
-        throw new Error('No collar IP found in discovery response');
-      }
-      
-      // Use WebSocket URL directly from collar if available, otherwise construct it
-      let wsUrl: string;
-      if (discoveryData.websocket_url && discoveryData.websocket_url.trim()) {
-        wsUrl = discoveryData.websocket_url;
-        console.log(`✅ Using WebSocket URL from collar: ${wsUrl}`);
-      } else {
-        // Construct WebSocket URL (most common case)
-        wsUrl = `ws://${collarIP}:8080`;
-        console.log(`🔧 Constructed WebSocket URL: ${wsUrl}`);
+      // Get cached WebSocket URL from localStorage
+      const wsUrl = localStorage.getItem('petg.wsUrl');
+      if (!wsUrl) {
+        alert('❌ Collar not discovered\n\nPlease reconnect to the collar first:\n• Go to Settings → Advanced Connection\n• Or wait for automatic UDP discovery');
+        return;
       }
       
       console.log(`📡 Connecting to collar WebSocket: ${wsUrl}`);
@@ -396,9 +356,9 @@ export function BeaconConfigurationPanel({
             wsErrorMessage,
             '',
             '🛠️ Troubleshooting Steps:',
-            '1. Check collar OLED display - confirm IP address is ' + collarIP,
+            '1. Check collar OLED display - confirm IP address matches cached URL',
             '2. Ensure collar and computer are on the same WiFi network',
-            '3. Check if collar is responding: go to http://' + collarIP + ' in browser',
+            '3. Check if collar is responding: go to ' + wsUrl.replace('ws://', 'http://').replace(':8080', '') + ' in browser',
             '4. Try the direct WebSocket test at: /test-websocket.html',
             '5. Go to Settings → Advanced Connection to reconfigure',
             '',

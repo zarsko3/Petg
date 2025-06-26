@@ -39,8 +39,8 @@ type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
 class CollarWebSocketService {
   private ws: WebSocket | null = null;
-  private reconnectTimeout: NodeJS.Timeout | null = null;
-  private pingInterval: NodeJS.Timeout | null = null;
+  private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+  private pingInterval: ReturnType<typeof setInterval> | null = null;
   private status: ConnectionStatus = 'disconnected';
   private lastError: string | null = null;
   private wsUrl: string | null = null;
@@ -67,42 +67,15 @@ class CollarWebSocketService {
         return this.wsUrl;
       }
       
-      // Check if the proxy has received a direct collar announcement with WebSocket URL
-      const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-      
-      // Make a single, fast request to get collar info directly (no discovery scanning)
-      const response = await fetch(`${baseUrl}/api/collar-proxy?endpoint=/api/discover`, {
-        method: 'GET',
-        headers: { 
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache' 
-        },
-        signal: AbortSignal.timeout(5000) // Fast timeout - collar should respond immediately if available
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        
-        // The collar provides the WebSocket URL directly in its response
-        if (data.websocket_url) {
-          console.log(`✅ CollarService: Using WebSocket URL directly from collar: ${data.websocket_url}`);
-          return data.websocket_url;
-        }
-        
-        // Fallback: construct from IP if websocket_url not provided
-        const collarIP = data.local_ip || data.ip_address;
-        if (collarIP) {
-          const websocketUrl = `ws://${collarIP}:8080`;
-          console.log(`✅ CollarService: Constructed WebSocket URL from collar IP: ${websocketUrl}`);
-          return websocketUrl;
-        }
-        
-        console.log('⚠️ CollarService: Collar response missing WebSocket URL and IP');
-        return null;
-      } else {
-        console.log(`ℹ️ CollarService: Collar not available (${response.status}), using HTTP polling`);
-        return null;
+      // Check localStorage for cached WebSocket URL from UDP discovery
+      const cachedUrl = localStorage.getItem('petg.wsUrl');
+      if (cachedUrl) {
+        console.log(`✅ CollarService: Using cached WebSocket URL: ${cachedUrl}`);
+        return cachedUrl;
       }
+      
+      console.log('ℹ️ CollarService: No cached WebSocket URL found');
+      return null;
       
     } catch (error) {
       console.log('ℹ️ CollarService: WebSocket not available, using HTTP polling');
@@ -200,14 +173,20 @@ class CollarWebSocketService {
           if (!isResolved) {
             isResolved = true;
             clearTimeout(connectionTimeout);
-            console.log('✅ CollarService: WebSocket connected successfully!');
+            console.log('✅ CollarService: WebSocket connected successfully');
             this.setStatus('connected');
             this.lastError = null;
             
-            // Update global store
-            this.updateStore();
+            // Dispatch connection state to store
+            if (typeof window !== 'undefined') {
+              const store = usePetgStore.getState();
+              store.setCollarConnected(true);
+              store.setConnectionStatus('Connected');
+              store.setConnectionMessage('WebSocket connected');
+              store.setLastConnectionAttempt(Date.now());
+            }
             
-            // Start ping to keep connection alive
+            this.updateStore();
             this.startPing();
             resolve();
           }
@@ -226,6 +205,13 @@ class CollarWebSocketService {
               console.log(`📡 CollarService: Scanner stats:`, data.scanner);
             }
             
+            // Update store with live data - this triggers switch from mock to live
+            if (typeof window !== 'undefined') {
+              const store = usePetgStore.getState();
+              store.setLastCollarData(data);
+              store.setLastDataReceived(Date.now());
+            }
+            
             // Update global store with latest data
             this.updateStore(data);
             
@@ -241,6 +227,15 @@ class CollarWebSocketService {
             console.error('❌ CollarService: WebSocket error:', error);
             this.setStatus('error');
             this.lastError = 'WebSocket connection error';
+            
+            // Dispatch error state to store
+            if (typeof window !== 'undefined') {
+              const store = usePetgStore.getState();
+              store.setCollarConnected(false);
+              store.setConnectionStatus('Failed');
+              store.setConnectionMessage('WebSocket error');
+            }
+            
             this.updateStore();
             reject(new Error('WebSocket connection error'));
           }
@@ -254,6 +249,14 @@ class CollarWebSocketService {
           
           console.log(`🔌 CollarService: WebSocket closed: ${event.code} ${event.reason || 'No reason'}`);
           this.setStatus('disconnected');
+          
+          // Dispatch disconnection state to store
+          if (typeof window !== 'undefined') {
+            const store = usePetgStore.getState();
+            store.setCollarConnected(false);
+            store.setConnectionStatus('Failed');
+            store.setConnectionMessage(`Connection closed: ${event.reason || 'Unknown reason'}`);
+          }
           
           // Update global store
           this.updateStore();
