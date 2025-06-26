@@ -448,4 +448,85 @@ input:focus, select:focus, textarea:focus {
 .mobile-nav-item:focus-visible {
   outline: 2px solid hsl(var(--pet-primary));
   outline-offset: 2px;
+}
+
+/* Safe area handling for iPhone and Android devices */
+:root {
+  --safe-area-inset-top: env(safe-area-inset-top, 0px);
+  --safe-area-inset-right: env(safe-area-inset-right, 0px);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-inset-left: env(safe-area-inset-left, 0px);
+  
+  /* Enhanced map style tokens */
+  --room-fill: rgba(59, 130, 246, 0.15);
+  --zone-fill: rgba(239, 68, 68, 0.25);
+  --beacon-color: #10b981;
+  --collar-color: #4cc9c8;
+}
+
+/* Enhanced Konva Map specific styles */
+.enhanced-konva-map {
+  /* Ensure proper touch handling */
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Handle iPhone notch and safe areas */
+@supports (padding: max(0px)) {
+  .mobile-safe-area {
+    padding-top: max(var(--safe-area-inset-top), 0px);
+    padding-bottom: max(var(--safe-area-inset-bottom), 0px);
+    padding-left: max(var(--safe-area-inset-left), 0px);
+    padding-right: max(var(--safe-area-inset-right), 0px);
+  }
+}
+
+/* Performance optimizations for Canvas/Konva */
+.konva-container {
+  /* GPU acceleration */
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
+  
+  /* Smooth scrolling and touch */
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* High DPI display optimization */
+@media (-webkit-min-device-pixel-ratio: 2) {
+  .konva-container canvas {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+  }
+}
+
+/* Mobile viewport adjustments */
+@media screen and (max-width: 768px) {
+  .enhanced-map-container {
+    /* Prevent zoom on double tap */
+    touch-action: manipulation;
+    
+    /* Ensure full height on mobile */
+    height: 100vh;
+    height: 100dvh; /* Use dynamic viewport height if supported */
+  }
+}
+
+/* Handle orientation changes smoothly */
+@media screen and (orientation: landscape) {
+  .enhanced-map-container {
+    /* Adjust for landscape mode */
+    padding-top: var(--safe-area-inset-top);
+    padding-bottom: var(--safe-area-inset-bottom);
+  }
+}
+
+/* Pixel 6 and similar devices */
+@media screen and (min-device-pixel-ratio: 3) {
+  .konva-container {
+    /* Additional optimizations for high-DPI */
+    image-rendering: pixelated;
+  }
 } 

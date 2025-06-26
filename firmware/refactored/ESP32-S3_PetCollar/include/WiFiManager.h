@@ -36,7 +36,7 @@ typedef std::function<void(bool connected)> WiFiConnectionCallback;
 typedef std::function<void(String ssid, String password)> WiFiCredentialsCallback;
 
 /**
- * @brief WiFi configuration parameters
+ * @brief Enhanced WiFi configuration parameters with fast reconnection support
  */
 struct WiFiCredentials {
     String ssid;
@@ -48,16 +48,48 @@ struct WiFiCredentials {
     IPAddress dns1;
     IPAddress dns2;
     
+    // Enhanced fast reconnection fields
+    int channel;                    // WiFi channel for fast scanning
+    uint8_t bssid[6];              // Specific AP BSSID for instant connection
+    int32_t rssi;                  // Last known signal strength
+    unsigned long lastConnected;   // Timestamp of last successful connection
+    bool isValid;                  // Credential validity flag
+    
     WiFiCredentials() : 
         useStaticIP(false),
         staticIP(0, 0, 0, 0),
         gateway(0, 0, 0, 0),
         subnet(255, 255, 255, 0),
         dns1(8, 8, 8, 8),
-        dns2(8, 8, 4, 4) {}
+        dns2(8, 8, 4, 4),
+        channel(0),
+        rssi(-100),
+        lastConnected(0),
+        isValid(false) {
+        memset(bssid, 0, 6);
+    }
     
-    bool isValid() const {
+    bool isValidCredentials() const {
+        return ssid.length() > 0 && ssid.length() <= MAX_SSID_LENGTH && isValid;
+    }
+    
+    bool isValidForConnection() const {
         return ssid.length() > 0 && ssid.length() <= MAX_SSID_LENGTH;
+    }
+    
+    void updateConnectionInfo() {
+        if (WiFi.status() == WL_CONNECTED) {
+            channel = WiFi.channel();
+            rssi = WiFi.RSSI();
+            lastConnected = millis();
+            
+            // Store BSSID for specific AP targeting
+            uint8_t* currentBSSID = WiFi.BSSID();
+            if (currentBSSID) {
+                memcpy(bssid, currentBSSID, 6);
+            }
+            isValid = true;
+        }
     }
 };
 
@@ -105,10 +137,13 @@ private:
     DNSServer* m_dnsServer;
     Preferences m_preferences;
     
-    // Configuration
-    WiFiCredentials m_credentials;
+    // Configuration - Enhanced with multi-network support
+    static const int MAX_SAVED_NETWORKS = 3;
+    WiFiCredentials m_savedNetworks[MAX_SAVED_NETWORKS];
+    WiFiCredentials m_credentials;  // Current active credentials
     APConfig m_apConfig;
     String m_deviceName;
+    String m_mdnsHostname;
     
     // State management
     ConnectionState m_connectionState;
@@ -116,6 +151,8 @@ private:
     bool m_isInitialized;
     bool m_captivePortalEnabled;
     bool m_autoReconnectEnabled;
+    bool m_setupModeActive;
+    unsigned long m_setupModeStartTime;
     
     // Timing and retry logic
     unsigned long m_lastConnectionAttempt;
@@ -200,6 +237,20 @@ private:
      * @brief Update connection state and notify callbacks
      */
     void updateConnectionState(ConnectionState newState);
+    
+    /**
+     * @brief Enhanced fast WiFi scanning and connection methods
+     */
+    void performFastScan();
+    bool connectToSavedNetwork(const WiFiCredentials& network);
+    void loadSavedNetworks();
+    void saveSavedNetworks();
+    int findOldestNetworkSlot();
+    
+    /**
+     * @brief mDNS service management
+     */
+    void updateMDNSServices();
 
 public:
     /**
@@ -348,7 +399,7 @@ public:
      * @return true if valid credentials exist
      */
     bool hasCredentials() const {
-        return m_credentials.isValid();
+        return m_credentials.isValidForConnection();
     }
     
     /**
@@ -409,8 +460,79 @@ public:
      * @return Configuration portal URL
      */
     String getConfigPortalURL() const {
-        return "http://" + getLocalIP();
+        return "http://" + m_apConfig.localIP.toString();
     }
+    
+    /**
+     * @brief Enhanced connection methods for fast WiFi re-association
+     */
+    
+    /**
+     * @brief Start enhanced WiFi manager with fast reconnection
+     * @return Success status
+     */
+    bool beginEnhanced();
+    
+    /**
+     * @brief Add network to cache for fast reconnection
+     * @param ssid Network SSID
+     * @param password Network password
+     * @return Success status
+     */
+    bool addNetworkToCache(const String& ssid, const String& password);
+    
+    /**
+     * @brief Setup mDNS service for zero-config discovery
+     * @return Success status
+     */
+    bool setupMDNSService();
+    
+    /**
+     * @brief Get mDNS hostname for zero-config discovery
+     * @return mDNS hostname (e.g., "petg-collar-1234.local")
+     */
+    String getMDNSHostname() const {
+        return m_mdnsHostname + ".local";
+    }
+    
+    /**
+     * @brief Force immediate reconnection with fresh network discovery
+     */
+    void forceReconnection();
+    
+    /**
+     * @brief Get saved networks information
+     * @return JSON array of saved networks
+     */
+    String getSavedNetworksJson() const;
+    
+    /**
+     * @brief Remove network from saved list
+     * @param ssid Network SSID to remove
+     */
+    void forgetNetwork(const String& ssid);
+    
+    /**
+     * @brief Clear all saved networks
+     */
+    void forgetAllNetworks();
+    
+    /**
+     * @brief Attempt controlled WiFi connection with proper error handling
+     * @param ssid Network SSID
+     * @param password Network password
+     * @return Success status
+     */
+    bool attemptConnection(const String& ssid, const String& password);
+    
+         /**
+      * @brief Check if setup mode timeout has been reached
+      * @return True if should start setup AP
+      */
+     bool shouldStartSetupMode() const {
+         return !WiFi.isConnected() && !m_setupModeActive && 
+                (millis() > 30000); // 30 second timeout
+     }
 };
 
 #endif // WIFI_MANAGER_H 

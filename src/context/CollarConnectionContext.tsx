@@ -124,13 +124,36 @@ export function CollarConnectionProvider({ children }: CollarConnectionProviderP
           break
 
         case 'COLLAR_DATA':
-          console.log('📊 Live collar data received:', message.data)
+          console.log('📊 Live collar data received (raw):', event.data)
+          console.log('📊 Live collar data (parsed):', message.data)
+          
+          // Enhanced battery parsing with detailed logging
+          let batteryLevel = 85; // default
+          const data = message.data;
+          if (data.battery !== undefined) {
+            batteryLevel = Number(data.battery);
+            console.log('🔋 Battery found in data.battery:', data.battery, '-> parsed as:', batteryLevel);
+          } else if (data.bat !== undefined) {
+            batteryLevel = Number(data.bat);
+            console.log('🔋 Battery found in data.bat:', data.bat, '-> parsed as:', batteryLevel);
+          } else if (data.power !== undefined) {
+            batteryLevel = Number(data.power);
+            console.log('🔋 Battery found in data.power:', data.power, '-> parsed as:', batteryLevel);
+          } else if (data.voltage !== undefined) {
+            // Convert voltage to percentage (typical LiPo: 3.0V = 0%, 4.2V = 100%)
+            const voltage = Number(data.voltage);
+            batteryLevel = Math.max(0, Math.min(100, ((voltage - 3.0) / 1.2) * 100));
+            console.log('🔋 Battery calculated from voltage:', voltage, 'V -> ', batteryLevel, '%');
+          } else {
+            console.log('⚠️ No battery information found in collar data. Available fields:', Object.keys(data));
+          }
+          
           setCollarData({
-            position: message.data.position,
-            battery: message.data.battery,
-            rssi: message.data.rssi,
-            temperature: message.data.temperature,
-            humidity: message.data.humidity,
+            position: data.position || data.pos || { x: 50, y: 50 },
+            battery: Math.round(batteryLevel),
+            rssi: data.rssi || data.signal || -45,
+            temperature: data.temperature || data.temp || 20,
+            humidity: data.humidity || data.hum || 60,
             timestamp: new Date().toISOString()
           })
           resetFailoverTimeout()
@@ -224,50 +247,66 @@ export function CollarConnectionProvider({ children }: CollarConnectionProviderP
     }
   }, [connectedIP, status, handleMessage, cleanup]);
 
-  // Listen for collar discovery events
+  // Listen for collar discovery events - ensure only one connection per tab
   useEffect(() => {
     const connectToDiscoveryServer = () => {
-      if (discoveryWsRef.current) return;
+      // Prevent multiple connections
+      if (discoveryWsRef.current?.readyState === WebSocket.CONNECTING || 
+          discoveryWsRef.current?.readyState === WebSocket.OPEN) {
+        console.log('🔄 Discovery WebSocket already connected/connecting, skipping...');
+        return;
+      }
       
       try {
-        // Use the current host for WebSocket connection
-        const wsHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-        console.log(`🔄 Attempting to connect to discovery WebSocket at ws://${wsHost}:3001`);
-        const discoveryWs = new WebSocket(`ws://${wsHost}:3001`);
+        // Use localhost for discovery WebSocket connection
+        const wsUrl = 'ws://localhost:3001/discovery';
+        console.log(`🔄 Connecting to discovery WebSocket: ${wsUrl}`);
+        const discoveryWs = new WebSocket(wsUrl);
         
         discoveryWs.onopen = () => {
-          console.log(`🔌 Connected to discovery WebSocket at ws://${wsHost}:3001`);
+          console.log(`🔌 Connected to discovery WebSocket: ${wsUrl}`);
           discoveryWsRef.current = discoveryWs;
         };
         
         discoveryWs.onmessage = (event) => {
           try {
             const message = JSON.parse(event.data);
-            console.log('📡 Discovery message received:', message);
+            console.log('📡 Discovery message received (raw):', event.data);
+            console.log('📡 Discovery message parsed:', message);
             
             if (message.type === 'COLLAR_DISCOVERED' && message.ip) {
-              console.log(`🎯 Collar discovered at ${message.ip}, attempting connection...`);
+              console.log(`🎯 Collar discovered at ${message.ip}, setting state to connecting...`);
+              setStatus('connecting');
+              
+              // Use the discovered IP to build WebSocket URL
+              const collarWsUrl = `ws://${message.ip}:8080`;
+              console.log(`🔗 Connecting to collar WebSocket: ${collarWsUrl}`);
               connectToCollar(message.ip);
             }
           } catch (error) {
             console.error('❌ Error parsing discovery message:', error);
+            console.error('❌ Raw message data:', event.data);
           }
         };
         
-        discoveryWs.onclose = () => {
-          console.log('🔌 Discovery WebSocket closed, will retry...');
+        discoveryWs.onclose = (event) => {
+          console.log(`🔌 Discovery WebSocket closed (code: ${event.code}, reason: ${event.reason})`);
           discoveryWsRef.current = null;
-          // Retry connection after 5 seconds
-          setTimeout(connectToDiscoveryServer, 5000);
+          
+          // Only retry if not a clean close
+          if (event.code !== 1000) {
+            console.log('🔄 Will retry discovery connection in 5 seconds...');
+            setTimeout(connectToDiscoveryServer, 5000);
+          }
         };
         
         discoveryWs.onerror = (error) => {
-          console.error(`❌ Discovery WebSocket error connecting to ws://${wsHost}:3001:`, error);
+          console.error(`❌ Discovery WebSocket error:`, error);
+          discoveryWsRef.current = null;
         };
         
       } catch (error) {
-        console.error('❌ Failed to connect to discovery server:', error);
-        // Retry after 5 seconds
+        console.error('❌ Failed to create discovery WebSocket connection:', error);
         setTimeout(connectToDiscoveryServer, 5000);
       }
     };
@@ -275,9 +314,11 @@ export function CollarConnectionProvider({ children }: CollarConnectionProviderP
     // Start discovery connection
     connectToDiscoveryServer();
     
+    // Cleanup on unmount
     return () => {
+      console.log('🧹 Cleaning up discovery WebSocket...');
       if (discoveryWsRef.current) {
-        discoveryWsRef.current.close();
+        discoveryWsRef.current.close(1000, 'Component unmounting');
         discoveryWsRef.current = null;
       }
     };
@@ -321,7 +362,7 @@ export function CollarConnectionProvider({ children }: CollarConnectionProviderP
       }
       
       // Fallback: try common collar IPs
-      const commonIPs = ['192.168.1.35', '192.168.0.35', '10.0.0.35'];
+      const commonIPs = ['192.168.1.35', '192.168.0.35', '192.168.1.100'];
       console.log('🔍 Trying common collar IPs...');
       
       for (const ip of commonIPs) {

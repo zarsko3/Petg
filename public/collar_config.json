@@ -1,7 +1,7 @@
 {
-  "collar_ip": "10.0.0.6",
-  "websocket_url": "ws://10.0.0.6:8080",
-  "http_url": "http://10.0.0.6",
+  "collar_ip": "192.168.1.35",
+  "websocket_url": "ws://192.168.1.35:8080",
+  "http_url": "http://192.168.1.35",
   "status": "connected",
   "last_discovered": "2025-06-10T19:00:00.000Z"
 }

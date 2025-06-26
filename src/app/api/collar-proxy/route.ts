@@ -77,7 +77,7 @@ function initWebSocketServer() {
 }
 
 // Broadcast discovery event to all connected clients
-function broadcastCollarDiscovered(ip: string) {
+function broadcastCollarDiscovered(collarInfo: any) {
   if (!wsServer) {
     initWebSocketServer();
     return;
@@ -85,11 +85,11 @@ function broadcastCollarDiscovered(ip: string) {
   
   const message = JSON.stringify({
     type: 'COLLAR_DISCOVERED',
-    ip: ip,
+    data: collarInfo,
     timestamp: Date.now()
   });
   
-  console.log(`📢 Proxy: Broadcasting collar discovery: ${ip}`);
+  console.log(`📢 Proxy: Broadcasting collar discovery: ${collarInfo.ip_address} (${collarInfo.mdns_hostname})`);
   
   wsServer.clients.forEach((client) => {
     if (client.readyState === 1) { // WebSocket.OPEN
@@ -136,7 +136,7 @@ function startCollarListener() {
         
         // Only broadcast if this is a new discovery or IP change
         if (previousIP !== cachedCollarIP && cachedCollarIP) {
-          broadcastCollarDiscovered(cachedCollarIP);
+          broadcastCollarDiscovered(data);
         }
       }
     } catch (error) {

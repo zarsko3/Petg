@@ -43,6 +43,9 @@
 // UDP for network broadcasting
 #include <WiFiUdp.h>
 
+// Enhanced Wi-Fi management
+#include "include/micro_wifi_manager.h"
+
 // ==================== HARDWARE PINS (ESP32-S3 OPTIMIZED) ====================
 #define BUZZER_PIN 18
 #define VIBRATION_PIN 16
@@ -1258,11 +1261,18 @@ void broadcastCollarPresence() {
   broadcastDoc["wifi_ssid"] = WiFi.SSID();
   broadcastDoc["signal_strength"] = WiFi.RSSI();
   
-  // Service endpoints
+  // mDNS hostname for zero-config discovery
+  String hostname = "petg-collar-" + WiFi.macAddress().substring(9);
+  hostname.replace(":", "");
+  hostname.toLowerCase();
+  broadcastDoc["mdns_hostname"] = hostname + ".local";
+  
+  // Service endpoints with mDNS support
   broadcastDoc["http_port"] = 80;
   broadcastDoc["websocket_port"] = 8080;
   broadcastDoc["dashboard_url"] = "http://" + WiFi.localIP().toString();
   broadcastDoc["websocket_url"] = "ws://" + WiFi.localIP().toString() + ":8080";
+  broadcastDoc["mdns_websocket_url"] = "ws://" + hostname + ".local:8080";
   broadcastDoc["api_endpoint"] = "http://" + WiFi.localIP().toString() + "/api/discover";
   
   // System status
@@ -1309,10 +1319,10 @@ void initializeUDPBroadcast() {
 void startmDNSService() {
   if (!systemState.wifiConnected) return;
   
-  Serial.println("🔍 Starting mDNS service for automatic discovery...");
+  Serial.println("🔍 Starting mDNS service for zero-config discovery...");
   
-  // Initialize mDNS with unique hostname
-  String hostname = "esp32-petcollar-" + WiFi.macAddress().substring(9);
+  // Use consistent hostname format: petg-collar-XXXX
+  String hostname = "petg-collar-" + WiFi.macAddress().substring(9);
   hostname.replace(":", "");
   hostname.toLowerCase();
   
@@ -1321,24 +1331,24 @@ void startmDNSService() {
     return;
   }
   
-  // Add service descriptions for discovery
-  MDNS.addService("http", "tcp", 80);
-  MDNS.addService("ws", "tcp", 8080);
-  MDNS.addService("petcollar", "tcp", 80);
+  // Primary service: _petg-ws._tcp for collar WebSocket discovery
+  MDNS.addService("_petg-ws", "_tcp", 8080);
+  MDNS.addServiceTxt("_petg-ws", "_tcp", "device", "ESP32-S3-PetCollar");
+  MDNS.addServiceTxt("_petg-ws", "_tcp", "version", FIRMWARE_VERSION);
+  MDNS.addServiceTxt("_petg-ws", "_tcp", "ip", WiFi.localIP().toString());
+  MDNS.addServiceTxt("_petg-ws", "_tcp", "mac", WiFi.macAddress());
+  MDNS.addServiceTxt("_petg-ws", "_tcp", "type", "collar");
   
-  // Add service attributes for identification
-  MDNS.addServiceTxt("http", "tcp", "device", "ESP32-S3-PetCollar");
-  MDNS.addServiceTxt("http", "tcp", "version", FIRMWARE_VERSION);
-  MDNS.addServiceTxt("http", "tcp", "api", "/api/discover");
-  MDNS.addServiceTxt("http", "tcp", "websocket", "8080");
-  
-  MDNS.addServiceTxt("petcollar", "tcp", "device_type", "ESP32-S3_PetCollar");
-  MDNS.addServiceTxt("petcollar", "tcp", "ip", WiFi.localIP().toString());
-  MDNS.addServiceTxt("petcollar", "tcp", "mac", WiFi.macAddress());
+  // HTTP service for discovery API
+  MDNS.addService("http", "_tcp", 80);
+  MDNS.addServiceTxt("http", "_tcp", "device", "ESP32-S3-PetCollar");
+  MDNS.addServiceTxt("http", "_tcp", "path", "/api/discover");
+  MDNS.addServiceTxt("http", "_tcp", "websocket", "8080");
   
   Serial.printf("✅ mDNS service started: %s.local\n", hostname.c_str());
-  Serial.printf("🔍 Dashboard can now discover collar automatically!\n");
-  Serial.printf("   Service: _petcollar._tcp.local\n");
+  Serial.printf("🔍 Zero-config discovery available!\n");
+  Serial.printf("   Primary service: _petg-ws._tcp.local:8080\n");
+  Serial.printf("   WebSocket URL: ws://%s.local:8080\n", hostname.c_str());
   Serial.printf("   Hostname: %s.local\n", hostname.c_str());
   Serial.printf("   IP: %s\n", WiFi.localIP().toString().c_str());
 }
@@ -1379,8 +1389,15 @@ void setup() {
     delay(1000);  // Let user see the text validation
   }
   
-  // Initialize advanced WiFi with captive portal fallback
-  connectWiFi();
+  // Initialize enhanced WiFi with fast re-association
+  Serial.println("🌐 Starting Fast Wi-Fi Manager...");
+  if (!wifiManager.begin()) {
+    Serial.println("❌ Fast Wi-Fi Manager initialization failed!");
+    // Fallback to old method
+    connectWiFi();
+  } else {
+    Serial.println("✅ Fast Wi-Fi Manager initialized successfully!");
+  }
   
   // Initialize advanced BLE with optimized scanning
   try {
@@ -1418,6 +1435,9 @@ void setup() {
 // ==================== ADVANCED MAIN LOOP ====================
 void loop() {
   unsigned long currentTime = millis();
+  
+  // Handle fast WiFi manager
+  wifiManager.loop();
   
   // Handle web server and WebSocket communication
   if (systemState.webServerRunning) {

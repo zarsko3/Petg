@@ -67,10 +67,9 @@ export function LiveCameraFrame({
   }, [streamSrc])
 
   return (
-    <div className={`w-full aspect-video overflow-hidden rounded-lg shadow ${className}`}>
+    <div className={`w-full overflow-hidden rounded-lg shadow ${className}`}>
       <div 
         className="w-full h-full relative"
-        style={{ maxHeight: 'calc(40vh - env(safe-area-inset-bottom))' }}
       >
         {streamSrc && isConnected ? (
           <video

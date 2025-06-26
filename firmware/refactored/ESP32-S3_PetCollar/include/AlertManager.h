@@ -18,28 +18,13 @@
 #include <Arduino.h>
 #include "ESP32_S3_Config.h"
 #include "MicroConfig.h"
+#include "BeaconTypes.h"
 
 // ==========================================
 // ALERT PATTERNS & DEFINITIONS
 // ==========================================
 
-/**
- * @brief Alert trigger reasons
- */
-enum class AlertReason : uint8_t {
-    NONE = 0,
-    PROXIMITY_DETECTED,     ///< Pet collar detected nearby
-    PROXIMITY_LOST,         ///< Pet collar signal lost  
-    LOW_BATTERY,            ///< Battery level is low
-    CRITICAL_BATTERY,       ///< Battery level is critical
-    WIFI_DISCONNECTED,      ///< WiFi connection lost
-    SYSTEM_ERROR,           ///< System error occurred
-    ZONE_ENTERED,           ///< Entered defined zone
-    ZONE_EXITED,            ///< Exited defined zone
-    MANUAL_TEST,            ///< Manual test activation
-    BEACON_FOUND,           ///< Target beacon detected
-    CUSTOM                  ///< Custom alert reason
-};
+// AlertReason now defined in BeaconTypes.h
 
 /**
  * @brief Alert pattern types
@@ -58,9 +43,9 @@ enum class AlertPattern : uint8_t {
  * @brief Alert priority levels
  */
 enum class AlertPriority : uint8_t {
-    LOW = 0,                ///< Low priority (can be overridden)
-    NORMAL,                 ///< Normal priority
-    HIGH,                   ///< High priority (overrides normal)
+    ALERT_LOW = 0,          ///< Low priority (can be overridden)
+    NORMAL,                 ///< Normal priority  
+    ALERT_HIGH,             ///< High priority (overrides normal)
     CRITICAL                ///< Critical priority (overrides all)
 };
 
@@ -443,12 +428,39 @@ inline const char* alertPatternToString(AlertPattern pattern) {
  */
 inline const char* alertPriorityToString(AlertPriority priority) {
     switch (priority) {
-        case AlertPriority::LOW: return "Low";
+        case AlertPriority::ALERT_LOW: return "Low";
         case AlertPriority::NORMAL: return "Normal";
-        case AlertPriority::HIGH: return "High";
+        case AlertPriority::ALERT_HIGH: return "High";
         case AlertPriority::CRITICAL: return "Critical";
         default: return "Unknown";
     }
 }
+
+// ==========================================
+// ENHANCED ALERT MANAGER CLASS
+// ==========================================
+
+/**
+ * @brief Enhanced Alert Manager with simplified interface
+ */
+class AlertManager_Enhanced {
+private:
+    uint8_t buzzerPin;
+    uint8_t vibrationPin;
+    bool alertActive;
+    
+public:
+    AlertManager_Enhanced(uint8_t buzzerPin, uint8_t vibrationPin);
+    
+    // Core functionality
+    bool update();
+    bool stopAlert(bool force = false);
+    bool isAlertActive() const;
+    bool initialize();
+    bool triggerAlert(const AlertConfig& config);
+    
+    // Utility functions
+    AlertMode stringToAlertMode(const String& modeStr);
+};
 
 #endif // ALERT_MANAGER_H 

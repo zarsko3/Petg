@@ -284,8 +284,9 @@ private:
      */
     void updateNetworkStatus();
     
+public:
     /**
-     * @brief Update battery status
+     * @brief Update battery status  
      */
     void updateBatteryStatus();
     
@@ -479,6 +480,59 @@ public:
                            uint32_t componentMs = 10000,
                            uint32_t networkMs = 5000,
                            uint32_t batteryMs = 30000);
+    
+    // ==================== COMPATIBILITY METHODS ====================
+    /**
+     * @brief Initialize system state manager (compatibility)
+     */
+    void initialize();
+    
+    /**
+     * @brief Get battery percentage (compatibility)
+     * @return Battery percentage (0-100)
+     */
+    int getBatteryPercent() const;
+    
+    /**
+     * @brief Get error count (compatibility)
+     * @return Total error count
+     */
+    int getErrorCount() const;
+    
+    /**
+     * @brief Get proximity alerts count (compatibility)
+     * @return Proximity alerts count
+     */
+    int getProximityAlerts() const;
+    
+    /**
+     * @brief Record system error (compatibility)
+     * @param error Error message
+     */
+    void recordError(const String& error);
+    
+    /**
+     * @brief Update proximity alerts count (compatibility)
+     * @param count Number of alerts to add
+     */
+    void updateProximityAlerts(int count);
+    
+    /**
+     * @brief Update beacon statistics (compatibility)
+     * @param newBeacons Number of new beacons detected
+     */
+    void updateBeaconStats(int newBeacons);
+    
+    /**
+     * @brief Update system metrics (compatibility)
+     */
+    void updateSystemMetrics();
+    
+    /**
+     * @brief Get system status as JSON (compatibility)
+     * @return JSON status string
+     */
+    String getSystemStatusJSON() const;
 };
 
 // ==========================================

@@ -7,6 +7,13 @@ import { Radio, PawPrint } from 'lucide-react'
 import { Point2D } from '@/lib/floorPlan'
 import { useCollarConnection } from '@/context/CollarConnectionContext'
 
+// Extend window to include Leaflet globals for defensive patching
+declare global {
+  interface Window {
+    L: typeof L
+  }
+}
+
 // Fix for default markers in Leaflet with Next.js
 delete (L.Icon.Default.prototype as any)._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -169,15 +176,47 @@ export function MobileLeafletMap({
   const markersRef = useRef<{ pet?: L.Marker; beacons: L.Marker[] }>({ beacons: [] })
   const [activePopup, setActivePopup] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
+  const isUnmounting = useRef(false)
   const { isLive } = useCollarConnection()
 
   // Only run on client side
   useEffect(() => {
+    // Defensive patch for Leaflet DOM classList error
+    if (typeof window !== 'undefined' && window.L && window.L.DomUtil) {
+      const originalRemoveClass = window.L.DomUtil.removeClass
+      const originalAddClass = window.L.DomUtil.addClass
+      
+      // Patch removeClass to handle undefined elements
+      window.L.DomUtil.removeClass = function(el: any, name: string) {
+        try {
+          if (el && el.classList && typeof el.classList.remove === 'function') {
+            return originalRemoveClass.call(this, el, name)
+          }
+        } catch (error) {
+          console.warn('⚠️ Leaflet removeClass error prevented:', error)
+        }
+      }
+      
+      // Patch addClass for consistency
+      window.L.DomUtil.addClass = function(el: any, name: string) {
+        try {
+          if (el && el.classList && typeof el.classList.add === 'function') {
+            return originalAddClass.call(this, el, name)
+          }
+        } catch (error) {
+          console.warn('⚠️ Leaflet addClass error prevented:', error)
+        }
+      }
+    }
+    
     setMounted(true)
   }, [])
 
   useEffect(() => {
     if (!mounted || !mapRef.current) return
+    
+    // Reset unmounting flag when creating a new map
+    isUnmounting.current = false
     
     // Clean up existing map instance first
     if (mapInstance.current) {
@@ -185,7 +224,7 @@ export function MobileLeafletMap({
       mapInstance.current = null
     }
 
-    // Initialize map with enhanced rendering quality and performance
+    // Initialize map with optimized settings for mobile performance
     const map = L.map(mapRef.current, {
       center: [petPosition.y, petPosition.x],
       zoom: 4,
@@ -197,14 +236,21 @@ export function MobileLeafletMap({
       scrollWheelZoom: false,
       boxZoom: false,
       keyboard: false,
-      maxZoom: 7,
+      maxZoom: 6,
       minZoom: 2,
-      // Enhanced rendering options for performance
-      preferCanvas: true, // Force canvas rendering for better performance
+      // Optimized rendering for stability and performance
+      preferCanvas: true,
       renderer: L.canvas({ 
-        tolerance: 5, // Increased tolerance for touch devices
-        padding: 0.2 // Add padding to improve panning performance
+        tolerance: 8, // Better touch handling
+        padding: 0.1 // Reduced padding for better performance
       }),
+      // Disable all animations for stability
+      fadeAnimation: false,
+      zoomAnimation: false,
+      markerZoomAnimation: false,
+      // Additional performance optimizations
+      inertia: false,
+      inertiaDeceleration: 3000
     })
 
     // Set pixel ratio for high-DPI displays with performance optimization
@@ -212,108 +258,178 @@ export function MobileLeafletMap({
       const container = map.getContainer()
       container.style.imageRendering = 'crisp-edges'
       container.style.imageRendering = '-webkit-optimize-contrast'
-      // Limit pixel ratio to avoid performance issues
-      const effectivePixelRatio = Math.min(window.devicePixelRatio, 2)
-      container.style.transform = `scale(${1/effectivePixelRatio})`
-      container.style.transformOrigin = '0 0'
+      // Remove problematic scale transform - let the map fill naturally
     }
 
-    // Create a more organized floor plan background
-    const FloorPlanLayer = L.GridLayer.extend({
-      createTile: function(coords: any) {
+    // Add a simple, static background layer instead of complex SVG grid
+    const SimpleBackgroundLayer = L.GridLayer.extend({
+      createTile: function() {
         const tile = document.createElement('div')
         tile.style.width = '256px'
         tile.style.height = '256px'
         tile.style.backgroundColor = '#F8FAFC'
-        tile.style.border = '1px solid rgba(148, 163, 184, 0.2)'
-        
-        // Cleaner, less cluttered room layout
-        tile.innerHTML = `
-          <svg width="256" height="256" style="position: absolute; top: 0; left: 0; opacity: 0.4;">
-            <defs>
-              <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-                <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(148, 163, 184, 0.1)" stroke-width="0.5"/>
-              </pattern>
-            </defs>
-            <rect width="256" height="256" fill="url(#grid)" />
-            <!-- Larger, clearer room outlines -->
-            <rect x="30" y="30" width="90" height="70" fill="rgba(59, 130, 246, 0.05)" stroke="rgba(59, 130, 246, 0.3)" stroke-width="1.5" rx="4" />
-            <rect x="140" y="30" width="80" height="60" fill="rgba(16, 185, 129, 0.05)" stroke="rgba(16, 185, 129, 0.3)" stroke-width="1.5" rx="4" />
-            <rect x="50" y="120" width="110" height="90" fill="rgba(139, 92, 246, 0.05)" stroke="rgba(139, 92, 246, 0.3)" stroke-width="1.5" rx="4" />
-            <!-- Room labels with better positioning -->
-            <text x="75" y="70" font-family="system-ui" font-size="11" font-weight="500" text-anchor="middle" fill="rgba(59, 130, 246, 0.8)">Living Room</text>
-            <text x="180" y="65" font-family="system-ui" font-size="11" font-weight="500" text-anchor="middle" fill="rgba(16, 185, 129, 0.8)">Kitchen</text>
-            <text x="105" y="170" font-family="system-ui" font-size="11" font-weight="500" text-anchor="middle" fill="rgba(139, 92, 246, 0.8)">Bedroom</text>
-          </svg>
-        `
+        tile.style.backgroundImage = 'linear-gradient(rgba(148, 163, 184, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(148, 163, 184, 0.1) 1px, transparent 1px)'
+        tile.style.backgroundSize = '20px 20px'
+        tile.style.pointerEvents = 'none' // Prevent interaction
         return tile
       }
     })
 
-    const floorPlan = new FloorPlanLayer()
-    floorPlan.addTo(map)
+    const backgroundLayer = new SimpleBackgroundLayer()
+    backgroundLayer.addTo(map)
     
     console.log('🗺️ Map initialized with enhanced performance and cleaner layout')
 
-    // Set bounds with more generous padding
+    // Set bounds with more generous padding - use defensive timing
     const bounds = L.latLngBounds(
       L.latLng(-5, -5),
       L.latLng(105, 105)
     )
     map.setMaxBounds(bounds)
-    map.fitBounds(bounds, { padding: [20, 20] }) // Add padding around map
+    
+    // Use requestAnimationFrame to ensure map is fully ready before fitBounds
+    requestAnimationFrame(() => {
+      try {
+        if (mapInstance.current && map.getContainer()) {
+          map.fitBounds(bounds, { 
+            padding: [20, 20],
+            animate: false // Disable animation to prevent timing issues
+          })
+        }
+      } catch (error) {
+        console.warn('⚠️ FitBounds failed, using fallback view:', error)
+        // Fallback to setView if fitBounds fails
+        try {
+          map.setView([50, 50], 3)
+        } catch (fallbackError) {
+          console.error('❌ Map view setup failed:', fallbackError)
+        }
+      }
+    })
 
     // Throttled zoom handler for better performance
     let zoomTimeout: ReturnType<typeof setTimeout>
     map.on('zoomstart', () => {
-      // Hide popups during zoom for performance
-      setActivePopup(null)
+      try {
+        // Hide popups during zoom for performance
+        setActivePopup(null)
+      } catch (error) {
+        console.warn('⚠️ Zoomstart handler error:', error)
+      }
     })
     
     map.on('zoomend', () => {
-      clearTimeout(zoomTimeout)
-      zoomTimeout = setTimeout(() => {
-        updateMarkerSizes()
-      }, 100) // Debounce marker updates
+      try {
+        if (isUnmounting.current) return
+        clearTimeout(zoomTimeout)
+        zoomTimeout = setTimeout(() => {
+          if (!isUnmounting.current) {
+            updateMarkerSizes()
+          }
+        }, 100) // Debounce marker updates
+      } catch (error) {
+        console.warn('⚠️ Zoomend handler error:', error)
+      }
     })
 
     // Handle map clicks to close popups
     map.on('click', () => {
-      setActivePopup(null)
+      try {
+        setActivePopup(null)
+      } catch (error) {
+        console.warn('⚠️ Map click handler error:', error)
+      }
     })
 
     mapInstance.current = map
     console.log('Map initialization complete')
 
     return () => {
-      if (mapInstance.current) {
-        mapInstance.current.remove()
-        mapInstance.current = null
+      isUnmounting.current = true
+      
+      try {
+        if (mapInstance.current) {
+          // Clear any pending timeouts
+          clearTimeout(zoomTimeout)
+          
+          // Stop all animations before cleanup
+          mapInstance.current.stop()
+          
+          // Close all popups to prevent reference issues
+          mapInstance.current.closePopup()
+          
+          // Remove all layers safely
+          mapInstance.current.eachLayer((layer) => {
+            try {
+              mapInstance.current?.removeLayer(layer)
+            } catch (layerError) {
+              console.warn('⚠️ Failed to remove layer:', layerError)
+            }
+          })
+          
+          // Clear event handlers
+          mapInstance.current.off()
+          
+          // Finally remove the map
+          mapInstance.current.remove()
+          mapInstance.current = null
+        }
+      } catch (error) {
+        console.warn('⚠️ Map cleanup error:', error)
+        mapInstance.current = null // Ensure it's cleared even if removal fails
       }
     }
   }, [mounted, petPosition.x, petPosition.y])
 
   // Function to update marker sizes based on current zoom
   const updateMarkerSizes = () => {
-    if (!mapInstance.current) return
+    if (!mapInstance.current || isUnmounting.current) return
 
-    const map = mapInstance.current
-    const currentZoom = map.getZoom()
-    const newSize = getSizeForZoom(currentZoom)
-
-    // Update beacon markers
-    markersRef.current.beacons.forEach((marker, index) => {
-      const beacon = beacons[index]
-      if (beacon) {
-        const newIcon = createMarkerIcon('beacon', newSize, beacon.connected)
-        marker.setIcon(newIcon)
+    try {
+      const map = mapInstance.current
+      
+      // Enhanced validation - check if map and DOM container still exist
+      const container = map.getContainer()
+      if (!container || !document.contains(container)) {
+        console.warn('⚠️ Map container no longer exists, skipping marker update')
+        return
       }
-    })
+      
+      const currentZoom = map.getZoom()
+      const newSize = getSizeForZoom(currentZoom)
 
-    // Update pet marker
-    if (markersRef.current.pet) {
-      const newIcon = createMarkerIcon('collar', newSize, true, isLive)
-      markersRef.current.pet.setIcon(newIcon)
+      // Update beacon markers with enhanced error handling
+      markersRef.current.beacons.forEach((marker, index) => {
+        try {
+          const beacon = beacons[index]
+          if (beacon && marker && marker.getElement()) {
+            // Check if marker DOM element still exists
+            const markerElement = marker.getElement()
+            if (markerElement && document.contains(markerElement)) {
+              const newIcon = createMarkerIcon('beacon', newSize, beacon.connected)
+              marker.setIcon(newIcon)
+            }
+          }
+        } catch (error) {
+          console.warn(`⚠️ Failed to update beacon marker ${index}:`, error)
+        }
+      })
+
+      // Update pet marker with enhanced error handling
+      if (markersRef.current.pet) {
+        try {
+          const petMarker = markersRef.current.pet
+          const markerElement = petMarker.getElement()
+          if (markerElement && document.contains(markerElement)) {
+            const newIcon = createMarkerIcon('collar', newSize, true, isLive)
+            petMarker.setIcon(newIcon)
+          }
+        } catch (error) {
+          console.warn('⚠️ Failed to update pet marker:', error)
+        }
+      }
+    } catch (error) {
+      console.warn('⚠️ updateMarkerSizes failed:', error)
     }
   }
 
@@ -744,6 +860,8 @@ export function MobileLeafletMap({
         .mobile-map {
           min-height: 300px !important;
           position: relative !important;
+          width: 100% !important;
+          height: 100% !important;
         }
         
         .mobile-map .leaflet-container {
@@ -751,6 +869,7 @@ export function MobileLeafletMap({
           width: 100% !important;
           min-height: 300px !important;
           position: relative !important;
+          transform: none !important; /* Remove any transform overrides */
         }
         
         /* Touch optimization */

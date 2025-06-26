@@ -13,7 +13,7 @@ interface ManualCollarConfigProps {
 }
 
 export function ManualCollarConfig({ onConnectionChange }: ManualCollarConfigProps) {
-  const [collarIP, setCollarIP] = useState('10.0.0.6');
+  const [collarIP, setCollarIP] = useState('192.168.1.35');
   const [customWebSocketUrl, setCustomWebSocketUrl] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
@@ -177,7 +177,7 @@ export function ManualCollarConfig({ onConnectionChange }: ManualCollarConfigPro
             <Input
               value={collarIP}
               onChange={(e) => setCollarIP(e.target.value)}
-              placeholder="e.g., 10.0.0.6 or 192.168.1.100"
+                              placeholder="e.g., 192.168.1.35 or 192.168.1.100"
               className="flex-1"
             />
             <Button 
@@ -213,7 +213,7 @@ export function ManualCollarConfig({ onConnectionChange }: ManualCollarConfigPro
             <Input
               value={customWebSocketUrl}
               onChange={(e) => setCustomWebSocketUrl(e.target.value)}
-              placeholder="ws://10.0.0.6:8080"
+                              placeholder="ws://192.168.1.35:8080"
               className="font-mono text-sm"
             />
           )}
@@ -261,7 +261,7 @@ export function ManualCollarConfig({ onConnectionChange }: ManualCollarConfigPro
         <div className="space-y-2">
           <p className="text-sm font-medium">Common IP Ranges:</p>
           <div className="flex flex-wrap gap-2">
-            {['10.0.0.6', '192.168.1.100', '192.168.0.100', '172.16.0.100'].map((ip) => (
+            {['192.168.1.35', '192.168.1.100', '192.168.0.100', '172.16.0.100'].map((ip) => (
               <Button
                 key={ip}
                 variant="ghost"

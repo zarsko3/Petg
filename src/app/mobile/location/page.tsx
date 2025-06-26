@@ -22,13 +22,13 @@ export default function MobileLocationPage() {
   
   return (
     <main className="flex flex-col h-screen bg-gradient-to-br from-slate-50 to-blue-50 overflow-hidden">
-      {/* Camera Frame - Fixed height */}
-      <section className="flex-shrink-0">
-        <LiveCameraFrame />
+      {/* Camera Frame - Fixed height at top */}
+      <section className="flex-shrink-0 w-full" style={{ height: 'min(40vh, 240px)' }}>
+        <LiveCameraFrame className="w-full h-full" />
       </section>
 
-      {/* Map Container - Flexible height */}
-      <section className="flex-1 relative overflow-hidden">
+      {/* Map Container - Fills all remaining space */}
+      <section className="flex-1 relative overflow-hidden w-full">
         {/* Action Buttons */}
         <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
           <button

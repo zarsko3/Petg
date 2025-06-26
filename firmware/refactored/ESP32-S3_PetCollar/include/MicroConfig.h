@@ -16,6 +16,7 @@
 
 #include <Arduino.h>
 #include "ESP32_S3_Config.h"
+#include "BeaconTypes.h"
 
 // ==========================================
 // FORWARD DECLARATIONS
@@ -28,15 +29,7 @@ class ZoneManager;
 // ALERT SYSTEM ENUMERATIONS
 // ==========================================
 
-/**
- * @brief Alert modes for the pet collar system
- */
-enum class AlertMode : uint8_t {
-    NONE = 0,      ///< No alert output
-    BUZZER,        ///< Buzzer only
-    VIBRATION,     ///< Vibration only
-    BOTH           ///< Both buzzer and vibration
-};
+// AlertMode now defined in BeaconTypes.h
 
 /**
  * @brief System operational states
@@ -98,9 +91,9 @@ struct Point2D {
 };
 
 /**
- * @brief System configuration structure
+ * @brief Extended system configuration structure
  */
-struct SystemConfig {
+struct SystemConfigExtended {
     char deviceId[MAX_DEVICE_NAME_LENGTH];      ///< Unique device identifier
     char firmwareVersion[16];                   ///< Current firmware version
     char hardwareVersion[16];                   ///< Hardware version string
@@ -128,7 +121,7 @@ struct SystemConfig {
     /**
      * @brief Initialize with default values
      */
-    SystemConfig() {
+    SystemConfigExtended() {
         // Clear all string buffers
         memset(deviceId, 0, sizeof(deviceId));
         memset(firmwareVersion, 0, sizeof(firmwareVersion));
@@ -180,12 +173,14 @@ struct SystemConfig {
     /**
      * @brief Apply constraints to configuration values
      */
-    void constrain() {
-        scanIntervalMs = ::constrain(scanIntervalMs, MIN_SCAN_INTERVAL_MS, MAX_SCAN_INTERVAL_MS);
-        scanWindowMs = ::constrain(scanWindowMs, MIN_SCAN_INTERVAL_MS, scanIntervalMs);
+    void constrainValues() {
+        scanIntervalMs = (scanIntervalMs < MIN_SCAN_INTERVAL_MS) ? MIN_SCAN_INTERVAL_MS : 
+                        (scanIntervalMs > MAX_SCAN_INTERVAL_MS) ? MAX_SCAN_INTERVAL_MS : scanIntervalMs;
+        scanWindowMs = (scanWindowMs < MIN_SCAN_INTERVAL_MS) ? MIN_SCAN_INTERVAL_MS : 
+                      (scanWindowMs > scanIntervalMs) ? scanIntervalMs : scanWindowMs;
         alertVolume = CONSTRAIN_BYTE(alertVolume);
         vibrationIntensity = CONSTRAIN_BYTE(vibrationIntensity);
-        rssiThreshold = ::constrain(rssiThreshold, -120, -30);
+        rssiThreshold = (rssiThreshold < -120) ? -120 : (rssiThreshold > -30) ? -30 : rssiThreshold;
     }
 };
 
@@ -293,7 +288,7 @@ struct NetworkStatus {
  * @brief Global system configuration instance
  * @note This is declared here and defined in the main source file
  */
-extern SystemConfig g_systemConfig;
+extern SystemConfigExtended g_systemConfig;
 extern BatteryStatus g_batteryStatus;
 extern NetworkStatus g_networkStatus;
 extern SystemState g_currentSystemState;

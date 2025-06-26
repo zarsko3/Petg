@@ -20,6 +20,15 @@ const withPWA = require('next-pwa')({
   ],
 })
 
+// Allowed development origins to silence CORS warnings
+const allowedDevOrigins = [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://192.168.1.35:8080',
+  'ws://localhost:3001',
+  'ws://127.0.0.1:3001',
+]
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
@@ -51,6 +60,24 @@ const nextConfig = {
           {
             key: 'Content-Type',
             value: 'application/manifest+json',
+          },
+        ],
+      },
+      // CORS headers for development collar connections
+      {
+        source: '/api/(.*)',
+        headers: [
+          {
+            key: 'Access-Control-Allow-Origin',
+            value: process.env.NODE_ENV === 'development' ? '*' : 'https://your-domain.com',
+          },
+          {
+            key: 'Access-Control-Allow-Methods',
+            value: 'GET, POST, PUT, DELETE, OPTIONS',
+          },
+          {
+            key: 'Access-Control-Allow-Headers',
+            value: 'Content-Type, Authorization',
           },
         ],
       },

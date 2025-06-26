@@ -24,6 +24,7 @@
 #include <BLEAdvertisedDevice.h>
 #include "ESP32_S3_Config.h"
 #include "MicroConfig.h"
+#include "BeaconTypes.h"
 
 // ==========================================
 // BEACON DATA STRUCTURES
@@ -482,6 +483,44 @@ public:
             m_manager->processAdvertisedDevice(advertisedDevice);
         }
     }
+};
+
+// ==========================================
+// ENHANCED BEACON MANAGER CLASS
+// ==========================================
+
+/**
+ * @brief Enhanced Beacon Manager with advanced features
+ */
+class BeaconManager_Enhanced {
+private:
+    BeaconList activeBeacons;
+    BeaconConfigList beaconConfigs;
+    
+public:
+    BeaconManager_Enhanced();
+    
+    // Core functionality
+    int getActiveBeaconCount() const;
+    String getBeaconsJson() const;
+    String getBeaconDataJSON() const;
+    void updateBeacon(const BeaconData& beacon);
+    
+    // Distance and confidence calculations
+    float calculateDistance(int rssi) const;
+    float calculateConfidence(int rssi) const;
+    
+    // Configuration management
+    BeaconConfig* getBeaconConfig(const String& address);
+    bool updateBeaconConfig(const String& beaconId, const JsonVariant& config);
+    
+    // System management
+    void initialize();
+    void cleanupOldBeacons(unsigned long timeoutMs);
+    void addDefaultConfigurations();
+    
+    // Legacy compatibility
+    void processAdvertisedDevice(BLEAdvertisedDevice advertisedDevice);
 };
 
 #endif // BEACON_MANAGER_H 

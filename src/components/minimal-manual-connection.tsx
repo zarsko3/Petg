@@ -8,7 +8,7 @@ import { getCollarService } from '@/lib/collar-websocket-service';
 
 export function MinimalManualConnection() {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [collarIP, setCollarIP] = useState('10.0.0.6');
+  const [collarIP, setCollarIP] = useState('192.168.1.35');
   const [isConnecting, setIsConnecting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [lastResult, setLastResult] = useState('');
@@ -97,7 +97,7 @@ export function MinimalManualConnection() {
               <Input
                 value={collarIP}
                 onChange={(e) => setCollarIP(e.target.value)}
-                placeholder="e.g., 10.0.0.6"
+                placeholder="e.g., 192.168.1.35"
                 className="text-sm h-8"
                 disabled={isConnecting}
               />

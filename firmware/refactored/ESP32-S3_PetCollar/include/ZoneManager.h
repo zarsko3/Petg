@@ -579,4 +579,16 @@ inline ZoneType stringToZoneType(const String& typeStr) {
     return ZoneType::SAFE;  // Default
 }
 
+// ==========================================
+// ENHANCED ZONE MANAGER CLASS
+// ==========================================
+
+/**
+ * @brief Enhanced Zone Manager with simplified interface
+ */
+class ZoneManager_Enhanced {
+public:
+    void initialize();
+};
+
 #endif // ZONE_MANAGER_H 
