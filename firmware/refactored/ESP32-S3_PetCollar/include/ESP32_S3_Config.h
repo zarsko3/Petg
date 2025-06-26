@@ -147,7 +147,7 @@
 // ==========================================
 #if FEATURE_OLED_DISPLAY
 #define DISPLAY_WIDTH               128
-#define DISPLAY_HEIGHT              64
+#define DISPLAY_HEIGHT              32
 #define DISPLAY_I2C_ADDRESS         0x3C
 #define DISPLAY_RESET_PIN           -1    // No reset pin needed
 #define DISPLAY_TIMEOUT_MS          30000 // Screen timeout (30 seconds)

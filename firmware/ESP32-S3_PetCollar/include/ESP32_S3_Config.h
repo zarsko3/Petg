@@ -125,7 +125,7 @@
 // ==========================================
 #if OLED_DISPLAY_ENABLED
 #define OLED_WIDTH 128
-#define OLED_HEIGHT 64
+#define OLED_HEIGHT 32
 #define OLED_ADDRESS 0x3C
 #define OLED_RESET_PIN -1       // No reset pin needed
 #define OLED_TIMEOUT 30000      // Screen timeout (30 seconds)

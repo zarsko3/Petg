@@ -326,19 +326,19 @@ Example: Average = -73 dBm → Update BLE_TX_POWER_1M_DBM to -73.0f
 Test at 5cm → If distance reads high: decrease to 1.7f → If low: increase to 2.1f
 ```
 
-#### 7. OLED Display Configuration Fix (128×64)
-**Issue**: Display showing "snow" on right half due to wrong resolution (64×32 vs actual 128×64)  
-**Root Cause**: Incorrect display constructor and buffer initialization for smaller display size
+#### 7. OLED Display Configuration Fix (128×32)
+**Issue**: Display showing "snow" on right half due to wrong resolution configuration  
+**Root Cause**: Incorrect display constructor and buffer initialization for 0.91" SSD1306 display
 
-**Solution**: Proper 128×64 display configuration with enhanced buffer clearing
+**Solution**: Proper 128×32 display configuration with enhanced buffer clearing
 
 **Changes Made**:
-- Updated display dimensions: `SCREEN_WIDTH` 64→128, `SCREEN_HEIGHT` 32→64
-- Fixed constructor: `Adafruit_SSD1306 display(128, 64, &Wire, -1)`
-- Enhanced buffer clearing: `clearDisplay()` + `fillScreen(BLACK)` + immediate `display()`
-- Added SH1106 support with column offset configuration
-- Optimized display layout for full 128×64 area utilization
-- Added comprehensive startup screen with system information
+- Corrected display dimensions: `SCREEN_WIDTH` 128, `SCREEN_HEIGHT` 64→32
+- Fixed constructor: `Adafruit_SSD1306 display(128, 32, &Wire, -1)`
+- Enhanced buffer clearing: `clearDisplay()` before every draw operation
+- Optimized display layout for compact 4-line format (128×32)
+- Added dual-column layout to maximize information density
+- Redesigned status display for smaller screen real estate
 
 ### 📋 Expected Display Behavior
 
@@ -350,16 +350,12 @@ ESP32-S3     [SNOW NOISE]
 Ready!       [SNOW NOISE]
 ```
 
-**After (Full 128×64)**:
+**After (Full 128×32)**:
 ```
-ESP32-S3 PetCollar
-WiFi: Connected  
-PetZone Beacons: 2
-Battery: 85% | Up: 12m
-Memory: 245KB | Errors: 0
-STATUS: All Systems Ready
-
-IP: 192.168.1.145
+PetCollar    WiFi:OK
+Beacons:2    Bat:85%
+All Systems Ready
+IP:192.168.1.145
 ```
 
 ### 🔧 SH1106 vs SSD1306 Support
@@ -454,4 +450,4 @@ For **SH1106** displays requiring column offset, consider switching to **U8G2** 
 U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
 ```
 
-This configuration ensures optimal ESP32-S3 performance with proper hardware pin assignments, robust error handling, intelligent WiFi priority management, clean BLE beacon filtering, accurate distance measurements, full 128×64 display utilization, correct buzzer operation on GPIO 18, and full compatibility with ESP32 Arduino Core 3.x. 
+This configuration ensures optimal ESP32-S3 performance with proper hardware pin assignments, robust error handling, intelligent WiFi priority management, clean BLE beacon filtering, accurate distance measurements, full 128×32 display utilization, correct buzzer operation on GPIO 18, and full compatibility with ESP32 Arduino Core 3.x. 

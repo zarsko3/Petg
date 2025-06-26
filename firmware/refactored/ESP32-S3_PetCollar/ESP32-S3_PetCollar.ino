@@ -73,7 +73,7 @@
 
 // Display configuration
 #define SCREEN_WIDTH 128
-#define SCREEN_HEIGHT 64
+#define SCREEN_HEIGHT 32
 #define OLED_ADDRESS 0x3C
 #define OLED_RESET_PIN -1
 
@@ -271,7 +271,7 @@ bool initializeDisplay() {
         display.dim(false);
         
         // Note: SH1106 offset handling would require switching to U8G2 library
-        // For now, Adafruit_SSD1306 works well with most 128x64 displays
+        // For now, Adafruit_SSD1306 works well with most 128x32 displays
         if (!DISPLAY_TYPE_SSD1306 && DISPLAY_COLUMN_OFFSET > 0) {
             if (DEBUG_DISPLAY) {
                 Serial.printf("⚠️ SH1106 offset not supported with Adafruit_SSD1306 library\n");
@@ -321,7 +321,7 @@ bool isDisplayActive() {
 }
 
 /**
- * @brief Update display with current system status (optimized for 128×64 display)
+ * @brief Update display with current system status (optimized for 128×32 display)
  */
 void updateDisplay() {
     static unsigned long lastUpdate = 0;
@@ -329,76 +329,61 @@ void updateDisplay() {
     
     if (millis() - lastUpdate < 1000) return; // Limit update rate
     
-    // Clear display buffer completely
+    // Clear display buffer completely before drawing
     display.clearDisplay();
     
     int line = 0;
     const int lineHeight = 8;
     
-    // Header with system name (Line 0)
+    // Line 0: Compact header with key status
     display.setCursor(0, line * lineHeight);
     display.setTextSize(1);
-    display.print("ESP32-S3 PetCollar");
-    line++;
-    
-    // WiFi Status (Line 1)
-    display.setCursor(0, line * lineHeight);
+    display.print("PetCollar");
+    display.setCursor(64, line * lineHeight);
     if (systemStateData.wifiConnected) {
-        String wifiInfo = "WiFi: Connected";
-        if (currentNetworkIndex >= 0) {
-            wifiInfo = "WiFi: " + String(wifiNetworks[currentNetworkIndex].location);
-        }
-        display.print(wifiInfo);
+        display.print("WiFi:OK");
     } else {
-        display.print("WiFi: Disconnected");
+        display.print("WiFi:--");
     }
     line++;
     
-    // BLE Beacon count (Line 2)
+    // Line 1: Beacon status and battery
     display.setCursor(0, line * lineHeight);
     int activeBeacons = beaconManager.getActiveBeaconCount();
-    display.printf("PetZone Beacons: %d", activeBeacons);
+    display.printf("Beacons:%d", activeBeacons);
+    display.setCursor(64, line * lineHeight);
+    display.printf("Bat:%d%%", systemStateManager.getBatteryPercent());
     line++;
     
-    // System metrics (Lines 3-4)
-    display.setCursor(0, line * lineHeight);
-    display.printf("Battery: %d%% | Up: %lum", 
-                  systemStateManager.getBatteryPercent(), millis() / 60000);
-    line++;
-    
-    display.setCursor(0, line * lineHeight);
-    display.printf("Memory: %dKB | Errors: %d", 
-                  ESP.getFreeHeap() / 1024, systemStateManager.getErrorCount());
-    line++;
-    
-    // Status line (Line 5)
+    // Line 2: Status or Alert
     display.setCursor(0, line * lineHeight);
     if (alertManager.isAlertActive()) {
-        display.print("STATUS: *** ALERT ACTIVE ***");
+        display.print("*** ALERT ACTIVE ***");
     } else if (systemStateManager.getErrorCount() > 0) {
-        display.print("STATUS: System Errors");
+        display.printf("Errors:%d", systemStateManager.getErrorCount());
     } else {
-        display.print("STATUS: All Systems Ready");
+        display.print("All Systems Ready");
     }
     line++;
     
-    // Rotating detailed information (Line 6-7)
-    line++; // Skip a line for spacing
+    // Line 3: Rotating detailed information
     display.setCursor(0, line * lineHeight);
-    switch (displayMode % 3) {
+    switch (displayMode % 4) {
         case 0:
             if (systemStateData.wifiConnected) {
-                display.printf("IP: %s", WiFi.localIP().toString().c_str());
+                display.printf("IP:%s", WiFi.localIP().toString().c_str());
             } else {
-                display.print("WiFi: Setup mode active");
+                display.print("Setup mode active");
             }
             break;
         case 1:
-            display.printf("Heap: %d/%d bytes", 
-                          ESP.getFreeHeap(), ESP.getHeapSize());
+            display.printf("Free:%dKB", ESP.getFreeHeap() / 1024);
             break;
         case 2:
-            display.printf("Build: %s", BUILD_DATE);
+            display.printf("Uptime:%lum", millis() / 60000);
+            break;
+        case 3:
+            display.printf("Signal:%ddBm", WiFi.RSSI());
             break;
     }
     
@@ -406,9 +391,9 @@ void updateDisplay() {
     display.display();
     lastUpdate = millis();
     
-    // Rotate display mode every 4 seconds
+    // Rotate display mode every 3 seconds
     static unsigned long lastModeChange = 0;
-    if (millis() - lastModeChange > 4000) {
+    if (millis() - lastModeChange > 3000) {
         displayMode++;
         lastModeChange = millis();
     }
