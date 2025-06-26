@@ -150,6 +150,10 @@
 #define DISPLAY_BRIGHTNESS          128   // 0-255 brightness level
 #define DISPLAY_CONTRAST            128   // 0-255 contrast level
 #define DISPLAY_REFRESH_RATE_MS     1000  // Update every second
+
+/* Alternative for SH1106 displays (1.3-inch modules) */
+#define DISPLAY_TYPE_SSD1306        true  // Set to false for SH1106
+#define DISPLAY_COLUMN_OFFSET       2     // SH1106 offset (0 for SSD1306)
 #endif
 
 // ==========================================
@@ -163,6 +167,13 @@
 #define WIFI_SCAN_TIMEOUT_MS        10000  // 10 seconds scan timeout
 #define WIFI_AP_CHANNEL             1      // Default AP channel
 #define WIFI_USE_MAX_POWER          true   // Use maximum WiFi power
+
+/* Preferred WiFi Networks (hardcoded for priority) */
+#define PREFERRED_SSID              "JenoviceAP"
+#define PREFERRED_PASSWORD          "your_password_here"  // Update with actual password
+// Add secondary networks if needed:
+// #define SECONDARY_SSID           "BackupNetwork"
+// #define SECONDARY_PASSWORD       "backup_password"
 
 /* Access Point Settings */
 #define AP_SSID_PREFIX              "ESP32-S3-PetCollar"
@@ -200,7 +211,26 @@
 #define BLE_FILTER_IBEACON          true   // Filter iBeacon advertisements
 #define BLE_FILTER_EDDYSTONE        true   // Filter Eddystone beacons
 #define BLE_FILTER_CUSTOM           true   // Filter custom pet collar beacons
-#define BLE_TARGET_BEACON_PREFIX    "Pet"  // Target device name prefix
+#define BLE_TARGET_BEACON_PREFIX    "PetZone"  // Target device name prefix
+
+/* BLE Distance Calculation (Calibrated for PetZone beacons) */
+#define BLE_TX_POWER_1M_DBM         -71.0f // RSSI measured at 1 meter (CALIBRATE THIS!)
+#define BLE_PATH_LOSS_EXPONENT      1.9f   // Path loss exponent for close proximity  
+#define BLE_RSSI_FILTER_SIZE        5      // Number of RSSI samples for smoothing
+#define BLE_MAX_DISTANCE_CM         500.0f // Maximum reasonable distance (5 meters)
+
+/* 
+ * CALIBRATION INSTRUCTIONS:
+ * 1. Place beacon exactly 1 meter from collar (use tape measure)
+ * 2. Record 30 RSSI samples and average them
+ * 3. Update BLE_TX_POWER_1M_DBM with your measured value
+ * 4. Test at 5 cm - adjust BLE_PATH_LOSS_EXPONENT until distance reads ~5 cm
+ * 
+ * Example values:
+ * - If you measure -73 dBm at 1m, set BLE_TX_POWER_1M_DBM to -73.0f
+ * - If distance still reads high at 5cm, try BLE_PATH_LOSS_EXPONENT = 1.7f
+ * - If distance reads low at 5cm, try BLE_PATH_LOSS_EXPONENT = 2.1f
+ */
 #endif
 
 // ==========================================
@@ -319,10 +349,22 @@
 #define DEBUG_PRINT(x)              Serial.print(x)
 #define DEBUG_PRINTLN(x)            Serial.println(x)
 #define DEBUG_PRINTF(...)           Serial.printf(__VA_ARGS__)
+
+/* Module-specific debug flags */
+#define DEBUG_WIFI                  true
+#define DEBUG_DISPLAY               true
+#define DEBUG_I2C                   true
+#define DEBUG_BLE                   true
+#define DEBUG_DISTANCE              true
 #else
 #define DEBUG_PRINT(x)
 #define DEBUG_PRINTLN(x)
 #define DEBUG_PRINTF(...)
+#define DEBUG_WIFI                  false
+#define DEBUG_DISPLAY               false
+#define DEBUG_I2C                   false
+#define DEBUG_BLE                   false
+#define DEBUG_DISTANCE              false
 #endif
 
 // ==========================================

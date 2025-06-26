@@ -40,6 +40,9 @@
 #include <ESPmDNS.h>
 #include <WiFiUdp.h>
 
+// ==================== DEBUG FLAGS ====================
+// Debug flags are now defined in ESP32_S3_Config.h
+
 // Display and hardware libraries
 #include <Wire.h>
 #include <Adafruit_GFX.h>
@@ -69,8 +72,8 @@
 #define BUILD_DATE __DATE__ " " __TIME__
 
 // Display configuration
-#define SCREEN_WIDTH 64
-#define SCREEN_HEIGHT 32
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
 #define OLED_ADDRESS 0x3C
 #define OLED_RESET_PIN -1
 
@@ -109,8 +112,9 @@ struct SimpleWiFiCredentials {
 };
 
 SimpleWiFiCredentials wifiNetworks[] = {
-    {"YOUR_WIFI_SSID", "YOUR_WIFI_PASSWORD", "Primary Network"},
-    {"PHONE_HOTSPOT", "hotspot123", "Mobile Hotspot"}
+    {PREFERRED_SSID, PREFERRED_PASSWORD, "Primary Network"}
+    // Add more real networks here as needed
+    // {SECONDARY_SSID, SECONDARY_PASSWORD, "Secondary Network"}
 };
 const int numNetworks = sizeof(wifiNetworks) / sizeof(wifiNetworks[0]);
 int currentNetworkIndex = -1;
@@ -123,18 +127,33 @@ int currentNetworkIndex = -1;
 class AdvancedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
 public:
     void onResult(BLEAdvertisedDevice advertisedDevice) {
-        // Process detected beacon through enhanced beacon manager
+        // CRITICAL: Only process devices with names starting with our target prefix
+        if (!advertisedDevice.haveName()) {
+            return; // Skip devices without a name
+        }
+        
+        String deviceName = advertisedDevice.getName().c_str();
+        if (deviceName.isEmpty() || !deviceName.startsWith(BLE_TARGET_BEACON_PREFIX)) {
+            return; // Skip devices that don't match our "PetZone" prefix
+        }
+        
+        // Process only our PetZone beacons
         BeaconData beacon;
         beacon.address = advertisedDevice.getAddress().toString().c_str();
         beacon.rssi = advertisedDevice.getRSSI();
-        beacon.name = advertisedDevice.haveName() ? 
-                     advertisedDevice.getName().c_str() : "Unknown";
+        beacon.name = deviceName.c_str(); // Use the friendly name (e.g., "PetZone-Living-01")
         beacon.lastSeen = millis();
         beacon.isActive = true;
         
         // Calculate distance estimation
         beacon.distance = beaconManager.calculateDistance(beacon.rssi);
         beacon.confidence = beaconManager.calculateConfidence(beacon.rssi);
+        
+        // Debug output for our beacons only
+        if (DEBUG_BLE) {
+            Serial.printf("🔍 PetZone beacon detected: %s, RSSI: %d dBm, Distance: %.2f cm\n",
+                         beacon.name.c_str(), beacon.rssi, beacon.distance);
+        }
         
         // Update beacon manager with new detection
         beaconManager.updateBeacon(beacon);
@@ -147,70 +166,141 @@ public:
     }
 };
 
+// ==================== I2C SCANNING UTILITY ====================
+/**
+ * @brief Scan I2C bus for connected devices
+ * @return bool True if any devices found
+ */
+bool scanI2CBus() {
+    if (DEBUG_I2C) {
+        Serial.println("🔍 Scanning I2C bus for devices...");
+    }
+    
+    int deviceCount = 0;
+    bool displayFound = false;
+    
+    for (byte address = 1; address < 127; address++) {
+        Wire.beginTransmission(address);
+        byte error = Wire.endTransmission();
+        
+        if (error == 0) {
+            deviceCount++;
+            if (DEBUG_I2C) {
+                Serial.printf("✅ I2C device found at address 0x%02X", address);
+                if (address == OLED_ADDRESS) {
+                    Serial.print(" (OLED Display)");
+                    displayFound = true;
+                }
+                Serial.println();
+            }
+        }
+    }
+    
+    if (DEBUG_I2C) {
+        Serial.printf("📊 I2C scan complete: %d device(s) found\n", deviceCount);
+        if (deviceCount == 0) {
+            Serial.println("⚠️ No I2C devices detected!");
+            Serial.println("🔧 Check connections:");
+            Serial.printf("   SDA → GPIO %d\n", I2C_SDA_PIN);
+            Serial.printf("   SCL → GPIO %d\n", I2C_SCL_PIN);
+            Serial.println("   VCC → 3.3V, GND → GND");
+        }
+    }
+    
+    return displayFound;
+}
+
 // ==================== DISPLAY MANAGEMENT ====================
 /**
  * @brief Initialize OLED display with comprehensive error handling
  * @return bool Success status
  */
 bool initializeDisplay() {
-    Serial.println("🖥️ Initializing OLED display system...");
+    if (DEBUG_DISPLAY) {
+        Serial.println("🖥️ Initializing OLED display system...");
+    }
     
-    // Initialize I2C with ESP32-S3 optimized pins
-    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
-    Wire.setClock(400000); // 400kHz for optimal performance
+    // Initialize I2C with ESP32-S3 optimized pins and frequency
+    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN, I2C_FREQUENCY);
+    
+    if (DEBUG_DISPLAY) {
+        Serial.printf("📡 I2C initialized: SDA=GPIO%d, SCL=GPIO%d, Freq=%dHz\n", 
+                     I2C_SDA_PIN, I2C_SCL_PIN, I2C_FREQUENCY);
+    }
     
     // CRITICAL: Give display time to power up before I2C detection
     delay(500);
     
-    // Test I2C connection with multiple attempts
-    bool i2cFound = false;
-    for (int attempt = 0; attempt < 3; attempt++) {
-        Wire.beginTransmission(OLED_ADDRESS);
-        if (Wire.endTransmission() == 0) {
-            i2cFound = true;
-            break;
+    // Perform I2C bus scan
+    bool displayFoundInScan = scanI2CBus();
+    
+    if (!displayFoundInScan) {
+        if (DEBUG_DISPLAY) {
+            Serial.printf("⚠️ Display not found in I2C scan at 0x%02X\n", OLED_ADDRESS);
+            Serial.println("🚀 Proceeding with initialization anyway...");
         }
-        Serial.printf("🔄 I2C attempt %d/3 failed, retrying...\n", attempt + 1);
-        delay(200);
+    } else {
+        if (DEBUG_DISPLAY) {
+            Serial.printf("✅ Display detected at 0x%02X\n", OLED_ADDRESS);
+        }
     }
     
-    if (!i2cFound) {
-        Serial.printf("⚠️ I2C device not detected at address 0x%02X\n", OLED_ADDRESS);
-        Serial.println("🔍 Check display connections:");
-        Serial.println("   VCC → 3.3V, GND → GND");
-        Serial.printf("   SDA → GPIO %d, SCL → GPIO %d\n", I2C_SDA_PIN, I2C_SCL_PIN);
-        Serial.println("🚀 Attempting display initialization anyway...");
-        // Don't return false - try to initialize anyway
-    }
-    
-    // Initialize display with error handling
+    // Initialize display with error handling (supports both SSD1306 and SH1106)
+    bool displayOnline = false;
     if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDRESS)) {
-        Serial.println("❌ OLED display initialization failed!");
-        return false;
+        if (DEBUG_DISPLAY) {
+            Serial.println("❌ OLED display initialization failed!");
+            Serial.println("📍 System will continue without display");
+        }
+        displayOnline = false;
+    } else {
+        displayOnline = true;
+        
+        // Clear display buffer completely to eliminate "snow"
+        display.clearDisplay();
+        display.fillScreen(SSD1306_BLACK);
+        display.display(); // Clear physical display
+        delay(100);
+        
+        // Configure display for optimal rendering
+        display.setTextSize(1);
+        display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+        display.setTextWrap(false);
+        display.cp437(true);
+        display.setRotation(0);
+        display.dim(false);
+        
+        // Apply SH1106 offset if needed (common for 1.3-inch modules)
+        if (!DISPLAY_TYPE_SSD1306 && DISPLAY_COLUMN_OFFSET > 0) {
+            // SH1106 typically needs a 2-pixel column offset
+            display.setDisplayOffset(DISPLAY_COLUMN_OFFSET);
+            if (DEBUG_DISPLAY) {
+                Serial.printf("📐 Applied SH1106 column offset: %d pixels\n", DISPLAY_COLUMN_OFFSET);
+            }
+        }
+        
+        // Clear again and show startup screen
+        display.clearDisplay();
+        display.setCursor(0, 0);
+        display.println("PetCollar ESP32-S3");
+        display.setCursor(0, 12);
+        display.printf("Resolution: %dx%d", SCREEN_WIDTH, SCREEN_HEIGHT);
+        display.setCursor(0, 24);
+        display.println("I2C Display Online");
+        display.setCursor(0, 36);
+        display.println("BLE Scanner Ready");
+        display.setCursor(0, 48);
+        display.println("WiFi Connecting...");
+        display.display();
+        
+        if (DEBUG_DISPLAY) {
+            Serial.printf("✅ OLED display initialized (%dx%d)\n", SCREEN_WIDTH, SCREEN_HEIGHT);
+            Serial.printf("📐 Full display area utilized: %d chars x %d lines\n", 
+                         SCREEN_WIDTH/6, SCREEN_HEIGHT/8);
+        }
     }
     
-    // Configure display for optimal rendering
-    display.clearDisplay();
-    display.setTextSize(1);
-    display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
-    display.setTextWrap(false);
-    display.cp437(true);
-    display.setRotation(0);
-    display.dim(false);
-    
-    // Show startup screen
-    display.setCursor(0, 0);
-    display.println("PetCollar");
-    display.setCursor(0, 8);
-    display.println("ESP32-S3");
-    display.setCursor(0, 16);
-    display.printf("%dx%d", SCREEN_WIDTH, SCREEN_HEIGHT);
-    display.setCursor(0, 24);
-    display.println("Ready!");
-    display.display();
-    
-    Serial.printf("✅ OLED display initialized (%dx%d)\n", SCREEN_WIDTH, SCREEN_HEIGHT);
-    return true;
+    return displayOnline;
 }
 
 /**
@@ -231,7 +321,7 @@ bool isDisplayActive() {
 }
 
 /**
- * @brief Update display with current system status
+ * @brief Update display with current system status (optimized for 128×64 display)
  */
 void updateDisplay() {
     static unsigned long lastUpdate = 0;
@@ -239,64 +329,86 @@ void updateDisplay() {
     
     if (millis() - lastUpdate < 1000) return; // Limit update rate
     
+    // Clear display buffer completely
     display.clearDisplay();
     
     int line = 0;
     const int lineHeight = 8;
     
-    // Line 0: Header
+    // Header with system name (Line 0)
     display.setCursor(0, line * lineHeight);
-    display.print("PetCollar");
+    display.setTextSize(1);
+    display.print("ESP32-S3 PetCollar");
     line++;
     
-    // Line 1: WiFi Status
+    // WiFi Status (Line 1)
     display.setCursor(0, line * lineHeight);
     if (systemStateData.wifiConnected) {
-        display.printf("WiFi:%s", currentNetworkIndex >= 0 ? 
-                      wifiNetworks[currentNetworkIndex].location : "OK");
+        String wifiInfo = "WiFi: Connected";
+        if (currentNetworkIndex >= 0) {
+            wifiInfo = "WiFi: " + String(wifiNetworks[currentNetworkIndex].location);
+        }
+        display.print(wifiInfo);
     } else {
-        display.print("WiFi:Off");
+        display.print("WiFi: Disconnected");
     }
     line++;
     
-    // Line 2: Rotating information
+    // BLE Beacon count (Line 2)
     display.setCursor(0, line * lineHeight);
-    switch (displayMode % 4) {
-        case 0: {
-            int activeBeacons = beaconManager.getActiveBeaconCount();
-            display.printf("Beac:%d", activeBeacons);
+    int activeBeacons = beaconManager.getActiveBeaconCount();
+    display.printf("PetZone Beacons: %d", activeBeacons);
+    line++;
+    
+    // System metrics (Lines 3-4)
+    display.setCursor(0, line * lineHeight);
+    display.printf("Battery: %d%% | Up: %lum", 
+                  systemStateManager.getBatteryPercent(), millis() / 60000);
+    line++;
+    
+    display.setCursor(0, line * lineHeight);
+    display.printf("Memory: %dKB | Errors: %d", 
+                  ESP.getFreeHeap() / 1024, systemStateManager.getErrorCount());
+    line++;
+    
+    // Status line (Line 5)
+    display.setCursor(0, line * lineHeight);
+    if (alertManager.isAlertActive()) {
+        display.print("STATUS: *** ALERT ACTIVE ***");
+    } else if (systemStateManager.getErrorCount() > 0) {
+        display.print("STATUS: System Errors");
+    } else {
+        display.print("STATUS: All Systems Ready");
+    }
+    line++;
+    
+    // Rotating detailed information (Line 6-7)
+    line++; // Skip a line for spacing
+    display.setCursor(0, line * lineHeight);
+    switch (displayMode % 3) {
+        case 0:
+            if (systemStateData.wifiConnected) {
+                display.printf("IP: %s", WiFi.localIP().toString().c_str());
+            } else {
+                display.print("WiFi: Setup mode active");
+            }
             break;
-        }
         case 1:
-            display.printf("Bat:%d%%", systemStateManager.getBatteryPercent());
+            display.printf("Heap: %d/%d bytes", 
+                          ESP.getFreeHeap(), ESP.getHeapSize());
             break;
         case 2:
-            display.printf("Up:%lum", millis() / 60000);
-            break;
-        case 3:
-            display.printf("Mem:%dK", ESP.getFreeHeap() / 1024);
+            display.printf("Build: %s", BUILD_DATE);
             break;
     }
-    line++;
     
-    // Line 3: Alert status
-    if (line * lineHeight < SCREEN_HEIGHT - 8) {
-        display.setCursor(0, line * lineHeight);
-        if (alertManager.isAlertActive()) {
-            display.print("*ALERT*");
-        } else if (systemStateManager.getErrorCount() > 0) {
-            display.printf("Err:%d", systemStateManager.getErrorCount());
-        } else {
-            display.print("Ready");
-        }
-    }
-    
+    // Push all changes to display
     display.display();
     lastUpdate = millis();
     
-    // Rotate display mode every 3 seconds
+    // Rotate display mode every 4 seconds
     static unsigned long lastModeChange = 0;
-    if (millis() - lastModeChange > 3000) {
+    if (millis() - lastModeChange > 4000) {
         displayMode++;
         lastModeChange = millis();
     }
@@ -308,43 +420,77 @@ void updateDisplay() {
  * @return bool Connection success status
  */
 bool initializeWiFi() {
-    Serial.println("🚀 Initializing Enhanced WiFi Manager...");
+    if (DEBUG_WIFI) {
+        Serial.println("🚀 Initializing Enhanced WiFi Manager...");
+        Serial.printf("📊 Free heap before WiFi init: %d bytes\n", ESP.getFreeHeap());
+    }
     
     // Initialize enhanced WiFi manager
     if (!wifiManager.beginEnhanced()) {
-        Serial.println("❌ Failed to initialize enhanced WiFi manager");
+        if (DEBUG_WIFI) {
+            Serial.println("❌ Failed to initialize enhanced WiFi manager");
+            Serial.printf("📊 WiFi status: %d\n", WiFi.status());
+        }
         systemStateData.wifiConnected = false;
         digitalWrite(STATUS_LED_WIFI, LOW);
         return false;
     }
     
-    // Add default networks to cache (but don't connect yet)
-    for (int i = 0; i < numNetworks; i++) {
-        wifiManager.addNetworkToCache(wifiNetworks[i].ssid, wifiNetworks[i].password);
-        Serial.printf("➕ Added %s (%s) to network cache\n", 
-                     wifiNetworks[i].ssid, wifiNetworks[i].location);
-    }
-    
-    // Now attempt controlled connections to each network
-    Serial.println("🔗 Attempting controlled WiFi connections...");
+    // First, wait for stored credentials connection (if any were found)
     bool connected = false;
     unsigned long startTime = millis();
     
-    // Try each network in sequence with proper error handling
-    for (int i = 0; i < numNetworks && !connected; i++) {
-        Serial.printf("\n🌐 Trying network %d/%d: %s\n", i+1, numNetworks, wifiNetworks[i].location);
-        connected = wifiManager.attemptConnection(wifiNetworks[i].ssid, wifiNetworks[i].password);
+    // Check if WiFi is already trying to connect to stored credentials
+    if (WiFi.status() == WL_CONNECTED) {
+        connected = true;
+        Serial.printf("✅ Already connected to stored network: %s\n", WiFi.SSID().c_str());
+    } else if (WiFi.getMode() == WIFI_STA && WiFi.status() != WL_NO_SSID_AVAIL) {
+        // Wait for stored credential connection to complete
+        Serial.println("⏳ Waiting for stored credential connection...");
+        unsigned long waitStart = millis();
+        while (WiFi.status() != WL_CONNECTED && WiFi.status() != WL_NO_SSID_AVAIL && 
+               WiFi.status() != WL_CONNECT_FAILED && (millis() - waitStart < 15000)) {
+            delay(500);
+            Serial.print(".");
+        }
         
-        if (connected) {
-            currentNetworkIndex = i;
-            break;
+        if (WiFi.status() == WL_CONNECTED) {
+            connected = true;
+            Serial.printf("\n✅ Connected to stored network: %s\n", WiFi.SSID().c_str());
         } else {
-            Serial.printf("❌ Failed to connect to %s, trying next...\n", wifiNetworks[i].location);
+            Serial.printf("\n❌ Stored credential connection failed (Status: %d)\n", WiFi.status());
+        }
+    }
+    
+    // Only try hardcoded networks if stored credentials failed
+    if (!connected) {
+        Serial.println("🔗 Trying hardcoded networks as fallback...");
+        
+        // Add fallback networks to cache
+        for (int i = 0; i < numNetworks; i++) {
+            wifiManager.addNetworkToCache(wifiNetworks[i].ssid, wifiNetworks[i].password);
+            if (DEBUG_WIFI) {
+                Serial.printf("➕ Added fallback %s (%s) to network cache\n", 
+                             wifiNetworks[i].ssid, wifiNetworks[i].location);
+            }
+        }
+        
+        // Try each fallback network in sequence with proper error handling
+        for (int i = 0; i < numNetworks && !connected; i++) {
+            Serial.printf("\n🌐 Trying fallback %d/%d: %s\n", i+1, numNetworks, wifiNetworks[i].location);
+            connected = wifiManager.attemptConnection(wifiNetworks[i].ssid, wifiNetworks[i].password);
             
-            // EXTENDED delay between networks to reset association counters
-            if (i < numNetworks - 1) {  // Don't delay after last attempt
-                Serial.println("⏳ Waiting 10 seconds before next network to reset association limits...");
-                delay(10000);  // 10 second delay to ensure association limits reset
+            if (connected) {
+                currentNetworkIndex = i;
+                break;
+            } else {
+                Serial.printf("❌ Failed to connect to %s, trying next...\n", wifiNetworks[i].location);
+                
+                // EXTENDED delay between networks to reset association counters
+                if (i < numNetworks - 1) {  // Don't delay after last attempt
+                    Serial.println("⏳ Waiting 10 seconds before next network to reset association limits...");
+                    delay(10000);  // 10 second delay to ensure association limits reset
+                }
             }
         }
     }
@@ -354,7 +500,10 @@ bool initializeWiFi() {
         digitalWrite(STATUS_LED_WIFI, HIGH);
         
         Serial.printf("\n🎉 WiFi connection successful!\n");
-        Serial.printf("🌐 Network: %s (%s)\n", wifiNetworks[currentNetworkIndex].location, wifiNetworks[currentNetworkIndex].ssid);
+        String networkName = (currentNetworkIndex >= 0) ? 
+                            String(wifiNetworks[currentNetworkIndex].location) + " (" + wifiNetworks[currentNetworkIndex].ssid + ")" :
+                            "Stored Network (" + WiFi.SSID() + ")";
+        Serial.printf("🌐 Network: %s\n", networkName.c_str());
         Serial.printf("📡 IP Address: %s\n", wifiManager.getLocalIP().c_str());
         Serial.printf("📶 Signal: %d dBm\n", wifiManager.getSignalStrength());
         Serial.printf("⚡ Connection time: %lu ms\n", millis() - startTime);
