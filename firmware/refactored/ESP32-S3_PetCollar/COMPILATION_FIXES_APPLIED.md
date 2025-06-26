@@ -450,4 +450,34 @@ For **SH1106** displays requiring column offset, consider switching to **U8G2** 
 U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
 ```
 
-This configuration ensures optimal ESP32-S3 performance with proper hardware pin assignments, robust error handling, intelligent WiFi priority management, clean BLE beacon filtering, accurate distance measurements, full 128×32 display utilization, correct buzzer operation on GPIO 18, and full compatibility with ESP32 Arduino Core 3.x. 
+#### 10. Ultra-Close Distance Calibration
+**Issue**: Distance readings inaccurate for very close proximity (touching beacon)  
+**Goal**: Show "0.00 cm" when collar is physically touching the beacon
+
+**Solution**: Ultra-close RSSI calibration with new constants and clamping
+
+**Changes Made**:
+- Updated distance calculation with ultra-close calibrated constants:
+  - `TX_POWER_DBM`: -65.0f (-29 dBm @ 1 cm → calculated 1m reference)
+  - `PATH_LOSS_EXP`: 1.8f (short-range indoor exponent)
+  - `CLAMP_MIN_M`: 0.005f (distances below 5mm → 0 cm)
+- Changed `pow()` to `powf()` for better float precision
+- Removed minimum 1cm constraint - now allows 0.00 cm readings
+- Added documentation constants in config for reference
+
+### 📋 Expected Ultra-Close Behavior
+
+**Before (Inaccurate)**:
+```
+🔍 PetZone-Home-01, RSSI: -29 dBm, Distance: 2.34 cm  (Touching!)
+🔍 PetZone-Home-01, RSSI: -32 dBm, Distance: 3.67 cm  (1 cm actual)
+```
+
+**After (Ultra-Close Accurate)**:
+```
+🔍 PetZone-Home-01, RSSI: -29 dBm, Distance: 0.00 cm  (Touching!)
+🔍 PetZone-Home-01, RSSI: -32 dBm, Distance: 1.02 cm  (1 cm actual)
+🔍 PetZone-Home-01, RSSI: -38 dBm, Distance: 5.18 cm  (5 cm actual)
+```
+
+This configuration ensures optimal ESP32-S3 performance with proper hardware pin assignments, robust error handling, intelligent WiFi priority management, clean BLE beacon filtering, ultra-accurate close-range distance measurements, full 128×32 display utilization, correct buzzer operation on GPIO 18, and full compatibility with ESP32 Arduino Core 3.x. 

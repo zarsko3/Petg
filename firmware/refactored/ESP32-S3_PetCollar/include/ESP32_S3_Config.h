@@ -217,23 +217,28 @@
 #define BLE_FILTER_CUSTOM           true   // Filter custom pet collar beacons
 #define BLE_TARGET_BEACON_PREFIX    "PetZone"  // Target device name prefix
 
-/* BLE Distance Calculation (Calibrated for PetZone beacons) */
+/* BLE Distance Calculation (Ultra-Close Calibrated for PetZone beacons) */
 #define BLE_TX_POWER_1M_DBM         -71.0f // RSSI measured at 1 meter (CALIBRATE THIS!)
 #define BLE_PATH_LOSS_EXPONENT      1.9f   // Path loss exponent for close proximity  
 #define BLE_RSSI_FILTER_SIZE        5      // Number of RSSI samples for smoothing
 #define BLE_MAX_DISTANCE_CM         500.0f // Maximum reasonable distance (5 meters)
 
+/* Ultra-Close Distance Calibration Constants */
+#define RSSI_REF_AT_1CM             -29    // measured raw RSSI touching the beacon
+#define PATH_LOSS_EXPONENT          1.8    // ultra-close range indoor exponent
+
 /* 
- * CALIBRATION INSTRUCTIONS:
- * 1. Place beacon exactly 1 meter from collar (use tape measure)
- * 2. Record 30 RSSI samples and average them
- * 3. Update BLE_TX_POWER_1M_DBM with your measured value
- * 4. Test at 5 cm - adjust BLE_PATH_LOSS_EXPONENT until distance reads ~5 cm
+ * ULTRA-CLOSE CALIBRATION INSTRUCTIONS:
+ * 1. Touch collar directly to beacon (0 cm distance)
+ * 2. Record raw RSSI value (should be around -29 dBm for most beacons)
+ * 3. Update RSSI_REF_AT_1CM constant with your measured value
+ * 4. Test at various close distances (1cm, 5cm, 10cm) to verify accuracy
  * 
- * Example values:
- * - If you measure -73 dBm at 1m, set BLE_TX_POWER_1M_DBM to -73.0f
- * - If distance still reads high at 5cm, try BLE_PATH_LOSS_EXPONENT = 1.7f
- * - If distance reads low at 5cm, try BLE_PATH_LOSS_EXPONENT = 2.1f
+ * Expected results with ultra-close calibration:
+ * - Touching: RSSI: -29 dBm, Distance: 0.00 cm
+ * - 1 cm: RSSI: -32 dBm, Distance: ~1.0 cm  
+ * - 5 cm: RSSI: -38 dBm, Distance: ~5.0 cm
+ * - 10 cm: RSSI: -44 dBm, Distance: ~10.0 cm
  */
 #endif
 

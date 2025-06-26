@@ -5,6 +5,49 @@
 #include "include/SystemStateManager.h"
 #include "include/ZoneManager.h"
 
+// ==================== RSSI FILTERING FOR DISTANCE ACCURACY ====================
+/**
+ * @brief Simple RSSI filter for smoothing noisy readings
+ */
+class RSSIFilter {
+private:
+    int samples[BLE_RSSI_FILTER_SIZE];
+    int index;
+    int count;
+    
+public:
+    RSSIFilter() : index(0), count(0) {
+        for (int i = 0; i < BLE_RSSI_FILTER_SIZE; i++) {
+            samples[i] = -100; // Initialize with weak signal
+        }
+    }
+    
+    int addSample(int rssi) {
+        samples[index] = rssi;
+        index = (index + 1) % BLE_RSSI_FILTER_SIZE;
+        if (count < BLE_RSSI_FILTER_SIZE) count++;
+        
+        // Calculate moving average
+        int sum = 0;
+        for (int i = 0; i < count; i++) {
+            sum += samples[i];
+        }
+        return sum / count;
+    }
+    
+    void reset() {
+        index = 0;
+        count = 0;
+    }
+    
+    bool hasEnoughSamples() const {
+        return count >= (BLE_RSSI_FILTER_SIZE / 2); // At least half the samples
+    }
+};
+
+// Global RSSI filters for each beacon (keyed by address)
+std::map<String, RSSIFilter> rssiFilters;
+
 // ==================== COMPATIBILITY CONSTANTS ====================
 
 // AlertMode compatibility constants
@@ -70,32 +113,64 @@ void BeaconManager_Enhanced::processAdvertisedDevice(BLEAdvertisedDevice adverti
 }
 
 void BeaconManager_Enhanced::updateBeacon(const BeaconData& beacon) {
+    // Create a mutable copy for RSSI filtering
+    BeaconData filteredBeacon = beacon;
+    
+    // Apply RSSI filtering to reduce noise
+    RSSIFilter& filter = rssiFilters[beacon.address];
+    int filteredRSSI = filter.addSample(beacon.rssi);
+    
+    // Use filtered RSSI for distance calculation
+    filteredBeacon.rssi = filteredRSSI;
+    filteredBeacon.distance = calculateDistance(filteredRSSI);
+    filteredBeacon.confidence = calculateConfidence(filteredRSSI);
+    
+    // Debug output showing both raw and filtered values  
+    if (DEBUG_DISTANCE && filter.hasEnoughSamples()) {
+        Serial.printf("🔍 Beacon %s: Raw RSSI=%d, Filtered=%d, Distance=%.2f cm\n", 
+                     beacon.name.c_str(), beacon.rssi, filteredRSSI, filteredBeacon.distance);
+    }
+    
     // Update or add beacon to active list
     bool found = false;
     for (auto& existing : activeBeacons) {
         if (existing.address == beacon.address) {
-            existing = beacon;
+            existing = filteredBeacon;
             found = true;
             break;
         }
     }
     
     if (!found && activeBeacons.size() < 10) { // Limit to 10 beacons
-        activeBeacons.push_back(beacon);
+        activeBeacons.push_back(filteredBeacon);
     }
     
-    Serial.printf("🔍 Updated beacon: %s, RSSI: %d dBm, Distance: %.2f cm\n", 
-                 beacon.address.c_str(), beacon.rssi, beacon.distance);
+    // Only log when we have enough samples for stable readings
+    if (filter.hasEnoughSamples()) {
+        Serial.printf("🔍 Updated beacon: %s, RSSI: %d dBm, Distance: %.2f cm\n", 
+                     filteredBeacon.name.c_str(), filteredBeacon.rssi, filteredBeacon.distance);
+    }
 }
 
 float BeaconManager_Enhanced::calculateDistance(int rssi) const {
-    // Calculate distance from RSSI using path loss model
+    // Calculate distance from RSSI using ultra-close calibrated path loss model
     if (rssi >= 0) return 0.0f;
     
+    // Ultra-close RSSI calibration constants for PetZone beacons:
+    constexpr float TX_POWER_DBM   = -65.0f;   // -29 dBm @ 1 cm → calc'd 1 m ref
+    constexpr float PATH_LOSS_EXP  = 1.8f;     // short-range indoor exponent  
+    constexpr float CLAMP_MIN_M    = 0.005f;   // distances below 5 mm → 0 cm
+    
     // Path loss formula: Distance = 10^((Tx Power - RSSI) / (10 * n))
-    // Where Tx Power ≈ -69 dBm at 1m, n ≈ 2.5 for indoor environment
-    float distance = pow(10.0f, (-69 - rssi) / (10.0f * 2.5f));
-    return constrain(distance * 100, 0.0f, 5000.0f); // Convert to cm, cap at 50m
+    float distance_m = powf(10.0f, (TX_POWER_DBM - rssi) / (10.0f * PATH_LOSS_EXP));
+    
+    // Clamp ultra-close distances to zero for touching contact
+    if (distance_m < CLAMP_MIN_M) distance_m = 0.0f;
+    
+    float distance_cm = distance_m * 100.0f; // Convert to centimeters
+    
+    // Apply reasonable limits for collar use case
+    return constrain(distance_cm, 0.0f, BLE_MAX_DISTANCE_CM);
 }
 
 float BeaconManager_Enhanced::calculateConfidence(int rssi) const {
