@@ -2,11 +2,11 @@
 #define COMPILE_FIX_H
 
 // Missing pin definitions
-#define I2C_SDA_PIN 21
-#define I2C_SCL_PIN 22
-#define BUZZER_PIN 25
+#define I2C_SDA_PIN 8   // Correct ESP32-S3 I2C SDA pin
+#define I2C_SCL_PIN 9   // Correct ESP32-S3 I2C SCL pin
+#define BUZZER_PIN 18
 #define VIBRATION_PIN 26
-#define STATUS_LED_WIFI 2
+#define STATUS_LED_WIFI 21  // WiFi status LED on GPIO 21
 #define STATUS_LED_BLE 4
 #define STATUS_LED_POWER 5
 #define BATTERY_VOLTAGE_PIN 35

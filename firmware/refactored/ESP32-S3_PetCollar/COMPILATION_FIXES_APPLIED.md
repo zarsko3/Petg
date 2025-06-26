@@ -372,4 +372,40 @@ IP: 192.168.1.145
 - Set `DISPLAY_TYPE_SSD1306 = false`  
 - Set `DISPLAY_COLUMN_OFFSET = 2`
 
-This configuration ensures optimal ESP32-S3 performance with proper hardware pin assignments, robust error handling, intelligent WiFi priority management, clean BLE beacon filtering, accurate distance measurements, and full 128×64 display utilization. 
+#### 8. Buzzer Pin Restoration (GPIO 18)
+**Issue**: Refactor accidentally moved buzzer from original GPIO 18 to GPIO 15  
+**Root Cause**: Pin reassignment during hardware configuration consolidation
+
+**Solution**: Restore buzzer to original GPIO 18 and resolve conflicts
+
+**Changes Made**:
+- Restored `BUZZER_PIN` from GPIO 15 → GPIO 18 in all config files
+- Moved UART1_RX from GPIO 18 → GPIO 19 to avoid conflict
+- Updated both legacy and refactored configuration headers
+- Added compatibility macros for backward compatibility
+- Added buzzer test function with dual verification methods
+
+### 🔧 Pin Assignment Resolution
+
+**BEFORE (Conflict)**:
+```cpp
+#define BUZZER_PIN 15          // Wrong pin
+#define PIN_UART1_RX 18        // Conflicting with original buzzer
+```
+
+**AFTER (Restored)**:
+```cpp
+#define BUZZER_PIN 18          // Original pin restored
+#define PIN_UART1_RX 19        // Moved to avoid conflict
+```
+
+### 🎵 Buzzer Test Function
+
+Added comprehensive test function for verification:
+```cpp
+testBuzzer(2000, 500);  // 2kHz tone for 0.5 seconds
+```
+
+Supports both `tone()` function and direct LEDC PWM control for maximum compatibility.
+
+This configuration ensures optimal ESP32-S3 performance with proper hardware pin assignments, robust error handling, intelligent WiFi priority management, clean BLE beacon filtering, accurate distance measurements, full 128×64 display utilization, and correct buzzer operation on GPIO 18. 

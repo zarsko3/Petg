@@ -84,10 +84,10 @@
 
 // UART (additional serial ports if needed)
 #define UART1_TX_PIN 17
-#define UART1_RX_PIN 18
+#define UART1_RX_PIN 19         // Moved from GPIO 18 to avoid buzzer conflict
 
 // Alert system
-#define BUZZER_PIN 15           // PWM capable pin for buzzer
+#define BUZZER_PIN 18           // PWM capable pin for buzzer (restored to original GPIO)
 #define VIBRATION_PIN 16        // PWM capable pin for vibration motor
 #define STATUS_LED_WIFI 21      // WiFi status LED
 #define STATUS_LED_BLE 47       // BLE status LED

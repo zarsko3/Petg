@@ -8,7 +8,7 @@
 
 // ==================== MISSING PIN DEFINITIONS ====================
 #ifndef BUZZER_PIN
-#define BUZZER_PIN 25
+#define BUZZER_PIN 18
 #endif
 
 #ifndef VIBRATION_PIN
@@ -16,7 +16,7 @@
 #endif
 
 #ifndef STATUS_LED_WIFI
-#define STATUS_LED_WIFI 2
+#define STATUS_LED_WIFI 21  // WiFi status LED on GPIO 21
 #endif
 
 #ifndef STATUS_LED_BLE
@@ -32,11 +32,11 @@
 #endif
 
 #ifndef I2C_SDA_PIN
-#define I2C_SDA_PIN 21
+#define I2C_SDA_PIN 8   // Correct ESP32-S3 I2C SDA pin
 #endif
 
 #ifndef I2C_SCL_PIN
-#define I2C_SCL_PIN 22
+#define I2C_SCL_PIN 9   // Correct ESP32-S3 I2C SCL pin  
 #endif
 
 // ==================== MISSING TYPE DEFINITIONS ====================

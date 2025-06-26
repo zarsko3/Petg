@@ -1016,6 +1016,30 @@ void printSystemStatus() {
     lastStatus = millis();
 }
 
+// ==================== BUZZER TEST FUNCTION ====================
+/**
+ * @brief Test buzzer on GPIO 18 with tone() function
+ * @param frequency Frequency in Hz (default 2000)
+ * @param duration Duration in milliseconds (default 500)
+ */
+void testBuzzer(int frequency = 2000, int duration = 500) {
+    Serial.printf("🔊 Testing buzzer on GPIO %d: %dHz for %dms\n", BUZZER_PIN, frequency, duration);
+    
+    // Method 1: Using ESP32 tone() function
+    tone(BUZZER_PIN, frequency, duration);
+    delay(duration + 100);
+    
+    // Method 2: Using LEDC for confirmation
+    ledcAttachPin(BUZZER_PIN, BUZZER_PWM_CHANNEL);
+    ledcSetup(BUZZER_PWM_CHANNEL, frequency, 8);
+    ledcWrite(BUZZER_PWM_CHANNEL, 128); // 50% duty cycle
+    delay(duration);
+    ledcWrite(BUZZER_PWM_CHANNEL, 0);   // Turn off
+    ledcDetachPin(BUZZER_PIN);
+    
+    Serial.printf("✅ Buzzer test complete on GPIO %d\n", BUZZER_PIN);
+}
+
 // ==================== ARDUINO CORE FUNCTIONS ====================
 /**
  * @brief Arduino setup function - Initialize all systems
@@ -1071,6 +1095,10 @@ void setup() {
     
     // Add default beacon configurations for testing
     beaconManager.addDefaultConfigurations();
+    
+    // Test buzzer to confirm GPIO 18 is working
+    Serial.println("🔊 Testing buzzer on restored GPIO 18...");
+    testBuzzer(2000, 500); // 2kHz for 0.5 seconds
     
     // System initialization complete
     systemInitialized = true;

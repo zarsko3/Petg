@@ -95,11 +95,15 @@
 
 /* Additional UART Pins */
 #define PIN_UART1_TX                17
-#define PIN_UART1_RX                18
+#define PIN_UART1_RX                19    // Moved from GPIO 18 to avoid buzzer conflict
 
 /* Alert System Pins */
-#define PIN_BUZZER                  15    // PWM capable pin for buzzer
+#define PIN_BUZZER                  18    // PWM capable pin for buzzer (restored to original)
 #define PIN_VIBRATION               16    // PWM capable pin for vibration motor
+
+/* Legacy compatibility macros */
+#define BUZZER_PIN                  PIN_BUZZER     // For backward compatibility
+#define VIBRATION_PIN               PIN_VIBRATION  // For backward compatibility
 
 /* Status LED Pins */
 #define PIN_LED_WIFI_STATUS         21    // WiFi connection status
