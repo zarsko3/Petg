@@ -408,4 +408,50 @@ testBuzzer(2000, 500);  // 2kHz tone for 0.5 seconds
 
 Supports both `tone()` function and direct LEDC PWM control for maximum compatibility.
 
-This configuration ensures optimal ESP32-S3 performance with proper hardware pin assignments, robust error handling, intelligent WiFi priority management, clean BLE beacon filtering, accurate distance measurements, full 128×64 display utilization, and correct buzzer operation on GPIO 18. 
+#### 9. Arduino Core 3.x Compatibility Fix
+**Issue**: Compilation errors with ESP32 Arduino Core 3.2.0 due to API changes  
+**Root Cause**: LEDC function names changed and Adafruit_SSD1306 API differences
+
+**Compilation Errors Fixed**:
+```
+error: 'class Adafruit_SSD1306' has no member named 'setDisplayOffset'
+error: 'ledcAttachPin' was not declared in this scope; did you mean 'ledcAttach'?
+error: 'ledcSetup' was not declared in this scope
+error: 'ledcDetachPin' was not declared in this scope; did you mean 'ledcDetach'?
+```
+
+**Changes Made**:
+- Updated LEDC functions for ESP32 Arduino Core 3.x compatibility:
+  - `ledcAttachPin()` → `ledcAttach()`
+  - `ledcSetup() + ledcAttachPin()` → `ledcAttach(pin, freq, resolution)`
+  - `ledcDetachPin()` → `ledcDetach()`
+- Removed unsupported `setDisplayOffset()` for Adafruit_SSD1306
+- Added informative messages for SH1106 display users
+
+### 🔧 LEDC API Migration
+
+**BEFORE (Arduino Core 2.x)**:
+```cpp
+ledcSetup(BUZZER_PWM_CHANNEL, frequency, 8);
+ledcAttachPin(BUZZER_PIN, BUZZER_PWM_CHANNEL);
+ledcWrite(BUZZER_PWM_CHANNEL, 128);
+ledcDetachPin(BUZZER_PIN);
+```
+
+**AFTER (Arduino Core 3.x)**:
+```cpp
+ledcAttach(BUZZER_PIN, frequency, 8);  // pin, frequency, resolution
+ledcWrite(BUZZER_PIN, 128);
+ledcDetach(BUZZER_PIN);
+```
+
+### 📱 Display Library Compatibility
+
+For **SH1106** displays requiring column offset, consider switching to **U8G2** library:
+```cpp
+// Alternative for SH1106 support
+#include <U8g2lib.h>
+U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
+```
+
+This configuration ensures optimal ESP32-S3 performance with proper hardware pin assignments, robust error handling, intelligent WiFi priority management, clean BLE beacon filtering, accurate distance measurements, full 128×64 display utilization, correct buzzer operation on GPIO 18, and full compatibility with ESP32 Arduino Core 3.x. 

@@ -270,12 +270,12 @@ bool initializeDisplay() {
         display.setRotation(0);
         display.dim(false);
         
-        // Apply SH1106 offset if needed (common for 1.3-inch modules)
+        // Note: SH1106 offset handling would require switching to U8G2 library
+        // For now, Adafruit_SSD1306 works well with most 128x64 displays
         if (!DISPLAY_TYPE_SSD1306 && DISPLAY_COLUMN_OFFSET > 0) {
-            // SH1106 typically needs a 2-pixel column offset
-            display.setDisplayOffset(DISPLAY_COLUMN_OFFSET);
             if (DEBUG_DISPLAY) {
-                Serial.printf("📐 Applied SH1106 column offset: %d pixels\n", DISPLAY_COLUMN_OFFSET);
+                Serial.printf("⚠️ SH1106 offset not supported with Adafruit_SSD1306 library\n");
+                Serial.printf("💡 Consider switching to U8G2 library for SH1106 support\n");
             }
         }
         
@@ -1029,13 +1029,12 @@ void testBuzzer(int frequency = 2000, int duration = 500) {
     tone(BUZZER_PIN, frequency, duration);
     delay(duration + 100);
     
-    // Method 2: Using LEDC for confirmation
-    ledcAttachPin(BUZZER_PIN, BUZZER_PWM_CHANNEL);
-    ledcSetup(BUZZER_PWM_CHANNEL, frequency, 8);
-    ledcWrite(BUZZER_PWM_CHANNEL, 128); // 50% duty cycle
+    // Method 2: Using LEDC for confirmation (ESP32 Arduino Core 3.x compatible)
+    ledcAttach(BUZZER_PIN, frequency, 8);  // pin, frequency, resolution
+    ledcWrite(BUZZER_PIN, 128); // 50% duty cycle
     delay(duration);
-    ledcWrite(BUZZER_PWM_CHANNEL, 0);   // Turn off
-    ledcDetachPin(BUZZER_PIN);
+    ledcWrite(BUZZER_PIN, 0);   // Turn off
+    ledcDetach(BUZZER_PIN);
     
     Serial.printf("✅ Buzzer test complete on GPIO %d\n", BUZZER_PIN);
 }
