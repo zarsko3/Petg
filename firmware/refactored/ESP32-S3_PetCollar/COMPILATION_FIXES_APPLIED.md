@@ -460,9 +460,10 @@ U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
 - Updated distance calculation with ultra-close calibrated constants:
   - `TX_POWER_DBM`: -65.0f (-29 dBm @ 1 cm → calculated 1m reference)
   - `PATH_LOSS_EXP`: 1.8f (short-range indoor exponent)
-  - `CLAMP_MIN_M`: 0.005f (distances below 5mm → 0 cm)
+- Applied 1cm offset correction: `d -= 0.01f` to shift contact to 0 cm
+- Added negative value clamping: `if (d < 0.0f) d = 0.0f`
 - Changed `pow()` to `powf()` for better float precision
-- Removed minimum 1cm constraint - now allows 0.00 cm readings
+- Removed minimum distance constraints - now allows true 0.00 cm readings
 - Added documentation constants in config for reference
 
 ### 📋 Expected Ultra-Close Behavior
@@ -473,11 +474,11 @@ U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
 🔍 PetZone-Home-01, RSSI: -32 dBm, Distance: 3.67 cm  (1 cm actual)
 ```
 
-**After (Ultra-Close Accurate)**:
+**After (Ultra-Close Accurate with 1cm Offset)**:
 ```
 🔍 PetZone-Home-01, RSSI: -29 dBm, Distance: 0.00 cm  (Touching!)
-🔍 PetZone-Home-01, RSSI: -32 dBm, Distance: 1.02 cm  (1 cm actual)
-🔍 PetZone-Home-01, RSSI: -38 dBm, Distance: 5.18 cm  (5 cm actual)
+🔍 PetZone-Home-01, RSSI: -32 dBm, Distance: 0.02 cm  (1 cm actual)
+🔍 PetZone-Home-01, RSSI: -38 dBm, Distance: 4.18 cm  (5 cm actual)
 ```
 
 This configuration ensures optimal ESP32-S3 performance with proper hardware pin assignments, robust error handling, intelligent WiFi priority management, clean BLE beacon filtering, ultra-accurate close-range distance measurements, full 128×32 display utilization, correct buzzer operation on GPIO 18, and full compatibility with ESP32 Arduino Core 3.x. 

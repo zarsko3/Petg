@@ -162,10 +162,13 @@ float BeaconManager_Enhanced::calculateDistance(int rssi) const {
     constexpr float CLAMP_MIN_M    = 0.005f;   // distances below 5 mm → 0 cm
     
     // Path loss formula: Distance = 10^((Tx Power - RSSI) / (10 * n))
-    float distance_m = powf(10.0f, (TX_POWER_DBM - rssi) / (10.0f * PATH_LOSS_EXP));
+    float d = powf(10.0f, (TX_POWER_DBM - rssi) / (10.0f * PATH_LOSS_EXP));
     
-    // Clamp ultra-close distances to zero for touching contact
-    if (distance_m < CLAMP_MIN_M) distance_m = 0.0f;
+    // Subtract 1 cm and clamp to ensure contact reads 0 cm
+    d -= 0.01f;                // offset for physical contact
+    if (d < 0.0f) d = 0.0f;    // clamp negative values to zero
+    
+    float distance_m = d;
     
     float distance_cm = distance_m * 100.0f; // Convert to centimeters
     

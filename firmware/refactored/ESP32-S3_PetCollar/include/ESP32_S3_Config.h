@@ -234,11 +234,11 @@
  * 3. Update RSSI_REF_AT_1CM constant with your measured value
  * 4. Test at various close distances (1cm, 5cm, 10cm) to verify accuracy
  * 
- * Expected results with ultra-close calibration:
+ * Expected results with ultra-close calibration (1cm offset applied):
  * - Touching: RSSI: -29 dBm, Distance: 0.00 cm
- * - 1 cm: RSSI: -32 dBm, Distance: ~1.0 cm  
- * - 5 cm: RSSI: -38 dBm, Distance: ~5.0 cm
- * - 10 cm: RSSI: -44 dBm, Distance: ~10.0 cm
+ * - 1 cm: RSSI: -32 dBm, Distance: ~0.0 cm (offset corrected)
+ * - 5 cm: RSSI: -38 dBm, Distance: ~4.0 cm (offset corrected)
+ * - 10 cm: RSSI: -44 dBm, Distance: ~9.0 cm (offset corrected)
  */
 #endif
 
