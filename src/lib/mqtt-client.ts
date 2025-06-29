@@ -9,7 +9,7 @@ import mqtt, { MqttClient, IClientOptions } from 'mqtt';
 
 // MQTT connection configuration
 const MQTT_CONFIG: IClientOptions = {
-  host: process.env.NEXT_PUBLIC_MQTT_HOST || 'ab14d5df84884fd68d24d7d25cc78f2f.s1.eu.hivemq.cloud',
+      host: process.env.NEXT_PUBLIC_MQTT_HOST || 'ab1d45df84884fd68d24d7d25cc78f2f.s1.eu.hivemq.cloud',
   port: parseInt(process.env.NEXT_PUBLIC_MQTT_PORT || '8884'),
   protocol: 'wss', // WebSocket Secure for browser clients
   username: process.env.NEXT_PUBLIC_MQTT_USER || 'zarsko',
@@ -26,20 +26,32 @@ const MQTT_CONFIG: IClientOptions = {
   }
 };
 
-// Topic scheme for collar communication
+// Topic scheme for collar communication (matches ESP32 firmware)
 export const MQTT_TOPICS = {
   // Collar status (online/offline)
-  COLLAR_STATUS: (collarId: string) => `collar/${collarId}/status`,
-  COLLAR_STATUS_WILDCARD: 'collar/+/status',
+  COLLAR_STATUS: (collarId: string) => `pet-collar/${collarId}/status`,
+  COLLAR_STATUS_WILDCARD: 'pet-collar/+/status',
   
   // Collar telemetry data (position, battery, sensors)
-  COLLAR_TELEMETRY: (collarId: string) => `collar/${collarId}/telemetry`, 
-  COLLAR_TELEMETRY_WILDCARD: 'collar/+/telemetry',
+  COLLAR_TELEMETRY: (collarId: string) => `pet-collar/${collarId}/telemetry`, 
+  COLLAR_TELEMETRY_WILDCARD: 'pet-collar/+/telemetry',
+  
+  // Additional firmware topics
+  COLLAR_ZONES: (collarId: string) => `pet-collar/${collarId}/zones`,
+  COLLAR_ZONES_WILDCARD: 'pet-collar/+/zones',
+  COLLAR_LOCATION: (collarId: string) => `pet-collar/${collarId}/location`,
+  COLLAR_LOCATION_WILDCARD: 'pet-collar/+/location',
+  COLLAR_BEACONS: (collarId: string) => `pet-collar/${collarId}/beacon-detection`,
+  COLLAR_BEACONS_WILDCARD: 'pet-collar/+/beacon-detection',
+  COLLAR_ALERTS: (collarId: string) => `pet-collar/${collarId}/alert`,
+  COLLAR_ALERTS_WILDCARD: 'pet-collar/+/alert',
   
   // Commands to collar
-  COLLAR_COMMAND_BUZZ: (collarId: string) => `collar/${collarId}/command/buzz`,
-  COLLAR_COMMAND_LED: (collarId: string) => `collar/${collarId}/command/led`,
-  COLLAR_COMMAND_SETTINGS: (collarId: string) => `collar/${collarId}/command/settings`,
+  COLLAR_COMMAND_BUZZ: (collarId: string) => `pet-collar/${collarId}/command/buzz`,
+  COLLAR_COMMAND_ZONE: (collarId: string) => `pet-collar/${collarId}/command/zone`,
+  COLLAR_COMMAND_LOCATE: (collarId: string) => `pet-collar/${collarId}/command/locate`,
+  COLLAR_COMMAND_LED: (collarId: string) => `pet-collar/${collarId}/command/led`,
+  COLLAR_COMMAND_SETTINGS: (collarId: string) => `pet-collar/${collarId}/command/settings`,
   
   // Web client status
   WEB_STATUS: 'web/status'
@@ -180,7 +192,11 @@ export class CollarMQTTClient {
     
     const topics = [
       MQTT_TOPICS.COLLAR_STATUS_WILDCARD,
-      MQTT_TOPICS.COLLAR_TELEMETRY_WILDCARD
+      MQTT_TOPICS.COLLAR_TELEMETRY_WILDCARD,
+      MQTT_TOPICS.COLLAR_ZONES_WILDCARD,
+      MQTT_TOPICS.COLLAR_LOCATION_WILDCARD,
+      MQTT_TOPICS.COLLAR_BEACONS_WILDCARD,
+      MQTT_TOPICS.COLLAR_ALERTS_WILDCARD
     ];
     
     topics.forEach(topic => {
@@ -199,8 +215,8 @@ export class CollarMQTTClient {
       const messageStr = message.toString();
       console.log(`📨 MQTT: Received on ${topic}:`, messageStr);
       
-      // Parse collar ID from topic (e.g., "collar/001/telemetry" → "001")
-      const collarIdMatch = topic.match(/^collar\/([^\/]+)\//);
+      // Parse collar ID from topic (e.g., "pet-collar/001/telemetry" → "001")
+      const collarIdMatch = topic.match(/^pet-collar\/([^\/]+)\//);
       if (!collarIdMatch) {
         console.warn('⚠️ MQTT: Could not parse collar ID from topic:', topic);
         return;
@@ -215,6 +231,14 @@ export class CollarMQTTClient {
       } else if (topic.includes('/status')) {
         const data: CollarStatusData = JSON.parse(messageStr);
         this.onCollarStatus?.(collarId, data);
+      } else if (topic.includes('/zones')) {
+        console.log(`🗺️ MQTT: Zone data for collar ${collarId}:`, messageStr);
+      } else if (topic.includes('/location')) {
+        console.log(`📍 MQTT: Location data for collar ${collarId}:`, messageStr);
+      } else if (topic.includes('/beacon-detection')) {
+        console.log(`📡 MQTT: Beacon detection for collar ${collarId}:`, messageStr);
+      } else if (topic.includes('/alert')) {
+        console.log(`🚨 MQTT: Alert from collar ${collarId}:`, messageStr);
       }
       
     } catch (error) {

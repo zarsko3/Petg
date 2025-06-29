@@ -41,7 +41,7 @@ const char* WIFI_SSID = "JenoviceAP";
 const char* WIFI_PASSWORD = "********"; // Replace with actual password
 
 // MQTT Configuration - HiveMQ Cloud
-const char* MQTT_HOST = "ab14d5df84884fd68d24d7d25cc78f2f.s1.eu.hivemq.cloud";
+const char* MQTT_HOST = "ab1d45df84884fd68d24d7d25cc78f2f.s1.eu.hivemq.cloud";
 const uint16_t MQTT_PORT = 8883;  // TLS port
 const char* MQTT_USER = "zarsko";
 const char* MQTT_PASSWORD = "089430732zG";

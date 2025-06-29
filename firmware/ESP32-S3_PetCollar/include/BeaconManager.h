@@ -502,6 +502,8 @@ public:
     
     // Core functionality
     int getActiveBeaconCount() const;
+    int getDetectedBeaconCount() const;
+    unsigned long getLastScanTime() const;
     String getBeaconsJson() const;
     String getBeaconDataJSON() const;
     void updateBeacon(const BeaconData& beacon);

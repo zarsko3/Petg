@@ -5,6 +5,9 @@
 #include <WString.h>
 #include <vector>
 
+// Forward declarations for BLE classes to avoid circular dependencies
+class BLEAdvertisedDevice;
+
 // ==================== SHARED ENUMS ====================
 
 enum class AlertMode : uint8_t {

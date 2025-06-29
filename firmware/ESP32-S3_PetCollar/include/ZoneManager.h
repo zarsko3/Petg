@@ -589,6 +589,10 @@ inline ZoneType stringToZoneType(const String& typeStr) {
 class ZoneManager_Enhanced {
 public:
     void initialize();
+    size_t getZoneCount() const;
+    String getCurrentZone() const;
+    size_t getBreachCount() const;
+    String getStatusJson() const;
 };
 
 #endif // ZONE_MANAGER_H 

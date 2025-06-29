@@ -30,7 +30,7 @@ Create or update your `.env.local` file:
 
 ```bash
 # MQTT Configuration for HiveMQ Cloud
-NEXT_PUBLIC_MQTT_HOST=ab14d5df84884fd68d24d7d25cc78f2f.s1.eu.hivemq.cloud
+NEXT_PUBLIC_MQTT_HOST=ab1d45df84884fd68d24d7d25cc78f2f.s1.eu.hivemq.cloud
 NEXT_PUBLIC_MQTT_PORT=8884
 NEXT_PUBLIC_MQTT_USER=zarsko
 NEXT_PUBLIC_MQTT_PASS=089430732zG

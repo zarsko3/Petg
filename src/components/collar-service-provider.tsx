@@ -1,8 +1,8 @@
   'use client';
 
 import { useEffect } from 'react';
-import { getCollarService } from '@/lib/collar-websocket-service';
-import { collarIntegration } from '@/lib/collar-integration';
+import { getMQTTClient } from '@/lib/mqtt-client';
+import { usePetgStore } from '@/lib/store';
 
 interface CollarServiceProviderProps {
   children: React.ReactNode;
@@ -10,30 +10,63 @@ interface CollarServiceProviderProps {
 
 export function CollarServiceProvider({ children }: CollarServiceProviderProps) {
   useEffect(() => {
-    console.log('🚀 CollarServiceProvider: Starting auto-initialization...');
+    console.log('🚀 CollarServiceProvider: Starting MQTT client...');
     
-    // Auto-initialize collar integration
-    const initializeCollar = async () => {
+    // Initialize MQTT client for cloud connectivity
+    const initializeMQTT = async () => {
       try {
-        // Initialize both collar integration and WebSocket service
-        await collarIntegration.autoInit();
-        console.log('✅ CollarServiceProvider: Collar integration auto-initialized');
+        const mqttClient = getMQTTClient();
+        const store = usePetgStore.getState();
+        
+        // Set up event handlers
+        mqttClient.onConnect = () => {
+          console.log('✅ CollarServiceProvider: MQTT connected');
+          store.setCollarConnected(true);
+          store.setConnectionStatus('Connected');
+          store.setConnectionMessage('Connected to HiveMQ Cloud');
+        };
+        
+        mqttClient.onDisconnect = () => {
+          console.log('🔌 CollarServiceProvider: MQTT disconnected');
+          store.setCollarConnected(false);
+          store.setConnectionStatus('Failed');
+          store.setConnectionMessage('MQTT connection lost');
+        };
+        
+        mqttClient.onCollarStatus = (collarId: string, data) => {
+          console.log(`📡 CollarServiceProvider: Status from ${collarId}:`, data);
+          if (data.status === 'online') {
+            store.setCollarConnected(true);
+            store.setConnectionStatus('Connected');
+            store.setConnectionMessage(`Collar ${collarId} online`);
+          }
+        };
+        
+        mqttClient.onCollarTelemetry = (collarId: string, data) => {
+          console.log(`📊 CollarServiceProvider: Telemetry from ${collarId}:`, data);
+          store.setLastCollarData(data);
+          store.setLastDataReceived(Date.now());
+        };
+        
+        mqttClient.onError = (error) => {
+          console.error('❌ CollarServiceProvider: MQTT error:', error);
+          store.setCollarConnected(false);
+          store.setConnectionStatus('Failed');
+          store.setConnectionMessage('MQTT connection error');
+        };
+        
+        console.log('✅ CollarServiceProvider: MQTT client initialized');
+        
       } catch (error) {
-        console.error('❌ CollarServiceProvider: Auto-initialization failed:', error);
-        // Continue with WebSocket service anyway
+        console.error('❌ CollarServiceProvider: MQTT initialization failed:', error);
       }
-      
-      // Initialize WebSocket service
-      const service = getCollarService();
-      console.log('📡 CollarServiceProvider: WebSocket service initialized');
     };
     
-    initializeCollar();
+    initializeMQTT();
     
     return () => {
-      console.log('🧹 CollarServiceProvider: Cleaning up services...');
-      const service = getCollarService();
-      service.disconnect();
+      console.log('🧹 CollarServiceProvider: Cleaning up MQTT client...');
+      // Note: MQTT client manages its own lifecycle
     };
   }, []);
 

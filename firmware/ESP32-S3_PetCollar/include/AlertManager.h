@@ -458,6 +458,7 @@ public:
     bool isAlertActive() const;
     bool initialize();
     bool triggerAlert(const AlertConfig& config);
+    bool startAlert(AlertReason reason, AlertMode mode = AlertMode::BOTH, int pattern = 1, int priority = 1, const String& customReason = "");
     
     // Utility functions
     AlertMode stringToAlertMode(const String& modeStr);

@@ -7,7 +7,7 @@ const char* ssid = "JenoviceAP";
 const char* password = "YOUR_WIFI_PASSWORD";
 
 // Your HiveMQ Cloud credentials
-const char* mqtt_server = "ab14d5df84884fd68d24d7d25cc78f2f.s1.eu.hivemq.cloud";
+const char* mqtt_server = "ab1d45df84884fd68d24d7d25cc78f2f.s1.eu.hivemq.cloud";
 const int mqtt_port = 8883;
 const char* mqtt_user = "zarsko";
 const char* mqtt_password = "089430732zG";

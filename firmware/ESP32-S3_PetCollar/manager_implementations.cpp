@@ -37,7 +37,7 @@ public:
     
     void reset() {
         index = 0;
-        count = 0;
+        count = 0;  
     }
     
     bool hasEnoughSamples() const {
@@ -241,6 +241,16 @@ void BeaconManager_Enhanced::addDefaultConfigurations() {
     Serial.println("➕ Added default enhanced beacon configurations");
 }
 
+// Add missing getDetectedBeaconCount method (alias for getActiveBeaconCount)
+int BeaconManager_Enhanced::getDetectedBeaconCount() const {
+    return getActiveBeaconCount();
+}
+
+// Add missing getLastScanTime method
+unsigned long BeaconManager_Enhanced::getLastScanTime() const {
+    return millis(); // Simple implementation - return current time
+}
+
 // ==================== ENHANCED ALERT MANAGER IMPLEMENTATIONS ====================
 
 // Constructor
@@ -292,6 +302,17 @@ bool AlertManager_Enhanced::triggerAlert(const AlertConfig& config) {
     Serial.printf("🚨 Enhanced alert triggered: mode=%d, intensity=%d\n", 
                  (int)config.mode, config.intensity);
     return true;
+}
+
+// Add missing startAlert method
+bool AlertManager_Enhanced::startAlert(AlertReason reason, AlertMode mode, int pattern, int priority, const String& customReason) {
+    AlertConfig config;
+    config.mode = mode;
+    config.intensity = 128; // Default intensity
+    config.duration = 5000; // Default 5 seconds
+    
+    Serial.printf("🚨 Starting alert: reason=%d, mode=%d\n", (int)reason, (int)mode);
+    return triggerAlert(config);
 }
 
 AlertMode AlertManager_Enhanced::stringToAlertMode(const String& modeStr) {
@@ -346,6 +367,11 @@ int SystemStateManager::getBatteryPercent() const {
     return systemStateImpl.batteryPercent;
 }
 
+// Add missing getBatteryLevel method (alias for getBatteryPercent)
+int SystemStateManager::getBatteryLevel() const {
+    return getBatteryPercent();
+}
+
 int SystemStateManager::getErrorCount() const {
     return systemStateImpl.errorCount;
 }
@@ -380,6 +406,31 @@ String SystemStateManager::getSystemStatusJSON() const {
 
 void ZoneManager_Enhanced::initialize() {
     Serial.println("🗺️ Enhanced ZoneManager initialized");
+}
+
+// Add missing zone management methods
+size_t ZoneManager_Enhanced::getZoneCount() const {
+    return 0; // Simple implementation - no zones configured yet
+}
+
+String ZoneManager_Enhanced::getCurrentZone() const {
+    return "none"; // Simple implementation
+}
+
+size_t ZoneManager_Enhanced::getBreachCount() const {
+    return 0; // Simple implementation
+}
+
+String ZoneManager_Enhanced::getStatusJson() const {
+    DynamicJsonDocument doc(512);
+    doc["zone_count"] = getZoneCount();
+    doc["current_zone"] = getCurrentZone();
+    doc["breach_count"] = getBreachCount();
+    doc["timestamp"] = millis();
+    
+    String result;
+    serializeJson(doc, result);
+    return result;
 }
 
 // ==================== GLOBAL UTILITY FUNCTIONS ====================

@@ -412,4 +412,19 @@ inline bool hasMemoryAvailable(uint32_t requiredBytes) {
     #define DEBUG_ALERT(mode)
 #endif
 
+// ==================== JSON SERIALIZATION HELPERS ====================
+
+// JSON serialization for SystemState enum to fix ArduinoJson compilation errors
+inline void convertToJson(const SystemState& src, JsonVariant dst) {
+    switch (src) {
+        case SystemState::INITIALIZING: dst.set("initializing"); break;
+        case SystemState::NORMAL: dst.set("normal"); break;
+        case SystemState::ALERT: dst.set("alert"); break;
+        case SystemState::LOW_BATTERY: dst.set("low_battery"); break;
+        case SystemState::ERROR: dst.set("error"); break;
+        case SystemState::SLEEP: dst.set("sleep"); break;
+        default: dst.set("unknown"); break;
+    }
+}
+
 #endif // MICRO_CONFIG_H 

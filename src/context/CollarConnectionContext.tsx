@@ -333,41 +333,12 @@ export function CollarConnectionProvider({ children }: CollarConnectionProviderP
     }
   }, [connectToCollar, retryUntilFound]);
 
-  // Connect to discovery server for UDP-to-WebSocket relay
+  // Discovery server disabled - using MQTT cloud connectivity instead
   const connectToDiscoveryServer = useCallback(() => {
-    console.log('🔊 Connecting to discovery server...');
-    
-    const discoveryWsUrl = 'ws://localhost:3001/discovery';
-    try {
-      console.log(`🔗 Connecting to discovery WebSocket: ${discoveryWsUrl}`);
-      const discoveryWs = new WebSocket(discoveryWsUrl);
-      discoveryWsRef.current = discoveryWs;
-      
-      discoveryWs.onopen = () => {
-        console.log('✅ Connected to UDP discovery service');
-      };
-      
-      discoveryWs.onmessage = handleUDPPacket;
-      
-      discoveryWs.onerror = (error) => {
-        console.log('❌ Discovery WebSocket error:', error);
-      };
-      
-      discoveryWs.onclose = () => {
-        console.log('🔌 Discovery WebSocket closed');
-        discoveryWsRef.current = null;
-        
-        // Retry connection after 5 seconds
-        setTimeout(() => {
-          if (status !== 'connected') {
-            connectToDiscoveryServer();
-          }
-        }, 5000);
-      };
-    } catch (error) {
-      console.error('❌ Failed to connect to discovery server:', error);
-    }
-  }, [handleUDPPacket, status]);
+    console.log('🌐 Discovery server disabled - using MQTT cloud connectivity');
+    // WebSocket discovery is replaced by MQTT-over-WSS for cloud connectivity
+    // The CollarServiceProvider now handles MQTT connections to HiveMQ Cloud
+  }, []);
 
   // Auto-initialize on mount
   useEffect(() => {

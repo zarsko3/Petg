@@ -117,18 +117,14 @@ const nextConfig = {
       },
     ]
   },
-  // 🔄 Development WebSocket proxy (Vercel handles this in production)
+  // 🌐 MQTT-only configuration (WebSocket proxy disabled for cloud connectivity)
   async rewrites() {
     return [
-      // WebSocket proxy for development
-      {
-        source: '/ws',
-        destination: process.env.COLLAR_TUNNEL_URL 
-          ? process.env.COLLAR_TUNNEL_URL
-          : process.env.COLLAR_IP 
-            ? `http://${process.env.COLLAR_IP}:8080`
-            : 'http://192.168.1.35:8080'
-      }
+      // WebSocket proxy disabled - using MQTT over WSS instead
+      // {
+      //   source: '/ws',
+      //   destination: 'disabled-using-mqtt-cloud'
+      // }
     ]
   },
   

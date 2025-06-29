@@ -439,6 +439,12 @@ public:
     uint32_t getUptimeSeconds() const;
     
     /**
+     * @brief Get battery level percentage
+     * @return Battery level (0-100)
+     */
+    int getBatteryLevel() const;
+    
+    /**
      * @brief Get system uptime as formatted string
      * @return Formatted uptime string (e.g., "1d 2h 30m")
      */

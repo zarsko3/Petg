@@ -3,7 +3,7 @@
 
 // WiFi Configuration
 #define WIFI_SSID "JenoviceAP"
-#define WIFI_PASSWORD "********"  // Replace with your actual password
+#define WIFI_PASSWORD "DataSecNet"  // Replace with your actual password
 
 // MQTT Cloud Configuration (HiveMQ Cloud)
 #define MQTT_SERVER "ab14d5df84884fd68d24d7d25cc78f2f.s1.eu.hivemq.cloud"

@@ -44,36 +44,11 @@ let lastCollarBroadcast = 0;
 let wsServer: WebSocketServer | null = null;
 const WS_PORT = 3001;
 
-// Initialize WebSocket server for discovery broadcasting
+// WebSocket server disabled - using MQTT cloud connectivity instead
 function initWebSocketServer() {
-  if (wsServer) return;
-  
-  try {
-    wsServer = new WebSocketServer({ 
-      port: WS_PORT,
-      clientTracking: true 
-    });
-    
-    wsServer.on('connection', (ws) => {
-      console.log('🔌 Proxy: Client connected to discovery WebSocket');
-      
-      ws.on('close', () => {
-        console.log('🔌 Proxy: Client disconnected from discovery WebSocket');
-      });
-      
-      ws.on('error', (error) => {
-        console.error('❌ Proxy: WebSocket client error:', error.message);
-      });
-    });
-    
-    wsServer.on('error', (error) => {
-      console.error('❌ Proxy: WebSocket server error:', error.message);
-    });
-    
-    console.log(`✅ Proxy: WebSocket server started on port ${WS_PORT}`);
-  } catch (error) {
-    console.error('❌ Proxy: Failed to start WebSocket server:', error);
-  }
+  console.log('🌐 WebSocket discovery server disabled - using MQTT cloud connectivity');
+  // Discovery WebSocket server is replaced by MQTT-over-WSS for cloud connectivity
+  return;
 }
 
 // Broadcast discovery event to all connected clients
