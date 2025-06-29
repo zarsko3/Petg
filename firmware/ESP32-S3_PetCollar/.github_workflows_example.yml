@@ -1,0 +1,82 @@
+# Example GitHub Actions Workflow for PetCollar Firmware
+# Place this in .github/workflows/firmware-build.yml
+
+name: 🔨 Build PetCollar Firmware
+
+on:
+  push:
+    paths:
+      - 'firmware/ESP32-S3_PetCollar/**'
+    branches: [ main, develop ]
+  pull_request:
+    paths:
+      - 'firmware/ESP32-S3_PetCollar/**'
+
+jobs:
+  build-firmware:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+      
+    - name: 🐍 Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: ⚡ Install PlatformIO
+      run: |
+        python -m pip install --upgrade pip
+        pip install platformio
+        
+    - name: 📚 Install Firmware Dependencies
+      working-directory: firmware/ESP32-S3_PetCollar
+      run: pio lib install
+      
+    - name: 🔨 Build Standard Firmware
+      working-directory: firmware/ESP32-S3_PetCollar
+      run: pio run -e esp32-s3-petcollar
+      
+    - name: 🔨 Build MQTT Firmware
+      working-directory: firmware/ESP32-S3_PetCollar
+      run: pio run -e esp32-s3-petcollar-mqtt
+      
+    - name: 📝 Apply Naming Convention
+      working-directory: firmware/ESP32-S3_PetCollar
+      run: python rename_firmware.py
+      
+    - name: 📤 Upload Firmware Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: petcollar-firmware
+        path: |
+          firmware/petcollar_v*.bin
+          firmware/ESP32-S3_PetCollar/.pio/build/*/petcollar_v*.bin
+        retention-days: 30
+        
+    - name: 🏷️ Create Release (on tag)
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: PetCollar Firmware ${{ github.ref }}
+        body: |
+          ## 🚀 PetCollar Firmware Release
+          
+          **Firmware Variants:**
+          - `petcollar_v*.bin` - Standard WebSocket firmware
+          - `petcollar_v*-mqtt.bin` - MQTT Cloud firmware
+          
+          **Flash Instructions:**
+          ```bash
+          esptool.py --chip esp32s3 --port COM3 write_flash 0x10000 petcollar_v*.bin
+          ```
+          
+          **OTA Update:**
+          The firmware filename follows the `petcollar_v<version>.bin` convention required by OTA tooling.
+          
+        draft: false
+        prerelease: false 
