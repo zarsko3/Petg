@@ -316,8 +316,8 @@ export function CollarConnectionProvider({ children }: CollarConnectionProviderP
         console.log(`📡 UDP discovery found WebSocket URL: ${ws}`);
         localStorage.setItem('petg.wsUrl', ws);
         
-        // Extract IP from WebSocket URL (e.g., "ws://192.168.1.35:8080" -> "192.168.1.35")
-        const ipMatch = ws.match(/ws:\/\/([^:]+):/);
+        // 🔒 SECURITY FIX: Extract IP from WebSocket URL (handles both ws:// and wss://)
+        const ipMatch = ws.match(/wss?:\/\/([^:]+):/);
         if (ipMatch) {
           const ip = ipMatch[1];
           

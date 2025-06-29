@@ -469,8 +469,12 @@ class CollarWebSocketService {
   async connectToIP(ip: string) {
     console.log(`🎯 CollarService: Connecting directly to IP: ${ip}`);
     
-    // Set the WebSocket URL directly
-    this.wsUrl = `ws://${ip}:8080`;
+    // 🔒 SECURITY FIX: Use WSS when served over HTTPS to prevent mixed-content blocking
+    const protocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    this.wsUrl = `${protocol}//${ip}:8080`;
+    
+    console.log(`🔒 Protocol selected: ${protocol} (page served over ${typeof window !== 'undefined' ? window.location.protocol : 'unknown'})`);
+    console.log(`🎯 WebSocket URL: ${this.wsUrl}`);
     
     // Disconnect current connection if any
     this.disconnect();

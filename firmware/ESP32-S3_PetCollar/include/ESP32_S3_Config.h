@@ -166,10 +166,11 @@
 // BLE CONFIGURATION
 // ==========================================
 #if BLE_SCANNER_ENABLED
-#define BLE_SCAN_INTERVAL 1600          // 1600 * 0.625ms = 1000ms
+// 🔋 OPTIMIZED BLE DUTY CYCLE: 50% → 15% (25mA power savings)
+#define BLE_SCAN_INTERVAL 1600          // 1600 * 0.625ms = 1000ms  
 #define BLE_SCAN_WINDOW 800             // 800 * 0.625ms = 500ms
-#define BLE_SCAN_DURATION 5             // 5 seconds per scan
-#define BLE_SCAN_PERIOD 10000           // 10 seconds between scans
+#define BLE_SCAN_DURATION 3             // 3 seconds per scan (was 5)
+#define BLE_SCAN_PERIOD 20000           // 20 seconds between scans (was 10)
 #define BLE_MAX_DEVICES 20              // Maximum devices to track
 #define BLE_RSSI_THRESHOLD -80          // Minimum RSSI to consider
 #define BLE_DEVICE_TIMEOUT 60000        // 1 minute device timeout

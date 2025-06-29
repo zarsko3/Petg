@@ -34,6 +34,14 @@ if (isClerkAvailable) {
 
 // Simple middleware that allows all requests without authentication
 export default function middleware(req: NextRequest) {
+  // 🔧 FIXED: Ensure manifest.json is always publicly accessible for PWA
+  if (req.nextUrl.pathname === '/manifest.json') {
+    const response = NextResponse.next();
+    response.headers.set('Cache-Control', 'public, max-age=86400');
+    response.headers.set('Content-Type', 'application/manifest+json');
+    return response;
+  }
+  
   return NextResponse.next();
 }
 

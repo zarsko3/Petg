@@ -6,13 +6,19 @@ interface CollarConfig {
   status: 'connected' | 'disconnected' | 'setup';
 }
 
-const DEFAULT_CONFIG: CollarConfig = {
-  collar_ip: '10.0.0.4',
-  websocket_url: 'ws://10.0.0.4:8080',
-  http_url: 'http://10.0.0.4',
-  last_discovered: '',
-  status: 'disconnected'
+// 🔒 SECURITY FIX: Dynamic protocol selection for default config
+const getDefaultConfig = (): CollarConfig => {
+  const protocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return {
+    collar_ip: '10.0.0.4',
+    websocket_url: `${protocol}//10.0.0.4:8080`,
+    http_url: 'http://10.0.0.4',
+    last_discovered: '',
+    status: 'disconnected'
+  };
 };
+
+const DEFAULT_CONFIG: CollarConfig = getDefaultConfig();
 
 export class CollarConfigManager {
   private config: CollarConfig = DEFAULT_CONFIG;
@@ -82,9 +88,11 @@ export class CollarConfigManager {
   }
 
   updateFromDiscovery(ip: string): void {
+    // 🔒 SECURITY FIX: Use WSS when served over HTTPS to prevent mixed-content blocking
+    const protocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     this.saveConfig({
       collar_ip: ip,
-      websocket_url: `ws://${ip}:8080`,
+      websocket_url: `${protocol}//${ip}:8080`,
       http_url: `http://${ip}`,
       last_discovered: new Date().toISOString(),
       status: 'connected'

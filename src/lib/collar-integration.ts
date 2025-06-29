@@ -218,7 +218,9 @@ class CollarIntegration {
       } else {
         // Handle IP address format - convert to WebSocket URL
         const ipAddress = url;
-        this.wsUrl = `ws://${ipAddress}:8080`;
+        // 🔒 SECURITY FIX: Use WSS when served over HTTPS to prevent mixed-content blocking
+        const protocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        this.wsUrl = `${protocol}//${ipAddress}:8080`;
         this.baseUrl = `http://${ipAddress}:80`;
         
         // Test HTTP endpoint

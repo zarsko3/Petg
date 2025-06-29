@@ -28,6 +28,7 @@ export const getDefaultWebSocketUrl = async (): Promise<string> => {
     return config.websocket;
   }
   
-  // Fallback to manual discovery
-  return 'ws://192.168.1.100:8080';
+  // 🔒 SECURITY FIX: Use WSS when served over HTTPS to prevent mixed-content blocking
+  const protocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${protocol}//192.168.1.100:8080`;
 }; 

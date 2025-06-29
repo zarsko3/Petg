@@ -110,7 +110,10 @@ Preferences preferences;
 WiFiUDP udp;
 const int DISCOVERY_PORT = 47808;  // Custom port for collar discovery
 unsigned long lastBroadcast = 0;
-const unsigned long BROADCAST_INTERVAL = 15000;  // Broadcast every 15 seconds
+// 🔋 OPTIMIZED DISCOVERY TRAFFIC: Reduced from 15s to 60s for power savings
+const unsigned long BROADCAST_INTERVAL = 60000;         // Every 60 seconds (was 15s)
+const unsigned long BROADCAST_INITIAL_PERIOD = 300000;  // 5 minutes of frequent broadcasts after boot
+const unsigned long BROADCAST_INITIAL_INTERVAL = 15000; // 15s interval during initial period
 
 // ==================== BEACON CONFIG STRUCTURE ====================
 struct BeaconConfig {
@@ -997,36 +1000,173 @@ void manageAlerts() {
   }
 }
 
-// ==================== ADVANCED WIFI MANAGEMENT ====================
-void connectWiFi() {
-  Serial.println("🌐 Starting advanced WiFi connection...");
+// ==================== OPTIMIZED NON-BLOCKING WIFI MANAGEMENT ====================
+
+// Non-blocking WiFi state machine variables
+enum class WiFiState { IDLE, SCANNING, CONNECTING, CONNECTED, FAILED, PORTAL, RECOVERY };
+WiFiState wifiState = WiFiState::IDLE;
+uint32_t wifiStateTimestamp = 0;
+uint32_t connectionStartTime = 0;
+uint32_t totalConnectionStartTime = 0;
+int currentNetworkIndex = -1;
+bool servicesBootstrapped = false;
+String customSSID = "";
+String customPassword = "";
+
+void initializeWiFi() {
+  Serial.println("📶 Initializing optimized non-blocking WiFi manager...");
   
-  // Check for saved custom networks first
-  String savedSSID = preferences.getString("custom_ssid", "");
-  String savedPassword = preferences.getString("custom_password", "");
+  // Load saved credentials
+  customSSID = preferences.getString("custom_ssid", "");
+  customPassword = preferences.getString("custom_password", "");
   
-  if (savedSSID.length() > 0) {
-    Serial.printf("🔍 Trying saved custom network: %s\n", savedSSID.c_str());
-    WiFi.begin(savedSSID.c_str(), savedPassword.c_str());
-    
-    int attempts = 0;
-    while (WiFi.status() != WL_CONNECTED && attempts < 20) {
-      delay(500);
-      Serial.print(".");
-      attempts++;
+  // Setup event-driven WiFi handling - REPLACES BLOCKING LOOPS
+  WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
+    switch (event) {
+      case ARDUINO_EVENT_WIFI_STA_GOT_IP:
+        Serial.printf("✅ Got IP: %s (%.1fs total)\n", 
+          WiFi.localIP().toString().c_str(),
+          (millis() - totalConnectionStartTime) / 1000.0);
+        
+        wifiState = WiFiState::CONNECTED;
+        systemState.wifiConnected = true;
+        wifiConnected = true;
+        digitalWrite(STATUS_LED_WIFI, HIGH);
+        
+        // 🚀 CRITICAL: Bootstrap services AFTER IP acquisition
+        if (!servicesBootstrapped) {
+          Serial.println("🚀 Bootstrapping services after IP acquisition...");
+          setupWebServer();     // Now called AFTER IP is confirmed
+          startmDNSService();  // Now called AFTER IP is confirmed
+          initializeUDPBroadcast(); // Now called AFTER IP is confirmed
+          servicesBootstrapped = true;
+          Serial.println("✅ All services bootstrapped successfully");
+        }
+        break;
+        
+      case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
+        Serial.println("📶 WiFi disconnected, entering recovery");
+        if (wifiState == WiFiState::CONNECTED) {
+          wifiState = WiFiState::RECOVERY;
+          wifiStateTimestamp = millis();
+        }
+        systemState.wifiConnected = false;
+        wifiConnected = false;
+        break;
+        
+      case ARDUINO_EVENT_WIFI_STA_CONNECTED:
+        Serial.printf("📶 Connected to SSID: %s\n", WiFi.SSID().c_str());
+        break;
     }
-    
-    if (WiFi.status() == WL_CONNECTED) {
-      systemState.wifiConnected = true;
-      digitalWrite(STATUS_LED_WIFI, HIGH);
-      Serial.printf("\n✅ Connected to saved network: %s\n", savedSSID.c_str());
-      Serial.printf("📡 IP address: %s\n", WiFi.localIP().toString().c_str());
-      setupWebServer();
-      return;
-    } else {
-      Serial.println("\n❌ Saved network failed, trying predefined networks...");
-    }
+  });
+  
+  startWiFiConnection();
+}
+
+void startWiFiConnection() {
+  Serial.println("🚀 Starting non-blocking WiFi connection sequence");
+  totalConnectionStartTime = millis();
+  currentNetworkIndex = -1;
+  wifiState = WiFiState::SCANNING;
+  wifiStateTimestamp = millis();
+}
+
+// NON-BLOCKING state machine - called from main loop()
+void updateWiFiStateMachine() {
+  uint32_t now = millis();
+  uint32_t stateAge = now - wifiStateTimestamp;
+  
+  switch (wifiState) {
+    case WiFiState::IDLE:
+      break;
+      
+    case WiFiState::SCANNING:
+      if (tryNextNetwork()) {
+        wifiState = WiFiState::CONNECTING;
+        wifiStateTimestamp = now;
+      } else {
+        // No more networks - check total timeout
+        if (now - totalConnectionStartTime >= 20000) { // 20s total timeout
+          Serial.println("❌ All networks failed after 20s, starting captive portal");
+          startWiFiSetup();
+          wifiState = WiFiState::PORTAL;
+          wifiStateTimestamp = now;
+        } else {
+          wifiState = WiFiState::FAILED;
+          wifiStateTimestamp = now;
+        }
+      }
+      break;
+      
+    case WiFiState::CONNECTING:
+      // 6s timeout per SSID (was 15s before)
+      if (stateAge >= 6000) {
+        Serial.printf("⏰ Timeout connecting to network %d after 6s\n", currentNetworkIndex);
+        wifiState = WiFiState::SCANNING;
+        wifiStateTimestamp = now;
+      }
+      break;
+      
+    case WiFiState::CONNECTED:
+      // Monitor connection health
+      if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("📶 Connection lost, entering recovery");
+        wifiState = WiFiState::RECOVERY;
+        wifiStateTimestamp = now;
+      }
+      break;
+      
+    case WiFiState::FAILED:
+      if (stateAge >= 1000) { // 1s delay before retry
+        wifiState = WiFiState::SCANNING;
+        wifiStateTimestamp = now;
+      }
+      break;
+      
+    case WiFiState::RECOVERY:
+      if (stateAge >= 5000) { // 5s recovery delay
+        Serial.println("🔄 Starting connection recovery");
+        currentNetworkIndex = -1;
+        wifiState = WiFiState::SCANNING;
+        wifiStateTimestamp = now;
+      }
+      break;
+      
+    case WiFiState::PORTAL:
+      // Captive portal active
+      break;
   }
+}
+
+bool tryNextNetwork() {
+  currentNetworkIndex++;
+  
+  // Try custom network first
+  if (currentNetworkIndex == 0 && customSSID.length() > 0) {
+    Serial.printf("🔗 Connecting to saved: %s\n", customSSID.c_str());
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(customSSID.c_str(), customPassword.c_str());
+    connectionStartTime = millis();
+    return true;
+  }
+  
+  // Try predefined networks
+  int networkArrayIndex = customSSID.length() > 0 ? 
+                         currentNetworkIndex - 1 : currentNetworkIndex;
+  
+  if (networkArrayIndex >= 0 && networkArrayIndex < numNetworks) {
+    Serial.printf("🔗 Connecting to: %s (%s)\n", 
+      wifiNetworks[networkArrayIndex].location, 
+      wifiNetworks[networkArrayIndex].ssid);
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(wifiNetworks[networkArrayIndex].ssid, 
+               wifiNetworks[networkArrayIndex].password);
+    connectionStartTime = millis();
+    return true;
+  }
+  
+  return false; // No more networks
+}
   
   // Try each predefined network in sequence with enhanced debugging
   for (int i = 0; i < numNetworks; i++) {
@@ -1308,7 +1448,8 @@ void initializeUDPBroadcast() {
   udp.begin(DISCOVERY_PORT);
   
   Serial.printf("✅ UDP broadcast initialized on port %d\n", DISCOVERY_PORT);
-  Serial.printf("🔊 Will broadcast presence every %d seconds\n", BROADCAST_INTERVAL / 1000);
+  Serial.printf("🔊 Optimized discovery: %ds for 5min, then %ds\n", 
+                 BROADCAST_INITIAL_INTERVAL / 1000, BROADCAST_INTERVAL / 1000);
   
   // Send initial broadcast immediately
   broadcastCollarPresence();
@@ -1389,15 +1530,14 @@ void setup() {
     delay(1000);  // Let user see the text validation
   }
   
-  // Initialize enhanced WiFi with fast re-association
-  Serial.println("🌐 Starting Fast Wi-Fi Manager...");
-  if (!wifiManager.begin()) {
-    Serial.println("❌ Fast Wi-Fi Manager initialization failed!");
-    // Fallback to old method
-    connectWiFi();
-  } else {
-    Serial.println("✅ Fast Wi-Fi Manager initialized successfully!");
-  }
+  // 🚀 Initialize optimized non-blocking WiFi
+  Serial.println("📶 Starting optimized non-blocking WiFi connection...");
+  initializeWiFi();  // Non-blocking - returns immediately
+  
+  // ❌ REMOVED BLOCKING SERVICE CALLS - now handled by onReady callback:
+  // - setupWebServer() -> moved to WiFi ready callback
+  // - startmDNSService() -> moved to WiFi ready callback  
+  // - initializeUDPBroadcast() -> moved to WiFi ready callback
   
   // Initialize advanced BLE with optimized scanning
   try {
@@ -1432,12 +1572,13 @@ void setup() {
   systemState.lastHeartbeat = millis();
 }
 
-// ==================== ADVANCED MAIN LOOP ====================
+// ==================== OPTIMIZED NON-BLOCKING MAIN LOOP ====================
 void loop() {
   unsigned long currentTime = millis();
   
-  // Handle fast WiFi manager
-  wifiManager.loop();
+  // 🚀 CRITICAL: Update non-blocking WiFi state machine
+  // This MUST be called every loop iteration for non-blocking operation
+  updateWiFiStateMachine();
   
   // Handle web server and WebSocket communication
   if (systemState.webServerRunning) {
@@ -1504,10 +1645,15 @@ void loop() {
     lastWebSocketBroadcast = currentTime;
   }
   
-  // Broadcast collar presence via UDP for dashboard discovery
-  if (systemState.wifiConnected && (currentTime - lastBroadcast > BROADCAST_INTERVAL)) {
-    broadcastCollarPresence();
-    lastBroadcast = currentTime;
+  // 🔋 OPTIMIZED DISCOVERY BROADCASTING: Frequent initially, then reduced
+  if (systemState.wifiConnected) {
+    unsigned long interval = (currentTime < BROADCAST_INITIAL_PERIOD) ? 
+                            BROADCAST_INITIAL_INTERVAL : BROADCAST_INTERVAL;
+    
+    if (currentTime - lastBroadcast > interval) {
+      broadcastCollarPresence();
+      lastBroadcast = currentTime;
+    }
   }
   
   // Watchdog and system stability

@@ -111,7 +111,8 @@ class CollarConnectionManager {
     console.log('📡 Starting HTTP polling to collar...');
     this.httpFallback = true;
     
-    const httpUrl = this.currentUrl.replace('ws://', 'http://').replace(':8080', '');
+    // 🔒 SECURITY FIX: Handle both ws:// and wss:// protocols for HTTP polling fallback
+    const httpUrl = this.currentUrl.replace(/^wss?:\/\//, 'http://').replace(':8080', '');
     
     const pollData = async () => {
       try {
@@ -267,7 +268,8 @@ class CollarConnectionManager {
     }
 
     try {
-      const httpUrl = this.currentUrl.replace('ws://', 'http://').replace(':8080', '');
+      // 🔒 SECURITY FIX: Handle both ws:// and wss:// protocols for HTTP commands
+      const httpUrl = this.currentUrl.replace(/^wss?:\/\//, 'http://').replace(':8080', '');
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
       
