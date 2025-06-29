@@ -16,10 +16,26 @@
 #define HARDWARE_PLATFORM "ESP32-S3"
 #define BUILD_DATE __DATE__ " " __TIME__
 
+// ==================== LIBRARY DEPENDENCY CHECK ====================
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
-#include <PubSubClient.h>
+
+// Check for PubSubClient library
+#ifndef PUBSUBCLIENT_H
+  #include <PubSubClient.h>
+  #if !defined(PUBSUBCLIENT_H)
+    #error "❌ PubSubClient library not found! Install 'PubSubClient by Nick O'Leary' via Arduino Library Manager"
+  #endif
+#else
+  #include <PubSubClient.h>
+#endif
+
+// Check for ArduinoJson library
 #include <ArduinoJson.h>
+#if ARDUINOJSON_VERSION_MAJOR < 7
+  #error "❌ ArduinoJson v7.0.0+ required! Update 'ArduinoJson by Benoit Blanchon' via Arduino Library Manager"
+#endif
+
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEScan.h>
