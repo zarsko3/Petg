@@ -435,7 +435,7 @@ void performBLEScan() {
   state.lastScan = millis();
   
   try {
-    BLEScanResults foundDevices = pBLEScan->start(BLE_SCAN_DURATION, false);
+    BLEScanResults* foundDevices = pBLEScan->start(BLE_SCAN_DURATION, false);
     state.successfulScans++;
     
     Serial.printf("📡 BLE scan completed: %d devices found\n", state.beaconsDetected);
