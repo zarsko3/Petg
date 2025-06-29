@@ -69,7 +69,7 @@ const nextConfig = {
         headers: [
           {
             key: 'Access-Control-Allow-Origin',
-            value: process.env.NODE_ENV === 'development' ? '*' : 'https://your-domain.com',
+            value: process.env.NODE_ENV === 'development' ? '*' : process.env.NEXT_PUBLIC_APP_URL || 'https://localhost:3000',
           },
           {
             key: 'Access-Control-Allow-Methods',
@@ -130,7 +130,7 @@ const nextConfig = {
               value: 'http',
             },
           ],
-          destination: 'https://your-domain.com/:path*',
+          destination: `${process.env.NEXT_PUBLIC_APP_URL || 'https://localhost:3000'}/:path*`,
           permanent: true,
         },
       ]
