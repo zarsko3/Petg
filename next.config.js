@@ -117,6 +117,19 @@ const nextConfig = {
       },
     ]
   },
+  // 🔄 Development WebSocket proxy (Vercel handles this in production)
+  async rewrites() {
+    return [
+      // WebSocket proxy for development
+      {
+        source: '/ws',
+        destination: process.env.COLLAR_IP 
+          ? `http://${process.env.COLLAR_IP}:8080`
+          : 'http://192.168.1.35:8080'
+      }
+    ]
+  },
+  
   // Ensure HTTPS redirect in production
   async redirects() {
     if (process.env.NODE_ENV === 'production') {

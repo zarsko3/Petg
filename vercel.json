@@ -1,0 +1,49 @@
+{
+  "functions": {
+    "src/app/api/*/route.ts": {
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/ws",
+      "destination": "http://192.168.1.35:8080"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/ws",
+      "headers": [
+        {
+          "key": "Connection",
+          "value": "upgrade"
+        },
+        {
+          "key": "Upgrade", 
+          "value": "websocket"
+        },
+        {
+          "key": "Sec-WebSocket-Protocol",
+          "value": "*"
+        }
+      ]
+    },
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, PUT, DELETE, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization"
+        }
+      ]
+    }
+  ]
+} 

@@ -30,17 +30,28 @@ export class MobileWebSocketService {
   private isConnected = false
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null
 
-  constructor(private url: string = 'ws://localhost:3001/collar-ws') {
+  constructor(private url: string = 'auto') {
     this.connect()
   }
 
   private connect() {
     try {
-      // For mobile browsers, use secure WebSocket if on HTTPS
-      const wsUrl = window.location.protocol === 'https:' 
-        ? this.url.replace('ws://', 'wss://') 
-        : this.url
+      // 🔄 PROXY: Use same-origin proxy for collar WebSocket
+      let wsUrl: string;
+      
+      if (this.url === 'auto' || this.url.includes('collar')) {
+        // Use Vercel proxy for collar connections
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        wsUrl = `${protocol}//${window.location.host}/ws`;
+        console.log('📱 MobileWebSocket: Using Vercel proxy for collar connection');
+      } else {
+        // Legacy URL handling for non-collar WebSockets
+        wsUrl = window.location.protocol === 'https:' 
+          ? this.url.replace('ws://', 'wss://') 
+          : this.url;
+      }
 
+      console.log(`🔗 MobileWebSocket: Connecting to ${wsUrl}`);
       this.ws = new WebSocket(wsUrl)
       
       this.ws.onopen = () => {

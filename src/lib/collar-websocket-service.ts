@@ -56,31 +56,21 @@ class CollarWebSocketService {
     }, 2000); // 2 second delay to avoid immediate scanning
   }
 
-  // Get WebSocket URL directly from collar broadcasts (no discovery/scanning)
-  private async fetchWebSocketUrl(): Promise<string | null> {
-    try {
-      console.log('🔗 CollarService: Getting WebSocket URL directly from collar...');
-      
-      // First check if we already have a working WebSocket URL - avoid any API calls
-      if (this.wsUrl && this.status === 'connected') {
-        console.log('✅ CollarService: Using existing WebSocket URL (no discovery needed)');
-        return this.wsUrl;
-      }
-      
-      // Check localStorage for cached WebSocket URL from UDP discovery
-      const cachedUrl = localStorage.getItem('petg.wsUrl');
-      if (cachedUrl) {
-        console.log(`✅ CollarService: Using cached WebSocket URL: ${cachedUrl}`);
-        return cachedUrl;
-      }
-      
-      console.log('ℹ️ CollarService: No cached WebSocket URL found');
-      return null;
-      
-    } catch (error) {
-      console.log('ℹ️ CollarService: WebSocket not available, using HTTP polling');
-      return null;
+  // 🔄 PROXY: Get WebSocket URL using same-origin proxy
+  private getProxyWebSocketUrl(): string {
+    if (typeof window === 'undefined') {
+      return 'ws://localhost:3000/ws';
     }
+    
+    // Always use same-origin proxy endpoint
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.host;
+    const proxyUrl = `${protocol}//${host}/ws`;
+    
+    console.log(`🔄 CollarService: Using Vercel proxy URL: ${proxyUrl}`);
+    console.log(`📡 This automatically proxies to collar via vercel.json configuration`);
+    
+    return proxyUrl;
   }
 
   // Quick check if current WebSocket is actually working
@@ -112,42 +102,16 @@ class CollarWebSocketService {
     this.updateStore();
     
     try {
-      let url = this.wsUrl; // Try to reuse existing URL first
+      // 🔄 PROXY: Always use same-origin proxy URL - no discovery needed
+      const url = this.getProxyWebSocketUrl();
       
-      // Only fetch new URL if we don't have one or if discovery is NOT being skipped
-      if (!url || !skipDiscovery) {
-        console.log(skipDiscovery ? '🔄 CollarService: Skipping discovery, using cached URL' : '🔍 CollarService: Fetching WebSocket URL from collar...');
-        const newUrl = await this.fetchWebSocketUrl();
-        
-        if (!newUrl) {
-          // If we have an existing URL, try to use it as fallback
-          if (url) {
-            console.log(`🔄 CollarService: Discovery failed, trying cached URL: ${url}`);
-          } else {
-            console.log('ℹ️ CollarService: WebSocket connection not available, relying on HTTP polling');
-            this.setStatus('disconnected');
-            this.lastError = 'WebSocket unavailable (using HTTP polling)';
-            this.updateStore();
-            return; // Exit gracefully without throwing
-          }
-        } else {
-          url = newUrl;
-        }
+      // Update stored URL if changed
+      if (this.wsUrl !== url) {
+        console.log(`🔄 CollarService: Using proxy URL: ${url}`);
+        this.wsUrl = url;
       }
       
-      // Log IP change detection
-      if (this.wsUrl && this.wsUrl !== url) {
-        console.log(`🔄 CollarService: IP address changed!`);
-        console.log(`   Previous: ${this.wsUrl}`);
-        console.log(`   New: ${url}`);
-      } else if (!this.wsUrl) {
-        console.log(`🎯 CollarService: Initial connection: ${url}`);
-      } else {
-        console.log(`✅ CollarService: Reusing URL: ${url}`);
-      }
-      
-      this.wsUrl = url;
-      console.log(`🔗 CollarService: Attempting WebSocket connection to ${url}...`);
+      console.log(`🔗 CollarService: Connecting via Vercel proxy to ${url}...`);
       
       const ws = new WebSocket(url);
       this.ws = ws;
@@ -465,16 +429,10 @@ class CollarWebSocketService {
     }, 10000); // Increased interval to reduce unnecessary attempts
   }
 
-  // Connect to a specific IP directly (e.g., from collar broadcast)
+  // 🔄 PROXY: Connect using same-origin proxy (IP parameter ignored)
   async connectToIP(ip: string) {
-    console.log(`🎯 CollarService: Connecting directly to IP: ${ip}`);
-    
-    // 🔒 SECURITY FIX: Use WSS when served over HTTPS to prevent mixed-content blocking
-    const protocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    this.wsUrl = `${protocol}//${ip}:8080`;
-    
-    console.log(`🔒 Protocol selected: ${protocol} (page served over ${typeof window !== 'undefined' ? window.location.protocol : 'unknown'})`);
-    console.log(`🎯 WebSocket URL: ${this.wsUrl}`);
+    console.log(`🔄 CollarService: Connect requested for IP ${ip} - using proxy instead`);
+    console.log(`📡 Vercel proxy will handle forwarding to collar automatically`);
     
     // Disconnect current connection if any
     this.disconnect();
@@ -482,16 +440,14 @@ class CollarWebSocketService {
     // Small delay to ensure cleanup
     await new Promise(resolve => setTimeout(resolve, 500));
     
-    // Connect using the cached URL (skip discovery)
-    return this.connect(true); // skipDiscovery = true
+    // Connect using proxy URL
+    return this.connect(true); // skipDiscovery = true (no discovery needed with proxy)
   }
 
-  // Force rediscovery of collar IP (useful when switching networks)
+  // 🔄 PROXY: Reconnect using proxy (no rediscovery needed)
   async forceRediscovery() {
-    console.log('🔄 CollarService: Forcing IP rediscovery...');
-    
-    // Clear cached URL to force fresh discovery
-    this.wsUrl = null;
+    console.log('🔄 CollarService: Reconnecting via proxy...');
+    console.log('📡 No rediscovery needed - Vercel proxy handles collar routing');
     
     // Disconnect current connection
     this.disconnect();
@@ -499,8 +455,8 @@ class CollarWebSocketService {
     // Small delay to ensure cleanup
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    // Start fresh connection with discovery
-    return this.connect(false); // skipDiscovery = false to force discovery
+    // Reconnect using proxy
+    return this.connect(true); // Always skip discovery with proxy approach
   }
 }
 
