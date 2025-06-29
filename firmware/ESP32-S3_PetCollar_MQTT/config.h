@@ -2,18 +2,18 @@
 // Edit these values before uploading to your ESP32-S3
 
 // WiFi Configuration
-#define WIFI_SSID "YOUR_WIFI_NAME"
-#define WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
+#define WIFI_SSID "JenoviceAP"
+#define WIFI_PASSWORD "********"  // Replace with your actual password
 
 // MQTT Cloud Configuration (HiveMQ Cloud)
-#define MQTT_SERVER "your-hivemq-cluster.hivemq.cloud"
+#define MQTT_SERVER "ab14d5df84884fd68d24d7d25cc78f2f.s1.eu.hivemq.cloud"
 #define MQTT_PORT 8883  // TLS port for secure connection
-#define MQTT_USER "your-username"
-#define MQTT_PASSWORD "your-password"
+#define MQTT_USER "zarsko"
+#define MQTT_PASSWORD "089430732zG"
 
-// Device Configuration
-#define COLLAR_ID "collar_001"  // Change this for each collar
-#define DEVICE_NAME "Pet Collar MQTT"
+// Device Configuration  
+#define COLLAR_ID "001"  // Change this for each collar
+#define DEVICE_NAME "COLLAR-001"
 
 // Hardware Configuration
 #define BUZZER_PIN 4

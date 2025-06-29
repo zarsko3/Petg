@@ -32,35 +32,20 @@
 #include <BLEScan.h>
 #include <BLEAdvertisedDevice.h>
 
-// =========================
-// 🔧 CONFIGURATION
-// =========================
+// ==================== CONFIGURATION ====================
+#include "config.h"
 
-// Wi-Fi Configuration
-const char* WIFI_SSID = "JenoviceAP";
-const char* WIFI_PASSWORD = "********"; // Replace with actual password
-
-// MQTT Configuration - HiveMQ Cloud
-const char* MQTT_HOST = "ab14d5df84884fd68d24d7d25cc78f2f.s1.eu.hivemq.cloud";
-const uint16_t MQTT_PORT = 8883;  // TLS port
-const char* MQTT_USER = "zarsko";
-const char* MQTT_PASSWORD = "089430732zG";
-
-// Device Configuration
-const char* DEVICE_ID = "001";  // Change this for each collar
-const char* DEVICE_NAME = "COLLAR-001";
-
-// Hardware Pins
-const int BUZZER_PIN = 4;
-const int LED_PIN = 2;
-const int BATTERY_PIN = A0;  // ADC pin for battery monitoring
-
-// Timing Configuration
-const unsigned long TELEMETRY_INTERVAL = 30000;  // 30 seconds
-const unsigned long HEARTBEAT_INTERVAL = 60000;  // 1 minute
-const unsigned long BLE_SCAN_DURATION = 5;       // 5 seconds
-const unsigned long WIFI_TIMEOUT = 10000;        // 10 seconds
-const unsigned long MQTT_TIMEOUT = 5000;         // 5 seconds
+// Use configuration from config.h
+const char* wifiSSID = WIFI_SSID;
+const char* wifiPassword = WIFI_PASSWORD;
+const char* mqttHost = MQTT_SERVER;
+const uint16_t mqttPort = MQTT_PORT;
+const char* mqttUser = MQTT_USER;
+const char* mqttPassword = MQTT_PASSWORD;
+const char* deviceID = COLLAR_ID;
+const char* deviceName = DEVICE_NAME;
+const int LED_PIN = 2;  // Standard ESP32-S3 LED pin
+const int batteryPin = BATTERY_ADC_PIN;
 
 // =========================
 // 🌐 GLOBAL OBJECTS
@@ -101,23 +86,23 @@ struct SystemState {
 // =========================
 
 String getStatusTopic() {
-  return "collar/" + String(DEVICE_ID) + "/status";
+  return "collar/" + String(deviceID) + "/status";
 }
 
 String getTelemetryTopic() {
-  return "collar/" + String(DEVICE_ID) + "/telemetry";
+  return "collar/" + String(deviceID) + "/telemetry";
 }
 
 String getBuzzCommandTopic() {
-  return "collar/" + String(DEVICE_ID) + "/command/buzz";
+  return "collar/" + String(deviceID) + "/command/buzz";
 }
 
 String getLEDCommandTopic() {
-  return "collar/" + String(DEVICE_ID) + "/command/led";
+  return "collar/" + String(deviceID) + "/command/led";
 }
 
 String getSettingsCommandTopic() {
-  return "collar/" + String(DEVICE_ID) + "/command/settings";
+  return "collar/" + String(deviceID) + "/command/settings";
 }
 
 // =========================
@@ -148,7 +133,7 @@ void initializeHardware() {
   // Initialize pins
   pinMode(BUZZER_PIN, OUTPUT);
   pinMode(LED_PIN, OUTPUT);
-  pinMode(BATTERY_PIN, INPUT);
+  pinMode(batteryPin, INPUT);
   
   // LED startup sequence
   for (int i = 0; i < 3; i++) {
@@ -162,7 +147,7 @@ void initializeHardware() {
 }
 
 void updateBatteryStatus() {
-  int adcValue = analogRead(BATTERY_PIN);
+  int adcValue = analogRead(batteryPin);
   state.batteryVoltage = (adcValue * 3.3) / 4095.0 * 2; // Voltage divider
   state.batteryLevel = map(constrain(state.batteryVoltage * 100, 320, 420), 320, 420, 0, 100);
   
@@ -238,8 +223,8 @@ void controlLED(String mode, String color = "white", int durationMs = 1000) {
 void connectToWiFi() {
   if (state.wifiConnected) return;
   
-  Serial.printf("🌐 Connecting to WiFi: %s\n", WIFI_SSID);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  Serial.printf("🌐 Connecting to WiFi: %s\n", wifiSSID);
+  WiFi.begin(wifiSSID, wifiPassword);
   
   unsigned long startTime = millis();
   while (WiFi.status() != WL_CONNECTED && millis() - startTime < WIFI_TIMEOUT) {
@@ -278,18 +263,18 @@ void connectToMQTT() {
   // Configure TLS - For production, replace with proper certificate
   wifiClient.setInsecure(); // OK for pilot testing
   
-  mqttClient.setServer(MQTT_HOST, MQTT_PORT);
+  mqttClient.setServer(mqttHost, mqttPort);
   mqttClient.setCallback(onMqttMessage);
   mqttClient.setKeepAlive(60);
   mqttClient.setSocketTimeout(15);
   
   // Last Will and Testament
   String statusTopic = getStatusTopic();
-  String offlineMessage = "{\"device_id\":\"" + String(DEVICE_ID) + "\",\"status\":\"offline\",\"timestamp\":" + String(millis()) + "}";
-  
-  String clientId = String(DEVICE_NAME) + "-" + String(random(0xffff), HEX);
-  
-  if (mqttClient.connect(clientId.c_str(), MQTT_USER, MQTT_PASSWORD, 
+      String offlineMessage = "{\"device_id\":\"" + String(deviceID) + "\",\"status\":\"offline\",\"timestamp\":" + String(millis()) + "}";
+    
+    String clientId = String(deviceName) + "-" + String(random(0xffff), HEX);
+    
+    if (mqttClient.connect(clientId.c_str(), mqttUser, mqttPassword, 
                         statusTopic.c_str(), 1, true, offlineMessage.c_str())) {
     Serial.println("✅ MQTT connected!");
     state.mqttConnected = true;
@@ -303,7 +288,7 @@ void connectToMQTT() {
     // Publish online status
     publishStatus("online");
     
-    Serial.printf("📡 Subscribed to command topics for device %s\n", DEVICE_ID);
+    Serial.printf("📡 Subscribed to command topics for device %s\n", deviceID);
     
   } else {
     Serial.printf("❌ MQTT connection failed, rc=%d\n", mqttClient.state());
@@ -356,7 +341,7 @@ void publishStatus(String status) {
   if (!state.mqttConnected) return;
   
   DynamicJsonDocument doc(512);
-  doc["device_id"] = String(DEVICE_ID);
+  doc["device_id"] = String(deviceID);
   doc["status"] = status;
   doc["timestamp"] = millis();
   doc["ip_address"] = WiFi.localIP().toString();
@@ -374,7 +359,7 @@ void publishTelemetry() {
   DynamicJsonDocument doc(2048);
   
   // Basic device info
-  doc["device_id"] = String(DEVICE_ID);
+  doc["device_id"] = String(deviceID);
   doc["timestamp"] = millis();
   doc["uptime"] = state.uptime;
   doc["freeHeap"] = ESP.getFreeHeap();
@@ -481,8 +466,8 @@ void setup() {
   }
   
   Serial.println("🎯 Setup complete! Collar is operational.");
-  Serial.printf("📱 Device ID: %s\n", DEVICE_ID);
-  Serial.printf("🌐 MQTT Host: %s:%d\n", MQTT_HOST, MQTT_PORT);
+  Serial.printf("📱 Device ID: %s\n", deviceID);
+  Serial.printf("🌐 MQTT Host: %s:%d\n", mqttHost, mqttPort);
 }
 
 void loop() {
@@ -528,7 +513,7 @@ void loop() {
 
 void printSystemStatus() {
   Serial.println("\n=== SYSTEM STATUS ===");
-  Serial.printf("Device ID: %s\n", DEVICE_ID);
+  Serial.printf("Device ID: %s\n", deviceID);
   Serial.printf("Uptime: %lu ms\n", state.uptime);
   Serial.printf("WiFi: %s\n", state.wifiConnected ? "Connected" : "Disconnected");
   Serial.printf("MQTT: %s\n", state.mqttConnected ? "Connected" : "Disconnected");
