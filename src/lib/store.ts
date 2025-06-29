@@ -25,6 +25,18 @@ interface PetgState {
   // Last collar data for real-time sharing
   lastCollarData: any | null;
   
+  // Live beacon detections
+  beacons: Array<{
+    id: string;
+    name: string;
+    rssi: number;
+    distance: number;
+    confidence: number;
+    timestamp: number;
+    address?: string;
+    collarId: string;
+  }>;
+  
   setSystemState: (state: 'normal' | 'alert' | 'lowBattery') => void;
   setBatteryLevel: (level: number) => void;
   setAlertActive: (active: boolean) => void;
@@ -32,16 +44,33 @@ interface PetgState {
   setUser: (user: User | null) => void;
   
   // Demo mode actions
-  setDemoMode: (demo: boolean) => void;
+  setDemoMode: (demoMode: boolean) => void;
   
   // Connection actions
   setCollarConnected: (connected: boolean) => void;
-  setConnectionUrl: (url: string) => void;
   setConnectionStatus: (status: 'Ready' | 'Connecting' | 'Connected' | 'Failed') => void;
   setConnectionMessage: (message: string) => void;
   setLastConnectionAttempt: (timestamp: number) => void;
   setLastDataReceived: (timestamp: number) => void;
-  setLastCollarData: (data: any | null) => void;
+  setConnectionUrl: (url: string) => void;
+  
+  // Collar data actions
+  setLastCollarData: (data: any) => void;
+  
+  // Beacon actions
+  addOrUpdateBeacon: (beacon: {
+    id: string;
+    name: string;
+    rssi: number;
+    distance: number;
+    confidence: number;
+    timestamp: number;
+    address?: string;
+    collarId: string;
+  }) => void;
+  removeBeacon: (id: string) => void;
+  clearBeacons: () => void;
+  cleanupOldBeacons: (maxAgeMs?: number) => void;
 }
 
 export const usePetgStore = create<PetgState>((set) => ({
@@ -65,6 +94,9 @@ export const usePetgStore = create<PetgState>((set) => ({
   // Last collar data for real-time sharing
   lastCollarData: null,
   
+  // Live beacon detections
+  beacons: [],
+  
   setSystemState: (state) => set({ systemState: state }),
   setBatteryLevel: (level) => set({ batteryLevel: level }),
   setAlertActive: (active) => set({ alertActive: active }),
@@ -76,10 +108,44 @@ export const usePetgStore = create<PetgState>((set) => ({
   
   // Connection actions
   setCollarConnected: (connected) => set({ isCollarConnected: connected }),
-  setConnectionUrl: (url) => set({ collarConnectionUrl: url }),
   setConnectionStatus: (status) => set({ connectionStatus: status }),
   setConnectionMessage: (message) => set({ connectionMessage: message }),
   setLastConnectionAttempt: (timestamp) => set({ lastConnectionAttempt: timestamp }),
   setLastDataReceived: (timestamp) => set({ lastDataReceived: timestamp }),
+  setConnectionUrl: (url) => set({ collarConnectionUrl: url }),
+  
+  // Collar data actions
   setLastCollarData: (data) => set({ lastCollarData: data, lastDataReceived: Date.now() }),
+  
+  // Beacon actions
+  addOrUpdateBeacon: (beacon) => set((state) => {
+    const existingIndex = state.beacons.findIndex(b => 
+      b.id === beacon.id || b.name === beacon.name
+    );
+    
+    if (existingIndex >= 0) {
+      // Update existing beacon
+      const updatedBeacons = [...state.beacons];
+      updatedBeacons[existingIndex] = beacon;
+      return {
+        beacons: updatedBeacons,
+        lastDataReceived: Date.now(),
+      };
+    } else {
+      // Add new beacon
+      return {
+        beacons: [...state.beacons, beacon],
+        lastDataReceived: Date.now(),
+      };
+    }
+  }),
+  removeBeacon: (id) => set((state) => ({
+    beacons: state.beacons.filter((b) => b.id !== id),
+    lastDataReceived: Date.now(),
+  })),
+  clearBeacons: () => set({ beacons: [] }),
+  cleanupOldBeacons: (maxAgeMs = 300000) => set((state) => ({
+    beacons: state.beacons.filter((b) => Date.now() - b.timestamp < maxAgeMs),
+    lastDataReceived: Date.now(),
+  })),
 })); 

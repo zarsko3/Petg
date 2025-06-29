@@ -127,6 +127,15 @@ export class CollarMQTTClient {
   public onConnect?: () => void;
   public onDisconnect?: () => void;
   public onError?: (error: Error) => void;
+  public onCollarBeaconDetection?: (collarId: string, beacon: {
+    device_id: string;
+    timestamp: number;
+    beacon_name: string;
+    rssi: number;
+    distance: number;
+    confidence: number;
+    address?: string;
+  }) => void;
 
   constructor() {
     this.connect();
@@ -237,6 +246,27 @@ export class CollarMQTTClient {
         console.log(`📍 MQTT: Location data for collar ${collarId}:`, messageStr);
       } else if (topic.includes('/beacon-detection')) {
         console.log(`📡 MQTT: Beacon detection for collar ${collarId}:`, messageStr);
+        
+        // Parse beacon detection data
+        const beaconData = JSON.parse(messageStr);
+        
+        // Validate required fields
+        if (beaconData.beacon_name && beaconData.rssi !== undefined) {
+          console.log(`🔍 MQTT: Processing beacon detection: ${beaconData.beacon_name} (${beaconData.rssi}dBm, ${beaconData.distance}cm)`);
+          
+          // Call the beacon detection handler
+          this.onCollarBeaconDetection?.(collarId, {
+            device_id: beaconData.device_id || collarId,
+            timestamp: beaconData.timestamp || Date.now(),
+            beacon_name: beaconData.beacon_name,
+            rssi: beaconData.rssi,
+            distance: beaconData.distance || 0,
+            confidence: beaconData.confidence || 0.5,
+            address: beaconData.address
+          });
+        } else {
+          console.warn('⚠️ MQTT: Invalid beacon detection data - missing beacon_name or rssi:', beaconData);
+        }
       } else if (topic.includes('/alert')) {
         console.log(`🚨 MQTT: Alert from collar ${collarId}:`, messageStr);
       }

@@ -61,7 +61,7 @@ function getBeaconStatus(rssi: number, lastSeen: number): 'online' | 'offline' |
 }
 
 export default function BeaconsPage() {
-  // Real beacon data from collar
+  // Real beacon data from live store and collar
   const [realBeacons, setRealBeacons] = useState<any[]>([]);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [scanStats, setScanStats] = useState<any>(null);
@@ -71,6 +71,10 @@ export default function BeaconsPage() {
   const connectionStatus = usePetgStore((state) => state.connectionStatus);
   const connectionMessage = usePetgStore((state) => state.connectionMessage);
   const rawCollarData = usePetgStore((state) => state.lastCollarData);
+  
+  // Get live beacon detections from the store
+  const liveBeacons = usePetgStore((state) => state.beacons);
+  const demoMode = usePetgStore((state) => state.demoMode);
   
   // Configuration beacons (for management purposes)
   const [configuredBeacons, setConfiguredBeacons] = useState<BeaconItem[]>(() => {
@@ -94,25 +98,45 @@ export default function BeaconsPage() {
     }
   }, [configuredBeacons]);
 
-  // Real-time collar data from global store (optimized for responsiveness)
+  // Process beacon data from live beacon store and legacy rawCollarData
   useEffect(() => {
-    if (isConnected && rawCollarData) {
-      // Process beacon data quickly without excessive logging
-      if (rawCollarData.beacons && Array.isArray(rawCollarData.beacons)) {
-        // Filter for only PetZone-Home-XX format beacons
-        const filteredBeacons = rawCollarData.beacons.filter((beacon: any) => 
-          beacon.name && beacon.name.startsWith("PetZone-Home-")
-        );
+    if (isConnected && !demoMode) {
+      // Primary source: Live beacon detections from MQTT
+      if (liveBeacons && liveBeacons.length > 0) {
+        // Convert live beacons to the expected format
+        const formattedBeacons = liveBeacons
+          .filter(beacon => beacon.name && beacon.name.startsWith("PetZone-Home-"))
+          .map(beacon => ({
+            name: beacon.name,
+            rssi: beacon.rssi,
+            distance: beacon.distance,
+            address: beacon.address,
+            last_seen: beacon.timestamp,
+            confidence: beacon.confidence
+          }));
         
-        setRealBeacons(filteredBeacons);
+        setRealBeacons(formattedBeacons);
         setLastUpdate(new Date());
         
-        if (filteredBeacons.length > 0) {
-          console.log(`✅ Beacon Page: ${filteredBeacons.length} PetZone beacons detected`);
+        if (formattedBeacons.length > 0) {
+          console.log(`✅ Beacons Page: ${formattedBeacons.length} live MQTT beacons detected`);
         }
-      } else if (rawCollarData.beacons && typeof rawCollarData.beacons === 'object') {
-        // Handle case where beacons is an object instead of array
-        const beaconArray = Object.values(rawCollarData.beacons);
+        
+        // Auto-add to configured beacons
+        updateConfiguredBeacons(formattedBeacons);
+        
+      } 
+      // Fallback: Legacy rawCollarData beacons (for backward compatibility)
+      else if (rawCollarData && rawCollarData.beacons) {
+        console.log('📡 Beacons Page: Using fallback rawCollarData.beacons');
+        
+        let beaconArray;
+        if (Array.isArray(rawCollarData.beacons)) {
+          beaconArray = rawCollarData.beacons;
+        } else {
+          beaconArray = Object.values(rawCollarData.beacons);
+        }
+        
         const filteredBeacons = beaconArray.filter((beacon: any) => 
           beacon && typeof beacon === 'object' && beacon.name && beacon.name.startsWith("PetZone-Home-")
         );
@@ -121,83 +145,14 @@ export default function BeaconsPage() {
         setLastUpdate(new Date());
         
         if (filteredBeacons.length > 0) {
-          console.log(`✅ Beacon Page: ${filteredBeacons.length} PetZone beacons detected (from object)`);
+          console.log(`✅ Beacon Page: ${filteredBeacons.length} legacy beacons detected`);
         }
         
-        // Auto-add filtered beacons to configured beacons list (instant updates)
-        const currentTime = Date.now();
-        const detectedBeacons = filteredBeacons.length > 0 ? filteredBeacons : beaconArray;
-        
-        setConfiguredBeacons(prevBeacons => {
-          let updatedBeacons = [...prevBeacons];
-          
-          detectedBeacons.forEach((detectedBeacon: any) => {
-            // Only process PetZone-Home-XX beacons
-            if (!detectedBeacon.name || !detectedBeacon.name.startsWith("PetZone-Home-")) {
-              return;
-            }
-            
-            const existingBeaconIndex = updatedBeacons.findIndex(
-              beacon => beacon.name === detectedBeacon.name || 
-                       (detectedBeacon.address && beacon.id.includes(detectedBeacon.address))
-            );
-            
-            if (existingBeaconIndex === -1) {
-              // Create new beacon entry for detected PetZone beacon
-              const newBeacon: BeaconItem = {
-                id: `detected-${detectedBeacon.address || detectedBeacon.name || Date.now()}`,
-                name: detectedBeacon.name,
-                location: 'Auto-detected',
-                position: { x: 50, y: 50 },
-                batteryLevel: 100,
-                signalStrength: rssiToSignalStrength(detectedBeacon.rssi),
-                lastUpdate: 'Just now',
-                status: getBeaconStatus(detectedBeacon.rssi, detectedBeacon.last_seen),
-                isAutoDetected: true,
-                address: detectedBeacon.address,
-                lastSeenTimestamp: currentTime
-              };
-              
-              console.log(`✅ Auto-adding PetZone beacon: ${newBeacon.name}`);
-              updatedBeacons.push(newBeacon);
-            } else {
-              // Update existing beacon with real-time data
-              updatedBeacons[existingBeaconIndex] = {
-                ...updatedBeacons[existingBeaconIndex],
-                signalStrength: rssiToSignalStrength(detectedBeacon.rssi),
-                lastUpdate: 'Just now',
-                status: getBeaconStatus(detectedBeacon.rssi, detectedBeacon.last_seen),
-                address: detectedBeacon.address || updatedBeacons[existingBeaconIndex].address,
-                lastSeenTimestamp: currentTime
-              };
-            }
-          });
-          
-          return updatedBeacons;
-        });
-        
-        // Mark beacons as offline if they haven't been seen recently
-        const activeBeaconNames = detectedBeacons.map((b: any) => b.name);
-        const activeBeaconAddresses = detectedBeacons.map((b: any) => b.address).filter(Boolean);
-        
-        setConfiguredBeacons(prev => 
-          prev.map(beacon => {
-            const isCurrentlyActive = activeBeaconNames.includes(beacon.name) ||
-                                    (beacon.address && activeBeaconAddresses.includes(beacon.address));
-            
-            if (!isCurrentlyActive && beacon.isAutoDetected) {
-              return {
-                ...beacon,
-                status: 'offline' as const,
-                lastUpdate: `Last seen ${Math.floor((currentTime - (beacon.lastSeenTimestamp || currentTime)) / 1000)}s ago`
-              };
-            }
-            return beacon;
-          })
-        );
+        // Auto-add to configured beacons
+        updateConfiguredBeacons(filteredBeacons.length > 0 ? filteredBeacons : beaconArray);
         
       } else {
-        // No beacon data received - clear real beacons and mark auto-detected as offline
+        // No beacon data received - clear real beacons
         setRealBeacons([]);
         setLastUpdate(new Date());
         
@@ -208,14 +163,15 @@ export default function BeaconsPage() {
         );
       }
       
-      // Extract scanner statistics
-      if (rawCollarData.scanner) {
+      // Extract scanner statistics from legacy data
+      if (rawCollarData && rawCollarData.scanner) {
         setScanStats(rawCollarData.scanner);
       } else {
         setScanStats(null);
       }
-    } else if (!isConnected) {
-      // Clear real beacon data when disconnected
+      
+    } else if (!isConnected || demoMode) {
+      // Clear real beacon data when disconnected or in demo mode
       setRealBeacons([]);
       setLastUpdate(null);
       setScanStats(null);
@@ -226,9 +182,82 @@ export default function BeaconsPage() {
           beacon.isAutoDetected ? { ...beacon, status: 'offline' as const } : beacon
         )
       );
-      console.log('📡 Beacons: Cleared data due to disconnection');
+      console.log('📡 Beacons: Cleared data due to disconnection or demo mode');
     }
-  }, [isConnected, rawCollarData]);
+  }, [isConnected, liveBeacons, rawCollarData, demoMode]);
+
+  // Helper function to update configured beacons
+  const updateConfiguredBeacons = (detectedBeacons: any[]) => {
+    const currentTime = Date.now();
+    
+    setConfiguredBeacons(prevBeacons => {
+      let updatedBeacons = [...prevBeacons];
+      
+      detectedBeacons.forEach((detectedBeacon: any) => {
+        // Only process PetZone-Home-XX beacons
+        if (!detectedBeacon.name || !detectedBeacon.name.startsWith("PetZone-Home-")) {
+          return;
+        }
+        
+        const existingBeaconIndex = updatedBeacons.findIndex(
+          beacon => beacon.name === detectedBeacon.name || 
+                   (detectedBeacon.address && beacon.id.includes(detectedBeacon.address))
+        );
+        
+        if (existingBeaconIndex === -1) {
+          // Create new beacon entry for detected PetZone beacon
+          const newBeacon: BeaconItem = {
+            id: `detected-${detectedBeacon.address || detectedBeacon.name || Date.now()}`,
+            name: detectedBeacon.name,
+            location: 'Auto-detected',
+            position: { x: 50, y: 50 },
+            batteryLevel: 100,
+            signalStrength: rssiToSignalStrength(detectedBeacon.rssi),
+            lastUpdate: 'Just now',
+            status: getBeaconStatus(detectedBeacon.rssi, detectedBeacon.last_seen),
+            isAutoDetected: true,
+            address: detectedBeacon.address,
+            lastSeenTimestamp: currentTime
+          };
+          
+          console.log(`✅ Auto-adding PetZone beacon: ${newBeacon.name}`);
+          updatedBeacons.push(newBeacon);
+        } else {
+          // Update existing beacon with real-time data
+          updatedBeacons[existingBeaconIndex] = {
+            ...updatedBeacons[existingBeaconIndex],
+            signalStrength: rssiToSignalStrength(detectedBeacon.rssi),
+            lastUpdate: 'Just now',
+            status: getBeaconStatus(detectedBeacon.rssi, detectedBeacon.last_seen),
+            address: detectedBeacon.address || updatedBeacons[existingBeaconIndex].address,
+            lastSeenTimestamp: currentTime
+          };
+        }
+      });
+      
+      return updatedBeacons;
+    });
+    
+    // Mark beacons as offline if they haven't been seen recently
+    const activeBeaconNames = detectedBeacons.map((b: any) => b.name);
+    const activeBeaconAddresses = detectedBeacons.map((b: any) => b.address).filter(Boolean);
+    
+    setConfiguredBeacons(prev => 
+      prev.map(beacon => {
+        const isCurrentlyActive = activeBeaconNames.includes(beacon.name) ||
+                                (beacon.address && activeBeaconAddresses.includes(beacon.address));
+        
+        if (!isCurrentlyActive && beacon.isAutoDetected) {
+          return {
+            ...beacon,
+            status: 'offline' as const,
+            lastUpdate: `Last seen ${Math.floor((currentTime - (beacon.lastSeenTimestamp || currentTime)) / 1000)}s ago`
+          };
+        }
+        return beacon;
+      })
+    );
+  };
 
   // Function to handle starting to edit a beacon
   const startEditingBeacon = (id: string) => {

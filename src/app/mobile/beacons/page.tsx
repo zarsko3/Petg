@@ -16,24 +16,47 @@ export default function MobileBeaconsPage() {
   const isConnected = usePetgStore((state) => state.isCollarConnected)
   const connectionStatus = usePetgStore((state) => state.connectionStatus)
   const rawCollarData = usePetgStore((state) => state.lastCollarData)
+  
+  // Get live beacon detections from the store
+  const liveBeacons = usePetgStore((state) => state.beacons)
+  const demoMode = usePetgStore((state) => state.demoMode)
 
-  // Extract beacon data from collar
+  // Extract beacon data from live store and collar data
   useEffect(() => {
-    if (isConnected && rawCollarData) {
-      if (rawCollarData.beacons && Array.isArray(rawCollarData.beacons)) {
+    if (isConnected && !demoMode) {
+      // Primary source: Live beacon detections from MQTT
+      if (liveBeacons && liveBeacons.length > 0) {
+        // Convert live beacons to expected format
+        const formattedBeacons = liveBeacons.map(beacon => ({
+          name: beacon.name,
+          rssi: beacon.rssi,
+          distance: beacon.distance,
+          address: beacon.address,
+          last_seen: beacon.timestamp,
+          confidence: beacon.confidence,
+          collarId: beacon.collarId
+        }))
+        
+        setRealBeacons(formattedBeacons)
+        setLastUpdate(new Date())
+        console.log('📱 Mobile Beacons: Updated from live beacon store', formattedBeacons.length, 'beacons')
+        
+      } 
+      // Fallback: Legacy rawCollarData beacons
+      else if (rawCollarData && rawCollarData.beacons && Array.isArray(rawCollarData.beacons)) {
         setRealBeacons(rawCollarData.beacons)
         setLastUpdate(new Date())
-        console.log('📱 Mobile Beacons: Updated from collar data', rawCollarData.beacons.length, 'beacons')
+        console.log('📱 Mobile Beacons: Updated from legacy collar data', rawCollarData.beacons.length, 'beacons')
       } else {
         setRealBeacons([])
         setLastUpdate(new Date())
       }
-    } else if (!isConnected) {
+    } else if (!isConnected || demoMode) {
       setRealBeacons([])
       setLastUpdate(null)
-      console.log('📱 Mobile Beacons: Cleared data due to disconnection')
+      console.log('📱 Mobile Beacons: Cleared data due to disconnection or demo mode')
     }
-  }, [isConnected, rawCollarData])
+  }, [isConnected, liveBeacons, rawCollarData, demoMode])
 
   const goBack = () => {
     window.history.back()

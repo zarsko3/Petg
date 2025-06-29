@@ -201,6 +201,38 @@ export function CollarServiceProvider({ children }: CollarServiceProviderProps) 
           }
         };
         
+        mqttClient.onCollarBeaconDetection = (collarId: string, beacon) => {
+          console.log(`🔍 CollarServiceProvider: Beacon detection from ${collarId}:`, beacon);
+          
+          // Check for device_id "001" and exit demo mode if needed
+          if (beacon.device_id === "001" || collarId === "001") {
+            console.log('🔍 Beacon detection from device 001 - ensuring demo mode is off');
+            store.setDemoMode(false);
+            toast.success('Live Beacon Data', {
+              description: `Detected ${beacon.beacon_name} via collar 001`
+            });
+          }
+          
+          // Add or update beacon in the store (store handles the logic)
+          const beaconId = beacon.address || beacon.beacon_name || `beacon-${Date.now()}`;
+          const storeBeacon = {
+            id: beaconId,
+            name: beacon.beacon_name,
+            rssi: beacon.rssi,
+            distance: beacon.distance,
+            confidence: beacon.confidence,
+            timestamp: beacon.timestamp,
+            address: beacon.address,
+            collarId: collarId
+          };
+          
+          store.addOrUpdateBeacon(storeBeacon);
+          console.log(`📊 Beacon stored: ${beacon.beacon_name} (${beacon.rssi}dBm, ${beacon.distance.toFixed(1)}cm)`);
+          
+          // Clean up old beacons (older than 5 minutes)
+          store.cleanupOldBeacons(300000);
+        };
+        
         mqttClient.onError = (error) => {
           console.error('❌ CollarServiceProvider: MQTT error:', error);
           setStatus('disconnected');
