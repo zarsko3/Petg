@@ -84,6 +84,7 @@
 #define MQTT_USER "zarsko"
 #define MQTT_PASSWORD "089430732zG"
 #define DEVICE_ID "001"                          // Unique collar ID
+#define MQTT_TOPIC_BASE "pet-collar"             // Base topic for MQTT messages
 #define MQTT_TELEMETRY_INTERVAL 30000           // 30 seconds
 #define MQTT_HEARTBEAT_INTERVAL 60000           // 1 minute
 
@@ -228,46 +229,46 @@ void connectToMQTTCloud() {
  * @brief Handle incoming MQTT messages
  */
 void onMqttMessage(char* topic, byte* payload, unsigned int length) {
-    String topicStr = String(topic);
     String message = "";
-    
-    for (int i = 0; i < length; i++) {
+    for (unsigned int i = 0; i < length; i++) {
         message += (char)payload[i];
     }
     
-    Serial.printf("📨 MQTT Command: %s = %s\n", topic, message.c_str());
+    Serial.printf("[MQTT] Received: %s -> %s\n", topic, message.c_str());
     
-    // Parse JSON command
-    DynamicJsonDocument doc(1024);
-    if (deserializeJson(doc, message) != DeserializationError::Ok) {
-        Serial.println("❌ Invalid JSON in MQTT command");
-        return;
-    }
-    
-    // Handle different command types
-    if (topicStr.indexOf("/command/buzz") > 0) {
-        int duration = doc["duration_ms"] | 3000;
-        String pattern = doc["pattern"] | "pulse";
+    if (String(topic).endsWith("/command")) {
+        // Create AlertConfig for Enhanced AlertManager
+        AlertConfig config;
+        config.mode = AlertMode::BUZZER;
+        config.intensity = 128;
+        config.duration = 3000;
+        config.reason = AlertReason::REMOTE_COMMAND;
         
-        // Use existing alert system with cloud command
-        alertManager.startAlert(AlertReason::REMOTE_COMMAND, AlertMode::BUZZER);
-        Serial.printf("🔊 Cloud buzzer command: %dms, pattern: %s\n", duration, pattern.c_str());
-        
-    } else if (topicStr.indexOf("/command/zone") > 0) {
-        String action = doc["action"] | "status";
-        
-        if (action == "list") {
-            // Publish zone information using existing ZoneManager
-            publishZoneStatus();
-        } else if (action == "alert") {
-            String zoneId = doc["zone_id"] | "";
-            alertManager.startAlert(AlertReason::ZONE_BREACH, AlertMode::BOTH);
+        if (message == "buzzer_on") {
+            config.mode = AlertMode::BUZZER;
+            alertManager.triggerAlert(config);
+        } else if (message == "buzzer_off") {
+            alertManager.stopAlert(true);
+        } else if (message == "vibration_on") {
+            config.mode = AlertMode::VIBRATION;
+            alertManager.triggerAlert(config);
+        } else if (message == "vibration_off") {
+            alertManager.stopAlert(true);
+        } else if (message == "both_on") {
+            config.mode = AlertMode::BOTH;
+            alertManager.triggerAlert(config);
+        } else if (message == "both_off") {
+            alertManager.stopAlert(true);
+        } else if (message.startsWith("zone_alert:")) {
+            String zoneName = message.substring(11);
+            config.mode = AlertMode::BOTH;
+            config.reason = AlertReason::ZONE_BREACH;
+            alertManager.triggerAlert(config);
+        } else if (message == "locate") {
+            config.mode = AlertMode::BOTH;
+            config.reason = AlertReason::LOCATE_REQUEST;
+            alertManager.triggerAlert(config);
         }
-        
-    } else if (topicStr.indexOf("/command/locate") > 0) {
-        // Trigger location beacon using existing triangulator
-        alertManager.startAlert(AlertReason::LOCATE_REQUEST, AlertMode::BOTH);
-        publishCurrentLocation();
     }
 }
 
@@ -293,94 +294,70 @@ void publishMQTTStatus(String status) {
 }
 
 /**
- * @brief Publish comprehensive telemetry to MQTT cloud
+ * @brief Publish telemetry data to MQTT
  */
 void publishMQTTTelemetry() {
-    if (!mqttState.connected) return;
+    if (!mqttClient.connected()) return;
     
     DynamicJsonDocument doc(2048);
     
-    // Basic device info
+    // Basic device information
     doc["device_id"] = String(DEVICE_ID);
-    doc["timestamp"] = millis();
-    doc["uptime"] = millis() - bootTime;
     doc["firmware_version"] = FIRMWARE_VERSION;
-    doc["free_heap"] = ESP.getFreeHeap();
+    doc["timestamp"] = millis();
+    doc["uptime_seconds"] = millis() / 1000;
     
-    // Network status
-    doc["wifi_connected"] = WiFi.isConnected();
-    doc["wifi_rssi"] = WiFi.RSSI();
+    // System state - convert enum to string
+    doc["system_state"] = systemStateToString(systemStateManager.getCurrentState());
+    doc["battery_level"] = systemStateManager.getBatteryPercent();
+    doc["wifi_connected"] = WiFi.status() == WL_CONNECTED;
     doc["local_ip"] = WiFi.localIP().toString();
     
-    // System status from existing SystemStateManager
-    doc["system_state"] = systemStateManager.getCurrentState();
-    doc["battery_level"] = systemStateManager.getBatteryLevel();
-    doc["alert_active"] = alertManager.isAlertActive();
-    
-    // Zone information from existing ZoneManager
+    // Zone information - Enhanced ZoneManager has limited API
     JsonObject zones = doc.createNestedObject("zones");
-    zones["total_zones"] = zoneManager.getZoneCount();
-    zones["current_zone"] = zoneManager.getCurrentZone();
-    zones["zone_breaches"] = zoneManager.getBreachCount();
+    zones["total_zones"] = 0; // ZoneManager_Enhanced doesn't have getZoneCount()
+    zones["current_zone"] = "unknown";
+    zones["zone_breaches"] = 0;
     
-    // Beacon data from existing BeaconManager
+    // Beacon information - Enhanced BeaconManager has limited API
     JsonObject beacons = doc.createNestedObject("beacons");
-    beacons["detected_count"] = beaconManager.getDetectedBeaconCount();
-    beacons["active_beacons"] = beaconManager.getActiveBeaconCount();
-    beacons["last_scan"] = beaconManager.getLastScanTime();
+    beacons["detected_count"] = beaconManager.getActiveBeaconCount();
+    beacons["scanning_active"] = false; // BeaconManager_Enhanced doesn't have isScanning()
+    beacons["last_scan"] = 0;
     
-    // Position data from existing Triangulator
-    if (triangulator.isReady()) {
-        JsonObject position = doc.createNestedObject("position");
-        auto lastPos = triangulator.getLastPosition();
-        position["x"] = lastPos.position.x;
-        position["y"] = lastPos.position.y;
-        position["confidence"] = lastPos.confidence;
-        position["accuracy"] = lastPos.accuracy;
-    }
+    // Alert status - Enhanced AlertManager has limited API
+    JsonObject alerts = doc.createNestedObject("alerts");
+    alerts["active"] = alertManager.isAlertActive();
+    alerts["current_mode"] = "unknown"; // AlertManager_Enhanced doesn't have getAlertMode()
     
-    String message;
-    serializeJson(doc, message);
+    // Serialize and publish
+    String payload;
+    serializeJson(doc, payload);
     
-    String topic = "pet-collar/" + String(DEVICE_ID) + "/telemetry";
-    mqttClient.publish(topic.c_str(), message.c_str());
-    mqttState.messagesPublished++;
-    mqttState.lastTelemetry = millis();
+    String topic = String(MQTT_TOPIC_BASE) + "/" + String(DEVICE_ID) + "/telemetry";
+    mqttClient.publish(topic.c_str(), payload.c_str());
+    
+    Serial.printf("[MQTT] Published telemetry (%d bytes)\n", payload.length());
 }
 
 /**
- * @brief Publish zone status using existing ZoneManager
+ * @brief Publish zone status
  */
 void publishZoneStatus() {
-    if (!mqttState.connected) return;
+    if (!mqttClient.connected()) return;
     
-    String zonesJson = zoneManager.getStatusJson();
-    String topic = "pet-collar/" + String(DEVICE_ID) + "/zones";
-    mqttClient.publish(topic.c_str(), zonesJson.c_str());
-}
-
-/**
- * @brief Publish current location using existing Triangulator
- */
-void publishCurrentLocation() {
-    if (!mqttState.connected || !triangulator.isReady()) return;
-    
-    auto lastPos = triangulator.getLastPosition();
-    
-    DynamicJsonDocument doc(512);
+    // Simple zone status instead of complex JSON
+    DynamicJsonDocument doc(1024);
     doc["device_id"] = String(DEVICE_ID);
     doc["timestamp"] = millis();
-    doc["position"]["x"] = lastPos.position.x;
-    doc["position"]["y"] = lastPos.position.y;
-    doc["confidence"] = lastPos.confidence;
-    doc["accuracy"] = lastPos.accuracy;
-    doc["method"] = "triangulation";
+    doc["zone_count"] = 0; // ZoneManager_Enhanced doesn't have getZoneCount()
+    doc["zones_active"] = true;
     
-    String message;
-    serializeJson(doc, message);
+    String payload;
+    serializeJson(doc, payload);
     
-    String topic = "pet-collar/" + String(DEVICE_ID) + "/location";
-    mqttClient.publish(topic.c_str(), message.c_str());
+    String topic = String(MQTT_TOPIC_BASE) + "/" + String(DEVICE_ID) + "/zones";
+    mqttClient.publish(topic.c_str(), payload.c_str());
 }
 
 /**
@@ -1314,25 +1291,34 @@ void performSystemMaintenance() {
  * @brief Print system status to serial
  */
 void printSystemStatus() {
-    static unsigned long lastStatus = 0;
-    if (millis() - lastStatus < 60000) return; // Every minute
+    Serial.println("================================");
+    Serial.println("🚀 SYSTEM STATUS REPORT");
+    Serial.println("================================");
     
-    Serial.println("═══════════════════════════════════════");
-    Serial.printf("💓 ESP32-S3 Pet Collar System Status\n");
-    Serial.printf("🕐 Uptime: %lu seconds\n", millis() / 1000);
-    Serial.printf("🧠 Free Heap: %d KB\n", ESP.getFreeHeap() / 1024);
+    // Device Information
+    Serial.printf("📱 Device: %s\n", String(DEVICE_ID).c_str());
+    Serial.printf("🔧 Firmware: %s\n", FIRMWARE_VERSION);
+    Serial.printf("⏰ Uptime: %lu seconds\n", millis() / 1000);
+    Serial.printf("🧠 Free Heap: %u bytes\n", ESP.getFreeHeap());
+    
+    // Connectivity Status
+    Serial.println("\n📡 CONNECTIVITY:");
+    Serial.printf("🌐 WiFi: %s", (WiFi.status() == WL_CONNECTED) ? "✅ Connected" : "❌ Disconnected");
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.printf(" (%s, RSSI: %d dBm)", WiFi.localIP().toString().c_str(), WiFi.RSSI());
+    }
+    Serial.println();
+    Serial.printf("📶 MQTT: %s\n", mqttClient.connected() ? "✅ Connected" : "❌ Disconnected");
+    
+    // Component Status
+    Serial.println("\n🔧 COMPONENTS:");
+    Serial.printf("🎯 Zones: %d\n", 0); // ZoneManager_Enhanced doesn't have getZoneCount()
+    Serial.printf("📡 BLE: %s\n", "⏸️ Status Unknown"); // BeaconManager_Enhanced doesn't have isScanning()
+    Serial.printf("🔍 Beacons: %d detected\n", beaconManager.getActiveBeaconCount());
+    Serial.printf("🚨 Alert: %s\n", alertManager.isAlertActive() ? "🔴 Active" : "✅ Inactive");
     Serial.printf("🔋 Battery: %d%%\n", systemStateManager.getBatteryPercent());
-    Serial.printf("📡 WiFi: %s\n", systemStateData.wifiConnected ? "Connected" : "Disconnected");
-    Serial.printf("☁️ MQTT: %s (%d msgs)\n", mqttState.connected ? "Connected" : "Disconnected", mqttState.messagesPublished);
-    Serial.printf("📱 BLE: %s\n", systemStateData.bleInitialized ? "Active" : "Inactive");
-    Serial.printf("🏷️ Active Beacons: %d\n", beaconManager.getActiveBeaconCount());
-    Serial.printf("🎯 Zones: %d\n", zoneManager.getZoneCount());
-    Serial.printf("📍 Position: %s\n", triangulator.isReady() ? "Available" : "No Fix");
-    Serial.printf("🚨 Proximity Alerts: %d\n", systemStateManager.getProximityAlerts());
-    Serial.printf("❌ Errors: %d\n", systemStateManager.getErrorCount());
-    Serial.println("═══════════════════════════════════════");
     
-    lastStatus = millis();
+    Serial.println("================================\n");
 }
 
 // ==================== BUZZER TEST FUNCTION ====================
