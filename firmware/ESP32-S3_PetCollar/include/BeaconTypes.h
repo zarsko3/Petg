@@ -26,7 +26,11 @@ enum class AlertReason : uint8_t {
     ZONE_EXITED,            ///< Exited defined zone
     MANUAL_TEST,            ///< Manual test activation
     BEACON_FOUND,           ///< Target beacon detected
-    CUSTOM                  ///< Custom alert reason
+    CUSTOM,                 ///< Custom alert reason
+    // Additional MQTT integration reasons
+    REMOTE_COMMAND,         ///< Remote command triggered alert
+    ZONE_BREACH,            ///< Zone boundary breach
+    LOCATE_REQUEST          ///< Location request alert
 };
 
 // ==================== SHARED STRUCTS ====================
