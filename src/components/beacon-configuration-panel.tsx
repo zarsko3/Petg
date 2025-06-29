@@ -7,9 +7,10 @@ import {
   Vibrate, VolumeX, Target, Timer, Zap, Home, Play,
   Circle, CheckCircle, XCircle, AlertCircle, Radio
 } from 'lucide-react';
+import { Filter, ChevronDown, Square, CheckSquare, Copy, Download, Upload, Wand2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-// Define the BeaconConfiguration type locally
+// Enhanced Beacon Configuration interface with Live Proximity Alerts
 interface BeaconConfiguration {
   id: string;
   name: string;
@@ -45,6 +46,94 @@ interface BeaconConfiguration {
   updatedAt?: string;
 }
 
+// Configuration Templates
+interface BeaconTemplate {
+  id: string;
+  name: string;
+  description: string;
+  icon: React.ComponentType<any>;
+  config: Partial<BeaconConfiguration>;
+}
+
+const BEACON_TEMPLATES: BeaconTemplate[] = [
+  {
+    id: 'kitchen',
+    name: 'Kitchen Zone',
+    description: 'Medium sensitivity for food areas',
+    icon: Home,
+    config: {
+      alertMode: 'vibration',
+      proximitySettings: {
+        triggerDistance: 8,
+        alertDuration: 1500,
+        alertIntensity: 2,
+        enableProximityDelay: true,
+        proximityDelayTime: 2000,
+        cooldownPeriod: 5000
+      },
+      safeZone: false,
+      boundaryAlert: true
+    }
+  },
+  {
+    id: 'safe-zone',
+    name: 'Safe Zone',
+    description: 'Low sensitivity for allowed areas',
+    icon: Shield,
+    config: {
+      alertMode: 'none',
+      proximitySettings: {
+        triggerDistance: 3,
+        alertDuration: 1000,
+        alertIntensity: 1,
+        enableProximityDelay: true,
+        proximityDelayTime: 5000,
+        cooldownPeriod: 10000
+      },
+      safeZone: true,
+      boundaryAlert: false
+    }
+  },
+  {
+    id: 'danger-zone',
+    name: 'Danger Zone',
+    description: 'High sensitivity for dangerous areas',
+    icon: AlertTriangle,
+    config: {
+      alertMode: 'both',
+      proximitySettings: {
+        triggerDistance: 15,
+        alertDuration: 3000,
+        alertIntensity: 5,
+        enableProximityDelay: false,
+        proximityDelayTime: 0,
+        cooldownPeriod: 2000
+      },
+      safeZone: false,
+      boundaryAlert: true
+    }
+  },
+  {
+    id: 'garden',
+    name: 'Garden Area',
+    description: 'Outdoor monitoring with weather resistance',
+    icon: Home,
+    config: {
+      alertMode: 'buzzer',
+      proximitySettings: {
+        triggerDistance: 12,
+        alertDuration: 2500,
+        alertIntensity: 4,
+        enableProximityDelay: true,
+        proximityDelayTime: 3000,
+        cooldownPeriod: 4000
+      },
+      safeZone: true,
+      boundaryAlert: false
+    }
+  }
+];
+
 interface BeaconConfigurationPanelProps {
   realBeacons: any[];
   isConnected: boolean;
@@ -64,6 +153,18 @@ export function BeaconConfigurationPanel({
   const [showAddForm, setShowAddForm] = useState(false);
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [testingAlert, setTestingAlert] = useState<string | null>(null);
+  
+  // NEW: Priority 2 features
+  const [selectedBeacons, setSelectedBeacons] = useState<Set<string>>(new Set());
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    status: 'all',
+    alertMode: 'all',
+    location: 'all',
+    zone: 'all'
+  });
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [showBatchOps, setShowBatchOps] = useState(false);
   
   // Form state for editing/adding
   const [formData, setFormData] = useState<Partial<BeaconConfiguration>>({
@@ -98,6 +199,142 @@ export function BeaconConfigurationPanel({
       syncWithRealBeacons();
     }
   }, [isConnected, realBeacons]);
+
+  // NEW: Filter configurations based on current filters
+  const filteredConfigurations = configurations.filter(config => {
+    if (filters.status !== 'all' && config.status !== filters.status) return false;
+    if (filters.alertMode !== 'all' && config.alertMode !== filters.alertMode) return false;
+    if (filters.location !== 'all' && config.location !== filters.location) return false;
+    if (filters.zone !== 'all' && config.zone !== filters.zone) return false;
+    return true;
+  });
+
+  // NEW: Get unique filter values
+  const getFilterOptions = () => {
+    const locations = [...new Set(configurations.map(c => c.location).filter(Boolean))];
+    const zones = [...new Set(configurations.map(c => c.zone).filter(Boolean))];
+    const alertModes = [...new Set(configurations.map(c => c.alertMode))];
+    const statuses = [...new Set(configurations.map(c => c.status).filter(Boolean))];
+    
+    return { locations, zones, alertModes, statuses };
+  };
+
+  // NEW: Batch operations
+  const applyTemplateToSelected = async (template: BeaconTemplate) => {
+    try {
+      setIsSaving(true);
+      const updates = [];
+      
+      for (const configId of selectedBeacons) {
+        const config = configurations.find(c => c.id === configId);
+        if (config) {
+          const updatedConfig = {
+            ...config,
+            ...template.config,
+            updatedAt: new Date().toISOString()
+          };
+          updates.push(saveConfiguration(updatedConfig));
+        }
+      }
+      
+      await Promise.all(updates);
+      setSelectedBeacons(new Set());
+      console.log(`✅ Applied ${template.name} template to ${updates.length} beacons`);
+    } catch (error) {
+      console.error('❌ Failed to apply template to selected beacons:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const batchUpdateAlertMode = async (alertMode: 'none' | 'buzzer' | 'vibration' | 'both') => {
+    try {
+      setIsSaving(true);
+      const updates = [];
+      
+      for (const configId of selectedBeacons) {
+        const config = configurations.find(c => c.id === configId);
+        if (config) {
+          const updatedConfig = {
+            ...config,
+            alertMode,
+            updatedAt: new Date().toISOString()
+          };
+          updates.push(saveConfiguration(updatedConfig));
+        }
+      }
+      
+      await Promise.all(updates);
+      setSelectedBeacons(new Set());
+      console.log(`✅ Updated alert mode for ${updates.length} beacons`);
+    } catch (error) {
+      console.error('❌ Failed to batch update alert mode:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const batchDelete = async () => {
+    if (!window.confirm(`Are you sure you want to delete ${selectedBeacons.size} selected beacons?`)) {
+      return;
+    }
+    
+    try {
+      setIsSaving(true);
+      const deletions = [];
+      
+      for (const configId of selectedBeacons) {
+        deletions.push(deleteConfiguration(configId));
+      }
+      
+      await Promise.all(deletions);
+      setSelectedBeacons(new Set());
+      console.log(`✅ Deleted ${deletions.length} beacons`);
+    } catch (error) {
+      console.error('❌ Failed to batch delete beacons:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // NEW: Export/Import functionality  
+  const exportConfigurations = () => {
+    const exportData = {
+      version: '1.0',
+      timestamp: new Date().toISOString(),
+      configurations: configurations
+    };
+    
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `beacon-configurations-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // Toggle beacon selection
+  const toggleBeaconSelection = (beaconId: string) => {
+    const newSelection = new Set(selectedBeacons);
+    if (newSelection.has(beaconId)) {
+      newSelection.delete(beaconId);
+    } else {
+      newSelection.add(beaconId);
+    }
+    setSelectedBeacons(newSelection);
+  };
+
+  const selectAllFiltered = () => {
+    const allFilteredIds = new Set(filteredConfigurations.map(c => c.id));
+    setSelectedBeacons(allFilteredIds);
+  };
+
+  const clearSelection = () => {
+    setSelectedBeacons(new Set());
+  };
 
   // Load configurations from API
   const loadConfigurations = async () => {
@@ -791,6 +1028,8 @@ export function BeaconConfigurationPanel({
     );
   }
 
+  const filterOptions = getFilterOptions();
+
   return (
     <div className="space-y-8">
       {/* Professional Header */}
@@ -836,21 +1075,282 @@ export function BeaconConfigurationPanel({
         </div>
       </div>
 
+      {/* NEW: Advanced Controls Bar */}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          {/* Filter & Search Controls */}
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors",
+                showFilters 
+                  ? "bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-300"
+                  : "border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
+              )}
+            >
+              <Filter className="h-4 w-4" />
+              Filters
+              <ChevronDown className={cn("h-4 w-4 transition-transform", showFilters && "rotate-180")} />
+            </button>
+
+            <button
+              onClick={() => setShowTemplates(!showTemplates)}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors",
+                showTemplates 
+                  ? "bg-purple-50 border-purple-200 text-purple-700 dark:bg-purple-900/30 dark:border-purple-800 dark:text-purple-300"
+                  : "border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
+              )}
+            >
+              <Wand2 className="h-4 w-4" />
+              Templates
+            </button>
+
+            <button
+              onClick={exportConfigurations}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
+            >
+              <Download className="h-4 w-4" />
+              Export
+            </button>
+          </div>
+
+          {/* Selection & Batch Operations */}
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              {filteredConfigurations.length} of {configurations.length} beacons
+              {selectedBeacons.size > 0 && ` • ${selectedBeacons.size} selected`}
+            </span>
+
+            {selectedBeacons.size > 0 && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={clearSelection}
+                  className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                >
+                  Clear
+                </button>
+                <button
+                  onClick={() => setShowBatchOps(!showBatchOps)}
+                  className="flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-700 rounded-lg text-sm hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
+                >
+                  Batch Actions
+                  <ChevronDown className={cn("h-3 w-3 transition-transform", showBatchOps && "rotate-180")} />
+                </button>
+              </div>
+            )}
+
+            {filteredConfigurations.length > 0 && selectedBeacons.size === 0 && (
+              <button
+                onClick={selectAllFiltered}
+                className="flex items-center gap-2 px-3 py-1 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+              >
+                <CheckSquare className="h-4 w-4" />
+                Select All
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Expandable Filter Panel */}
+        {showFilters && (
+          <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-600">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status</label>
+                <select
+                  value={filters.status}
+                  onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                >
+                  <option value="all">All Statuses</option>
+                  {filterOptions.statuses.map(status => (
+                    <option key={status} value={status}>{status}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Alert Mode</label>
+                <select
+                  value={filters.alertMode}
+                  onChange={(e) => setFilters(prev => ({ ...prev, alertMode: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                >
+                  <option value="all">All Alert Modes</option>
+                  {filterOptions.alertModes.map(mode => (
+                    <option key={mode} value={mode}>{mode}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Location</label>
+                <select
+                  value={filters.location}
+                  onChange={(e) => setFilters(prev => ({ ...prev, location: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                >
+                  <option value="all">All Locations</option>
+                  {filterOptions.locations.map(location => (
+                    <option key={location} value={location}>{location}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Zone</label>
+                <select
+                  value={filters.zone}
+                  onChange={(e) => setFilters(prev => ({ ...prev, zone: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                >
+                  <option value="all">All Zones</option>
+                  {filterOptions.zones.map(zone => (
+                    <option key={zone} value={zone}>{zone}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={() => setFilters({ status: 'all', alertMode: 'all', location: 'all', zone: 'all' })}
+                className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                Clear Filters
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Expandable Template Panel */}
+        {showTemplates && (
+          <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-600">
+            <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Configuration Templates</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {BEACON_TEMPLATES.map(template => {
+                const TemplateIcon = template.icon;
+                return (
+                  <div
+                    key={template.id}
+                    onClick={() => selectedBeacons.size > 0 ? applyTemplateToSelected(template) : null}
+                    className={cn(
+                      "p-4 border rounded-xl cursor-pointer transition-all",
+                      selectedBeacons.size > 0
+                        ? "border-blue-200 hover:border-blue-300 hover:bg-blue-50 dark:border-blue-800 dark:hover:border-blue-700 dark:hover:bg-blue-900/20"
+                        : "border-gray-200 bg-gray-50 cursor-not-allowed dark:border-gray-600 dark:bg-gray-700/50"
+                    )}
+                  >
+                    <div className="flex items-center gap-3 mb-2">
+                      <TemplateIcon className={cn(
+                        "h-5 w-5",
+                        selectedBeacons.size > 0 ? "text-blue-600" : "text-gray-400"
+                      )} />
+                      <span className={cn(
+                        "font-medium",
+                        selectedBeacons.size > 0 ? "text-gray-900 dark:text-white" : "text-gray-500 dark:text-gray-400"
+                      )}>
+                        {template.name}
+                      </span>
+                    </div>
+                    <p className={cn(
+                      "text-sm",
+                      selectedBeacons.size > 0 ? "text-gray-600 dark:text-gray-300" : "text-gray-400 dark:text-gray-500"
+                    )}>
+                      {template.description}
+                    </p>
+                    {selectedBeacons.size === 0 && (
+                      <p className="text-xs text-gray-400 mt-2">Select beacons to apply template</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Expandable Batch Operations Panel */}
+        {showBatchOps && selectedBeacons.size > 0 && (
+          <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-600">
+            <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Batch Operations ({selectedBeacons.size} selected)
+            </h4>
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={() => batchUpdateAlertMode('none')}
+                disabled={isSaving}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+              >
+                Disable Alerts
+              </button>
+              <button
+                onClick={() => batchUpdateAlertMode('buzzer')}
+                disabled={isSaving}
+                className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 disabled:opacity-50 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
+              >
+                Set Buzzer
+              </button>
+              <button
+                onClick={() => batchUpdateAlertMode('vibration')}
+                disabled={isSaving}
+                className="px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 disabled:opacity-50 dark:bg-purple-900/30 dark:text-purple-300 dark:hover:bg-purple-900/50"
+              >
+                Set Vibration
+              </button>
+              <button
+                onClick={() => batchUpdateAlertMode('both')}
+                disabled={isSaving}
+                className="px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 disabled:opacity-50 dark:bg-orange-900/30 dark:text-orange-300 dark:hover:bg-orange-900/50"
+              >
+                Set Both
+              </button>
+              <button
+                onClick={batchDelete}
+                disabled={isSaving}
+                className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 disabled:opacity-50 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
+              >
+                Delete Selected
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Enhanced Configuration Cards */}
-      {configurations.length > 0 && (
+      {filteredConfigurations.length > 0 && (
         <div className="grid gap-6">
-          {configurations.map(config => {
+          {filteredConfigurations.map(config => {
             const realtimeStatus = getRealtimeStatus(config);
             const alertDisplay = getAlertModeDisplay(config.alertMode);
             const StatusIcon = realtimeStatus.icon;
             const AlertIcon = alertDisplay.icon;
+            const isSelected = selectedBeacons.has(config.id);
 
             return (
-              <div key={config.id} className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-xl transition-all duration-300">
+              <div key={config.id} className={cn(
+                "bg-white dark:bg-gray-800 rounded-2xl shadow-lg border overflow-hidden transition-all duration-300",
+                isSelected 
+                  ? "border-blue-300 ring-2 ring-blue-100 dark:border-blue-600 dark:ring-blue-900/50" 
+                  : "border-gray-200 dark:border-gray-700 hover:shadow-xl"
+              )}>
                 {/* Header Section */}
                 <div className="p-6 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 border-b border-gray-200 dark:border-gray-600">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
+                      {/* Selection Checkbox */}
+                      <button
+                        onClick={() => toggleBeaconSelection(config.id)}
+                        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
+                      >
+                        {isSelected ? (
+                          <CheckSquare className="h-5 w-5 text-blue-600" />
+                        ) : (
+                          <Square className="h-5 w-5 text-gray-400" />
+                        )}
+                      </button>
+
                       <div className={cn("p-3 rounded-xl", realtimeStatus.bgColor)}>
                         <StatusIcon className={cn("h-6 w-6", realtimeStatus.color)} />
                       </div>
@@ -1328,7 +1828,7 @@ export function BeaconConfigurationPanel({
       )}
 
       {/* Enhanced Empty State */}
-      {configurations.length === 0 && (
+      {configurations.length === 0 ? (
         <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-12 text-center border border-gray-200 dark:border-gray-700">
           <div className="max-w-md mx-auto">
             <Home className="h-16 w-16 text-gray-400 mx-auto mb-6" />
@@ -1347,7 +1847,26 @@ export function BeaconConfigurationPanel({
             </button>
           </div>
         </div>
-      )}
+      ) : filteredConfigurations.length === 0 ? (
+        <div className="bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 rounded-2xl p-12 text-center border border-yellow-200 dark:border-yellow-800">
+          <div className="max-w-md mx-auto">
+            <Filter className="h-16 w-16 text-yellow-500 mx-auto mb-6" />
+            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+              No Beacons Match Filters
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
+              No beacon configurations match your current filter criteria. 
+              Try adjusting your filters or clearing them to see all beacons.
+            </p>
+            <button 
+              onClick={() => setFilters({ status: 'all', alertMode: 'all', location: 'all', zone: 'all' })}
+              className="px-6 py-3 bg-yellow-600 hover:bg-yellow-700 text-white rounded-xl font-medium transition-all duration-200 shadow-lg hover:shadow-xl"
+            >
+              Clear All Filters
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 } 

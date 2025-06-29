@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { promises as fs } from 'fs';
+import path from 'path';
 
 // Enhanced Beacon Configuration interface with Live Proximity Alerts
 export interface BeaconConfiguration {
@@ -41,9 +43,122 @@ export interface BeaconConfiguration {
   updatedAt?: string;
 }
 
+// Legacy beacon configuration interface (for migration)
+interface LegacyBeaconConfiguration {
+  id: string;
+  name: string;
+  location: string;
+  zone?: string;
+  macAddress?: string;
+  alertMode: 'none' | 'buzzer' | 'vibration' | 'both';
+  proximityThreshold: number;
+  alertDelay: number;
+  alertTimeout: number;
+  safeZone: boolean;
+  boundaryAlert: boolean;
+  position: { x: number; y: number };
+  isAutoDetected?: boolean;
+  lastSeen?: string;
+  batteryLevel?: number;
+  signalStrength?: number;
+  status?: 'online' | 'offline' | 'low-battery';
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// Path to beacon configurations file
+const BEACON_CONFIG_FILE = path.join(process.cwd(), 'data', 'beacon-configurations.json');
+
+// Migration function to convert legacy configurations
+function migrateLegacyConfiguration(legacy: LegacyBeaconConfiguration): BeaconConfiguration {
+  console.log(`🔄 Migrating legacy beacon configuration: ${legacy.name}`);
+  
+  // Convert RSSI threshold to distance (approximate)
+  const triggerDistance = Math.max(2, Math.min(20, rssiToDistance(legacy.proximityThreshold)));
+  
+  return {
+    ...legacy,
+    proximitySettings: {
+      triggerDistance: triggerDistance,
+      alertDuration: legacy.alertTimeout || 2000,
+      alertIntensity: 3, // Default medium intensity
+      enableProximityDelay: legacy.alertDelay > 0,
+      proximityDelayTime: legacy.alertDelay || 0,
+      cooldownPeriod: 3000 // Default 3 second cooldown
+    },
+    // Keep legacy fields for backward compatibility
+    proximityThreshold: legacy.proximityThreshold,
+    alertDelay: legacy.alertDelay,
+    alertTimeout: legacy.alertTimeout,
+    updatedAt: new Date().toISOString()
+  };
+}
+
+// Check if configuration needs migration
+function needsMigration(config: any): config is LegacyBeaconConfiguration {
+  return config && typeof config === 'object' && !config.proximitySettings;
+}
+
+// Load beacon configurations from file with automatic migration
+async function loadBeaconConfigurations(): Promise<BeaconConfiguration[]> {
+  try {
+    const fileContent = await fs.readFile(BEACON_CONFIG_FILE, 'utf-8');
+    const configs = JSON.parse(fileContent);
+    
+    let migrationPerformed = false;
+    const migratedConfigs = configs.map((config: any) => {
+      if (needsMigration(config)) {
+        migrationPerformed = true;
+        return migrateLegacyConfiguration(config);
+      }
+      return config as BeaconConfiguration;
+    });
+    
+    // If migration was performed, save the updated configurations
+    if (migrationPerformed) {
+      console.log(`✅ Migration completed for ${migratedConfigs.length} beacon configurations`);
+      await saveBeaconConfigurations(migratedConfigs);
+    }
+    
+    return migratedConfigs;
+  } catch (error) {
+    if ((error as any).code === 'ENOENT') {
+      console.log('📁 No existing beacon configurations file found, starting with empty array');
+      return [];
+    }
+    console.error('❌ Failed to load beacon configurations:', error);
+    return [];
+  }
+}
+
+// Save beacon configurations to file
+async function saveBeaconConfigurations(configs: BeaconConfiguration[]): Promise<void> {
+  try {
+    // Ensure data directory exists
+    const dataDir = path.dirname(BEACON_CONFIG_FILE);
+    await fs.mkdir(dataDir, { recursive: true });
+    
+    // Save configurations with pretty formatting
+    await fs.writeFile(BEACON_CONFIG_FILE, JSON.stringify(configs, null, 2), 'utf-8');
+    console.log(`💾 Saved ${configs.length} beacon configurations to file`);
+  } catch (error) {
+    console.error('❌ Failed to save beacon configurations:', error);
+    throw error;
+  }
+}
+
 // In-memory storage for demo purposes
-// In production, this would be stored in a database
+// This will be loaded from file on startup
 let beaconConfigurations: BeaconConfiguration[] = [];
+
+// Initialize configurations from file
+let isInitialized = false;
+async function initializeConfigurations() {
+  if (!isInitialized) {
+    beaconConfigurations = await loadBeaconConfigurations();
+    isInitialized = true;
+  }
+}
 
 // Helper function to convert distance (cm) to approximate RSSI threshold
 function distanceToRSSI(distanceCm: number): number {
@@ -152,6 +267,9 @@ async function syncToCollar(config: BeaconConfiguration): Promise<boolean> {
 export async function GET(request: NextRequest) {
   try {
     console.log('📋 GET /api/beacons - Retrieving all configurations');
+    
+    // Initialize configurations from file (with automatic migration)
+    await initializeConfigurations();
 
     return NextResponse.json({
       success: true,
@@ -235,8 +353,14 @@ export async function POST(request: NextRequest) {
       updatedAt: new Date().toISOString()
     };
 
+    // Initialize configurations from file first
+    await initializeConfigurations();
+
     // Add to storage
     beaconConfigurations.push(newConfig);
+
+    // Save to file
+    await saveBeaconConfigurations(beaconConfigurations);
 
     // Attempt to sync to collar
     const collarUpdated = await syncToCollar(newConfig);
@@ -274,6 +398,9 @@ export async function PUT(request: NextRequest) {
       }, { status: 400 });
     }
 
+    // Initialize configurations from file first
+    await initializeConfigurations();
+
     const configIndex = beaconConfigurations.findIndex(config => config.id === body.id);
     
     if (configIndex === -1) {
@@ -292,6 +419,9 @@ export async function PUT(request: NextRequest) {
     };
 
     beaconConfigurations[configIndex] = updatedConfig;
+
+    // Save to file
+    await saveBeaconConfigurations(beaconConfigurations);
 
     // Attempt to sync to collar
     const collarUpdated = await syncToCollar(updatedConfig);
@@ -330,6 +460,9 @@ export async function DELETE(request: NextRequest) {
       }, { status: 400 });
     }
 
+    // Initialize configurations from file first
+    await initializeConfigurations();
+
     const configIndex = beaconConfigurations.findIndex(config => config.id === id);
     
     if (configIndex === -1) {
@@ -345,6 +478,9 @@ export async function DELETE(request: NextRequest) {
 
     // Remove from storage
     beaconConfigurations.splice(configIndex, 1);
+
+    // Save to file
+    await saveBeaconConfigurations(beaconConfigurations);
 
     // Send deletion command to collar
     try {

@@ -18,7 +18,7 @@ import {
   BarChart3,
   Award,
   CheckCircle2,
-  Hand,
+  Sparkles,
   Smartphone,
   Target
 } from 'lucide-react'
@@ -149,7 +149,7 @@ export default function MobileDashboard() {
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white font-rounded">
                 Hi {userName}!
               </h1>
-              <Hand className="h-8 w-8 text-amber-500" />
+              <Sparkles className="h-8 w-8 text-amber-500" />
             </div>
             <p className="text-gray-600 dark:text-gray-400 font-medium">
               Let's check on {petName} • {currentTime}
@@ -235,54 +235,105 @@ export default function MobileDashboard() {
           </div>
         </div>
 
-        {/* Pet Status Card */}
-        <div className="mobile-card bg-pet-surface-elevated rounded-2xl p-6 border border-gray-200 dark:border-gray-800 shadow-pet">
+        {/* Recent Notifications */}
+        <div className="mobile-card bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-800 rounded-3xl p-6 border border-gray-200 dark:border-gray-700 shadow-xl hover:shadow-2xl transition-all duration-300">
+          {/* Header */}
           <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-12 bg-gradient-to-br from-teal-400 to-teal-500 rounded-2xl flex items-center justify-center shadow-teal-glow">
-                <Heart className="h-6 w-6 text-white" />
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <div className="h-16 w-16 bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 rounded-3xl flex items-center justify-center shadow-amber-glow">
+                  <Bell className="h-8 w-8 text-white" />
+                </div>
+                <div className="absolute -top-1 -right-1 h-6 w-6 bg-red-500 rounded-full flex items-center justify-center border-2 border-white dark:border-gray-800">
+                  <span className="text-xs font-bold text-white">3</span>
+                </div>
               </div>
               <div>
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white font-rounded">
-                  {petName}'s Status
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white font-rounded mb-1">
+                  Recent Notifications
                 </h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Updated {lastUpdate ? formatTimeAgo(lastUpdate) : 'just now'}
-                </p>
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 bg-amber-400 rounded-full animate-pulse" />
+                  <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
+                    3 new alerts today
+                  </p>
+                </div>
               </div>
             </div>
           </div>
 
+          {/* Notifications List */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between py-3 px-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
-              <div className="flex items-center gap-3">
-                <MapPin className="h-5 w-5 text-teal-500" />
-                <span className="text-gray-900 dark:text-white font-medium">Current Location</span>
+            {/* Alert 1 - Restricted Zone */}
+            <div className="group relative overflow-hidden bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/30 dark:to-red-800/30 rounded-2xl p-4 border border-red-200 dark:border-red-700 hover:scale-102 transition-all duration-200">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0">
+                  <div className="h-10 w-10 bg-red-500 rounded-xl flex items-center justify-center shadow-md">
+                    <AlertTriangle className="h-5 w-5 text-white" />
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-sm font-bold text-red-700 dark:text-red-300 uppercase tracking-wide">Alert</span>
+                    <span className="text-xs text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/50 px-2 py-1 rounded-full">10:22</span>
+                  </div>
+                  <p className="text-sm text-red-900 dark:text-red-100 font-medium leading-relaxed">
+                    Activity detected near the restricted zone in the living room.
+                  </p>
+                </div>
               </div>
-              <span className="text-gray-600 dark:text-gray-400 font-semibold">
-                {typeof collarData?.location === 'string' ? collarData.location : 'Living Room'}
-              </span>
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-all duration-700" />
             </div>
 
-            <div className="flex items-center justify-between py-3 px-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
-              <div className="flex items-center gap-3">
-                <Clock className="h-5 w-5 text-emerald-500" />
-                <span className="text-gray-900 dark:text-white font-medium">Last Seen</span>
+            {/* Alert 2 - Sleep Activity */}
+            <div className="group relative overflow-hidden bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 rounded-2xl p-4 border border-blue-200 dark:border-blue-700 hover:scale-102 transition-all duration-200">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0">
+                  <div className="h-10 w-10 bg-blue-500 rounded-xl flex items-center justify-center shadow-md">
+                    <Activity className="h-5 w-5 text-white" />
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-sm font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wide">Alert</span>
+                    <span className="text-xs text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/50 px-2 py-1 rounded-full">8:45</span>
+                  </div>
+                  <p className="text-sm text-blue-900 dark:text-blue-100 font-medium leading-relaxed">
+                    {petName} slept for 1 hour 30 minutes and is now roaming around the house.
+                  </p>
+                </div>
               </div>
-              <span className="text-gray-600 dark:text-gray-400 font-semibold">
-                {collarData?.last_seen ? formatTimeAgo(new Date(collarData.last_seen)) : '2 min ago'}
-              </span>
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-all duration-700" />
             </div>
 
-            <div className="flex items-center justify-between py-3 px-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
-              <div className="flex items-center gap-3">
-                <Zap className="h-5 w-5 text-orange-500" />
-                <span className="text-gray-900 dark:text-white font-medium">Activity Level</span>
+            {/* Alert 3 - Barking */}
+            <div className="group relative overflow-hidden bg-gradient-to-r from-orange-50 to-orange-100 dark:from-orange-900/30 dark:to-orange-800/30 rounded-2xl p-4 border border-orange-200 dark:border-orange-700 hover:scale-102 transition-all duration-200">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0">
+                  <div className="h-10 w-10 bg-orange-500 rounded-xl flex items-center justify-center shadow-md">
+                    <Bell className="h-5 w-5 text-white" />
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-sm font-bold text-orange-700 dark:text-orange-300 uppercase tracking-wide">Alert</span>
+                    <span className="text-xs text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/50 px-2 py-1 rounded-full">7:15</span>
+                  </div>
+                  <p className="text-sm text-orange-900 dark:text-orange-100 font-medium leading-relaxed">
+                    {petName} has started barking inside the house.
+                  </p>
+                </div>
               </div>
-              <span className="text-gray-600 dark:text-gray-400 font-semibold">
-                {collarData?.activity_level !== undefined ? getActivityLevelText(collarData.activity_level) : 'Moderate'}
-              </span>
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-all duration-700" />
             </div>
+          </div>
+
+          {/* Footer with action button */}
+          <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+            <button className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1 flex items-center justify-center gap-2">
+              <Bell className="h-5 w-5" />
+              View All Notifications
+            </button>
           </div>
         </div>
 

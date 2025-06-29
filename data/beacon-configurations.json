@@ -6,6 +6,14 @@
     "zone": "",
     "macAddress": "08:d1:f9:53:9c:82",
     "alertMode": "buzzer",
+    "proximitySettings": {
+      "triggerDistance": 5,
+      "alertDuration": 2000,
+      "alertIntensity": 3,
+      "enableProximityDelay": true,
+      "proximityDelayTime": 3000,
+      "cooldownPeriod": 3000
+    },
     "proximityThreshold": -65,
     "alertDelay": 3000,
     "alertTimeout": 10000,
@@ -21,6 +29,35 @@
     "signalStrength": 68.57142857142857,
     "status": "offline",
     "createdAt": "2025-06-06T15:31:17.347Z",
-    "updatedAt": "2025-06-06T15:31:17.347Z"
+    "updatedAt": "2025-01-15T10:30:00.000Z"
+  },
+  {
+    "id": "beacon-1751104041412-vfo0s8gj4",
+    "name": "Test Kitchen Beacon",
+    "location": "Kitchen",
+    "zone": "Main Floor",
+    "macAddress": "",
+    "alertMode": "both",
+    "proximitySettings": {
+      "triggerDistance": 5,
+      "alertDuration": 2000,
+      "alertIntensity": 3,
+      "enableProximityDelay": false,
+      "proximityDelayTime": 0,
+      "cooldownPeriod": 3000
+    },
+    "proximityThreshold": -65,
+    "alertDelay": 3000,
+    "alertTimeout": 10000,
+    "safeZone": true,
+    "boundaryAlert": false,
+    "position": {
+      "x": 50,
+      "y": 50
+    },
+    "isAutoDetected": false,
+    "status": "offline",
+    "createdAt": "2025-06-28T09:47:21.412Z",
+    "updatedAt": "2025-06-28T09:47:21.412Z"
   }
 ]

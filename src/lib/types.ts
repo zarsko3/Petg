@@ -229,6 +229,7 @@ export const ZoneCreateSchema = z.object({
   type: z.enum(ZONE_TYPES).default('SAFE'),
   polygon_json: z.array(PointSchema).min(3),
   color: z.string().regex(/^#[0-9A-F]{6}$/i),
+  active: z.boolean().optional(),
   alert_settings: z.object({
     entry_alert: z.boolean().default(false),
     exit_alert: z.boolean().default(true),

@@ -1,9 +1,9 @@
+/* CSS imports must be at the top */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Nunito:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* Import Google Fonts for rounded typography */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Nunito:wght@400;500;600;700&display=swap');
 
 @layer base {
   :root {
@@ -277,5 +277,25 @@
   /* Social buttons specific styling */
   .cl-socialButtonsBlockButton svg {
     @apply w-5 h-5;
+  }
+}
+
+/* Utility classes for mobile UI */
+@layer utilities {
+  .scrollbar-hide {
+    /* IE and Edge */
+    -ms-overflow-style: none;
+    /* Firefox */
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    /* Safari and Chrome */
+    display: none;
+  }
+  
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
   }
 }

@@ -9,6 +9,8 @@ import { SidebarNav } from '@/components/sidebar-nav'
 import { CollarServiceProvider } from '@/components/collar-service-provider'
 import { ClerkProviderWrapper } from '@/components/clerk-provider-wrapper'
 import { RootLayoutClient } from '@/components/root-layout-client'
+import { StagewiseToolbar } from '@stagewise/toolbar-next'
+import { ReactPlugin } from '@stagewise-plugins/react'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -73,6 +75,11 @@ export default function RootLayout({
             </CollarServiceProvider>
           </ThemeProvider>
         </ClerkProviderWrapper>
+        <StagewiseToolbar 
+          config={{
+            plugins: [ReactPlugin]
+          }}
+        />
       </body>
     </html>
   )

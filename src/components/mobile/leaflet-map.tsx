@@ -43,125 +43,128 @@ interface MobileLeafletMapProps {
   petName: string
   className?: string
   customFloorPlan?: Point2D[] | null
+  onMapReady?: (mapRef: React.RefObject<L.Map>) => void
 }
 
-// Helper to create responsive marker icons based on zoom level
-const createMarkerIcon = (type: 'collar' | 'beacon', size: number, connected: boolean = true, isLive: boolean = false) => {
-  // Increased base sizes for better visibility
-  const displaySize = Math.max(size * 1.5, 36) // Minimum 36px for touch targets
-  const iconSize = Math.max(displaySize * 0.6, 20) // Icon within the marker
-  
-  const iconContent = type === 'collar' 
-    ? `<svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-         <circle cx="11" cy="4" r="2"/>
-         <circle cx="18" cy="8" r="2"/>
-         <circle cx="12" cy="12" r="3"/>
-         <circle cx="6" cy="8" r="2"/>
-         <path d="m7 21-3-5"/>
-         <path d="m17 21 3-5"/>
-       </svg>`
-    : `<svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-         <path d="m12 1 3 3-3 3-3-3z"/>
-         <path d="M8 11v6"/>
-         <path d="M12 11v6"/>
-         <path d="M16 11v6"/>
-         <circle cx="12" cy="12" r="1"/>
-       </svg>`
-
-  // Much more distinct colors and styling
-  const ringColor = type === 'collar' ? '#14B8A6' : (connected ? '#10B981' : '#9CA3AF')
-  const bgColor = type === 'collar' 
-    ? 'linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%)' // Coral gradient for pet
-    : connected 
-      ? 'linear-gradient(135deg, #10B981 0%, #059669 100%)' // Green gradient for connected beacons
-      : 'linear-gradient(135deg, #9CA3AF 0%, #6B7280 100%)' // Gray for disconnected
-  
-  const shadowColor = type === 'collar' ? 'rgba(255, 107, 107, 0.4)' : 'rgba(16, 185, 129, 0.3)'
-  
-  return L.divIcon({
-    html: `
-      <div class="marker-container" style="
-        width: ${displaySize + 8}px; 
-        height: ${displaySize + 8}px; 
-        display: flex; 
-        align-items: center; 
-        justify-content: center;
-        position: relative;
-      ">
-        <div class="marker-content" style="
-          width: ${displaySize}px; 
-          height: ${displaySize}px; 
-          background: ${bgColor}; 
-          border-radius: 50%; 
+// Helper to create Google Maps-style marker icons
+const createMarkerIcon = (type: 'collar' | 'beacon', zoom: number, connected: boolean = true, isLive: boolean = false) => {
+  if (type === 'collar') {
+    // Google Maps user location style - small circular marker (20-24px)
+    const size = Math.max(20, Math.min(24, 18 + zoom * 2))
+    const ringSize = size + 8
+    
+    return L.divIcon({
+      html: `
+        <div style="
+          width: ${ringSize}px; 
+          height: ${ringSize}px; 
           display: flex; 
           align-items: center; 
           justify-content: center;
-          border: 3px solid ${ringColor};
-          box-shadow: 0 4px 12px ${shadowColor}, 0 2px 4px rgba(0,0,0,0.1);
-          color: white;
           position: relative;
-          z-index: ${type === 'collar' ? '1000' : '100'};
-          transition: transform 0.2s ease, box-shadow 0.2s ease;
-          cursor: pointer;
         ">
-          ${iconContent}
-          ${connected && type === 'beacon' ? 
-            `<div style="
+          <div style="
+            width: ${size}px; 
+            height: ${size}px; 
+            background: #4285F4; 
+            border-radius: 50%; 
+            border: 3px solid white;
+            box-shadow: 0 2px 8px rgba(66, 133, 244, 0.4), 0 1px 3px rgba(0,0,0,0.2);
+            position: relative;
+            z-index: 1000;
+          ">
+            ${isLive ? `
+              <div style="
+                position: absolute;
+                top: -8px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: #34A853;
+                color: white;
+                padding: 1px 4px;
+                border-radius: 4px;
+                font-size: 8px;
+                font-weight: 600;
+                white-space: nowrap;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+              ">LIVE</div>` : ''
+            }
+          </div>
+          <div style="
+            position: absolute;
+            width: ${ringSize}px;
+            height: ${ringSize}px;
+            border: 2px solid #4285F4;
+            border-radius: 50%;
+            opacity: 0.3;
+            animation: ripple 2s infinite ease-out;
+          "></div>
+        </div>
+        <style>
+          @keyframes ripple {
+            0% { transform: scale(0.8); opacity: 0.3; }
+            100% { transform: scale(1.2); opacity: 0; }
+          }
+        </style>
+      `,
+      iconSize: [ringSize, ringSize],
+      iconAnchor: [ringSize / 2, ringSize / 2],
+      className: 'custom-marker marker-collar',
+    })
+  } else {
+    // Google Maps pin style - standard teardrop marker (40px)
+    const pinHeight = Math.max(36, Math.min(44, 32 + zoom * 3))
+    const pinWidth = Math.round(pinHeight * 0.6)
+    const iconSize = Math.round(pinWidth * 0.5)
+    
+    const pinColor = connected ? '#EA4335' : '#9AA0A6'
+    const iconColor = 'white'
+    
+    return L.divIcon({
+      html: `
+        <div style="
+          width: ${pinWidth}px; 
+          height: ${pinHeight}px; 
+          position: relative;
+          display: flex;
+          align-items: flex-start;
+          justify-content: center;
+        ">
+          <svg width="${pinWidth}" height="${pinHeight}" viewBox="0 0 24 32" style="
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+          ">
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" 
+                  fill="${pinColor}" 
+                  stroke="white" 
+                  stroke-width="1"/>
+            <circle cx="12" cy="9" r="3" fill="${iconColor}"/>
+          </svg>
+          ${connected ? `
+            <div style="
               position: absolute;
               top: -4px;
               right: -4px;
               width: 12px;
               height: 12px;
-              background: #10B981;
-              border: 3px solid white;
+              background: #34A853;
+              border: 2px solid white;
               border-radius: 50%;
-              box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-              animation: pulse 2s infinite;
+              box-shadow: 0 1px 3px rgba(0,0,0,0.3);
             "></div>` : ''
           }
-          ${type === 'collar' && isLive ? 
-            `<div style="
-              position: absolute;
-              top: -6px;
-              left: 50%;
-              transform: translateX(-50%);
-              background: rgba(16, 185, 129, 0.95);
-              color: white;
-              padding: 2px 6px;
-              border-radius: 8px;
-              font-size: 10px;
-              font-weight: 600;
-              white-space: nowrap;
-              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-              pointer-events: none;
-              animation: pulse 2s infinite;
-            ">LIVE</div>` : ''
-          }
         </div>
-      </div>
-      <style>
-        .marker-content:hover {
-          transform: scale(1.1);
-          box-shadow: 0 6px 16px ${shadowColor}, 0 4px 8px rgba(0,0,0,0.15);
-        }
-        @keyframes pulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.7; transform: scale(1.2); }
-        }
-      </style>
-    `,
-    iconSize: [displaySize + 8, displaySize + 8], // Account for padding
-    iconAnchor: [(displaySize + 8) / 2, (displaySize + 8) / 2],
-    className: `custom-marker marker-${type} ${connected ? 'connected' : 'disconnected'}`,
-  })
+      `,
+      iconSize: [pinWidth, pinHeight],
+      iconAnchor: [pinWidth / 2, pinHeight - 2],
+      className: `custom-marker marker-beacon ${connected ? 'connected' : 'disconnected'}`,
+    })
+  }
 }
 
-// Get marker size based on zoom level - increased sizes
-const getSizeForZoom = (zoom: number): number => {
-  if (zoom >= 6) return 42       // Large when zoomed in
-  if (zoom >= 4) return 36       // Medium for normal view
-  if (zoom >= 2) return 30       // Minimum readable size
-  return 28                      // Very zoomed out
+// Google Maps uses zoom levels from 1-6 for our use case
+const getZoomLevel = (leafletZoom: number): number => {
+  // Convert Leaflet zoom (2-6) to our internal zoom (1-6)
+  return Math.max(1, Math.min(6, leafletZoom))
 }
 
 export function MobileLeafletMap({ 
@@ -169,7 +172,8 @@ export function MobileLeafletMap({
   petPosition, 
   petName, 
   className = '',
-  customFloorPlan
+  customFloorPlan,
+  onMapReady
 }: MobileLeafletMapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstance = useRef<L.Map | null>(null)
@@ -177,6 +181,7 @@ export function MobileLeafletMap({
   const [activePopup, setActivePopup] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
   const isUnmounting = useRef(false)
+  const firstRender = useRef(true)
   const { isLive } = useCollarConnection()
 
   // Only run on client side
@@ -215,17 +220,35 @@ export function MobileLeafletMap({
   useEffect(() => {
     if (!mounted || !mapRef.current) return
     
+    // Prevent multiple map instances
+    if (mapInstance.current) {
+      console.log('🗺️ Map already exists, skipping initialization')
+      return
+    }
+    
+    // Block duplicate initialization during Fast Refresh (dev-only)
+    if (process.env.NODE_ENV === 'development' && (window as any).__LEAFLET_MAP__) {
+      console.log('🚫 Development: Blocking duplicate map initialization')
+      return
+    }
+    
     // Reset unmounting flag when creating a new map
     isUnmounting.current = false
     
-    // Clean up existing map instance first
-    if (mapInstance.current) {
-      mapInstance.current.remove()
-      mapInstance.current = null
+    // Additional validation for container
+    const container = mapRef.current
+    if (!container || !document.contains(container)) {
+      console.error('❌ Map container not properly attached to DOM')
+      return
     }
 
-    // Initialize map with optimized settings for mobile performance
-    const map = L.map(mapRef.current, {
+    // Add a small delay to ensure DOM is fully ready
+    setTimeout(() => {
+      try {
+        if (isUnmounting.current || !mapRef.current) return
+        
+        // Initialize map with ALL animations disabled to prevent classList errors
+        const map = L.map(mapRef.current, {
       center: [petPosition.y, petPosition.x],
       zoom: 4,
       zoomControl: false,
@@ -238,20 +261,21 @@ export function MobileLeafletMap({
       keyboard: false,
       maxZoom: 6,
       minZoom: 2,
-      // Optimized rendering for stability and performance
-      preferCanvas: true,
-      renderer: L.canvas({ 
-        tolerance: 8, // Better touch handling
-        padding: 0.1 // Reduced padding for better performance
-      }),
-      // Disable all animations for stability
+      // Disable ALL animations to prevent DOM classList errors
+      panAnimation: false,      // ← Critical: disable pan animations
       fadeAnimation: false,
       zoomAnimation: false,
       markerZoomAnimation: false,
-      // Additional performance optimizations
+      // Additional performance optimizations - disable inertia/momentum
       inertia: false,
-      inertiaDeceleration: 3000
-    })
+      inertiaDeceleration: 0,
+      // Optimized rendering for stability
+      preferCanvas: true,
+      renderer: L.canvas({ 
+        tolerance: 8,
+        padding: 0.1
+      })
+    } as any)
 
     // Set pixel ratio for high-DPI displays with performance optimization
     if (window.devicePixelRatio > 1) {
@@ -290,28 +314,44 @@ export function MobileLeafletMap({
     // Use requestAnimationFrame to ensure map is fully ready before fitBounds
     requestAnimationFrame(() => {
       try {
-        if (mapInstance.current && map.getContainer()) {
-          map.fitBounds(bounds, { 
-            padding: [20, 20],
-            animate: false // Disable animation to prevent timing issues
-          })
+        // Enhanced validation before fitBounds
+        if (mapInstance.current && map && map.getContainer && typeof map.fitBounds === 'function') {
+          const container = map.getContainer()
+          if (container && document.contains(container)) {
+            map.fitBounds(bounds, { 
+              padding: [20, 20],
+              animate: false // Disable animation to prevent timing issues
+            })
+          } else {
+            console.warn('⚠️ Map container not found in DOM, skipping fitBounds')
+          }
+        } else {
+          console.warn('⚠️ Map instance invalid for fitBounds')
         }
       } catch (error) {
         console.warn('⚠️ FitBounds failed, using fallback view:', error)
         // Fallback to setView if fitBounds fails
         try {
-          map.setView([50, 50], 3)
+          if (map && typeof map.setView === 'function' && map.getContainer && map.getContainer()) {
+            const container = map.getContainer()
+            if (container && document.contains(container)) {
+              map.setView([50, 50], 3, { animate: false })
+            } else {
+              console.error('❌ Map container invalid for setView fallback')
+            }
+          } else {
+            console.error('❌ Map instance is invalid for setView fallback')
+          }
         } catch (fallbackError) {
           console.error('❌ Map view setup failed:', fallbackError)
         }
       }
     })
 
-    // Throttled zoom handler for better performance
-    let zoomTimeout: ReturnType<typeof setTimeout>
+    // Simplified zoom handlers without animations
     map.on('zoomstart', () => {
       try {
-        // Hide popups during zoom for performance
+        if (isUnmounting.current) return
         setActivePopup(null)
       } catch (error) {
         console.warn('⚠️ Zoomstart handler error:', error)
@@ -321,12 +361,8 @@ export function MobileLeafletMap({
     map.on('zoomend', () => {
       try {
         if (isUnmounting.current) return
-        clearTimeout(zoomTimeout)
-        zoomTimeout = setTimeout(() => {
-          if (!isUnmounting.current) {
-            updateMarkerSizes()
-          }
-        }, 100) // Debounce marker updates
+        // Call updateMarkerSizes directly without timeout to avoid race conditions
+        updateMarkerSizes()
       } catch (error) {
         console.warn('⚠️ Zoomend handler error:', error)
       }
@@ -342,44 +378,124 @@ export function MobileLeafletMap({
     })
 
     mapInstance.current = map
+    
+    // Aggressively patch Leaflet's internal animation system to prevent classList errors
+    try {
+      // Force disable pan animations at runtime
+      (map as any)._panAnim = null;
+      (map as any)._zoomAnim = null;
+      
+      // Override any internal setView calls to force animate: false
+      const originalSetView = map.setView;
+      map.setView = function(center: any, zoom?: any, options?: any) {
+        return originalSetView.call(this, center, zoom, { ...options, animate: false });
+      };
+      
+      // Override panTo to force animate: false
+      if (map.panTo) {
+        const originalPanTo = map.panTo;
+        map.panTo = function(latlng: any, options?: any) {
+          return originalPanTo.call(this, latlng, { ...options, animate: false });
+        };
+      }
+      
+      // Override flyTo to force animate: false  
+      if (map.flyTo) {
+        const originalFlyTo = map.flyTo;
+        map.flyTo = function(latlng: any, zoom?: any, options?: any) {
+          return originalFlyTo.call(this, latlng, zoom, { ...options, animate: false });
+        };
+      }
+      
+      console.log('🔒 Map animations completely disabled with runtime patches');
+    } catch (patchError) {
+      console.warn('⚠️ Animation patch error:', patchError);
+    }
+    
+    // Set development flag to prevent duplicates
+    if (process.env.NODE_ENV === 'development') {
+      (window as any).__LEAFLET_MAP__ = true
+    }
+    
+    // Call onMapReady callback if provided
+    if (onMapReady) {
+      onMapReady({ current: map })
+    }
+    
     console.log('Map initialization complete')
+      } catch (error) {
+        console.error('❌ Map initialization failed:', error)
+      }
+    }, 100) // Small delay to ensure DOM is ready
 
     return () => {
       isUnmounting.current = true
       
       try {
         if (mapInstance.current) {
-          // Clear any pending timeouts
-          clearTimeout(zoomTimeout)
+          const map = mapInstance.current
           
-          // Stop all animations before cleanup
-          mapInstance.current.stop()
+          // Stop any ongoing animations immediately to prevent race conditions
+          try {
+            map.stop() // Halt any pan/zoom animations
+          } catch (stopError) {
+            console.warn('⚠️ Map stop error:', stopError)
+          }
           
           // Close all popups to prevent reference issues
-          mapInstance.current.closePopup()
+          try {
+            map.closePopup()
+          } catch (popupError) {
+            console.warn('⚠️ Popup close error:', popupError)
+          }
+          
+          // Clear all event handlers FIRST to prevent callbacks
+          try {
+            map.off()
+          } catch (offError) {
+            console.warn('⚠️ Event handler cleanup error:', offError)
+          }
           
           // Remove all layers safely
-          mapInstance.current.eachLayer((layer) => {
+          map.eachLayer((layer) => {
             try {
-              mapInstance.current?.removeLayer(layer)
+              map.removeLayer(layer)
             } catch (layerError) {
               console.warn('⚠️ Failed to remove layer:', layerError)
             }
           })
           
-          // Clear event handlers
-          mapInstance.current.off()
-          
-          // Finally remove the map
-          mapInstance.current.remove()
-          mapInstance.current = null
+          // Wait a brief moment for any pending DOM operations
+          setTimeout(() => {
+            try {
+              if (mapInstance.current === map) {
+                map.remove()
+                mapInstance.current = null
+                
+                // Clear development flag
+                if (process.env.NODE_ENV === 'development') {
+                  delete (window as any).__LEAFLET_MAP__
+                }
+                
+                console.log('🗺️ Map cleaned up successfully')
+              }
+            } catch (removeError) {
+              console.warn('⚠️ Map removal error:', removeError)
+              mapInstance.current = null
+              
+              // Ensure flag is cleared even on error
+              if (process.env.NODE_ENV === 'development') {
+                delete (window as any).__LEAFLET_MAP__
+              }
+            }
+          }, 50)
         }
       } catch (error) {
         console.warn('⚠️ Map cleanup error:', error)
         mapInstance.current = null // Ensure it's cleared even if removal fails
       }
     }
-  }, [mounted, petPosition.x, petPosition.y])
+  }, [mounted]) // Only depend on mounted to prevent re-initialization
 
   // Function to update marker sizes based on current zoom
   const updateMarkerSizes = () => {
@@ -396,7 +512,7 @@ export function MobileLeafletMap({
       }
       
       const currentZoom = map.getZoom()
-      const newSize = getSizeForZoom(currentZoom)
+      const zoomLevel = getZoomLevel(currentZoom)
 
       // Update beacon markers with enhanced error handling
       markersRef.current.beacons.forEach((marker, index) => {
@@ -406,7 +522,7 @@ export function MobileLeafletMap({
             // Check if marker DOM element still exists
             const markerElement = marker.getElement()
             if (markerElement && document.contains(markerElement)) {
-              const newIcon = createMarkerIcon('beacon', newSize, beacon.connected)
+              const newIcon = createMarkerIcon('beacon', zoomLevel, beacon.connected)
               marker.setIcon(newIcon)
             }
           }
@@ -421,7 +537,7 @@ export function MobileLeafletMap({
           const petMarker = markersRef.current.pet
           const markerElement = petMarker.getElement()
           if (markerElement && document.contains(markerElement)) {
-            const newIcon = createMarkerIcon('collar', newSize, true, isLive)
+            const newIcon = createMarkerIcon('collar', zoomLevel, true, isLive)
             petMarker.setIcon(newIcon)
           }
         } catch (error) {
@@ -433,13 +549,21 @@ export function MobileLeafletMap({
     }
   }
 
-  // Update markers when data changes
+  // Update markers when data changes (with optimization to prevent unnecessary updates)
   useEffect(() => {
-    if (!mounted || !mapInstance.current) return
+    if (!mounted || !mapInstance.current || isUnmounting.current) return
 
     const map = mapInstance.current
+    
+    // Validate map container still exists before proceeding
+    const container = map.getContainer()
+    if (!container || !document.contains(container)) {
+      console.warn('⚠️ Map container no longer exists, skipping marker update')
+      return
+    }
+    
     const currentZoom = map.getZoom()
-    const markerSize = getSizeForZoom(currentZoom)
+    const zoomLevel = getZoomLevel(currentZoom)
 
     // Clear existing markers
     markersRef.current.beacons.forEach(marker => map.removeLayer(marker))
@@ -487,7 +611,7 @@ export function MobileLeafletMap({
 
     // Add beacon markers
     beacons.forEach((beacon, index) => {
-      const beaconIcon = createMarkerIcon('beacon', markerSize, beacon.connected)
+      const beaconIcon = createMarkerIcon('beacon', zoomLevel, beacon.connected)
 
       const marker = L.marker([beacon.y, beacon.x], { 
         icon: beaconIcon,
@@ -633,7 +757,7 @@ export function MobileLeafletMap({
     })
 
     // Add pet marker (always on top)
-    const petIcon = createMarkerIcon('collar', markerSize, true, isLive)
+          const petIcon = createMarkerIcon('collar', zoomLevel, true, isLive)
 
     const petMarker = L.marker([petPosition.y, petPosition.x], { 
       icon: petIcon,
@@ -687,8 +811,12 @@ export function MobileLeafletMap({
 
     console.log(`🐾 Added collar marker for ${petName} at (${petPosition.x}, ${petPosition.y})`)
 
-    // Center map on pet
-    map.setView([petPosition.y, petPosition.x], currentZoom)
+    // Only center map on first render to prevent race conditions
+    if (firstRender.current) {
+      map.setView([petPosition.y, petPosition.x], currentZoom, { animate: false })
+      firstRender.current = false
+      console.log('🎯 Centered map on pet (first render only)')
+    }
     
     console.log(`🗺️ Map updated with ${markersRef.current.beacons.length} beacons + 1 collar marker`)
 
@@ -728,14 +856,29 @@ export function MobileLeafletMap({
     }
   }, [])
 
-  // Show loading state during SSR and initial mount
+  // Show enhanced loading state during SSR and initial mount
   if (!mounted) {
     return (
       <div className={`relative ${className} flex items-center justify-center`}>
-        <div className="w-full h-full min-h-[300px] bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-2 border-teal-200 border-t-teal-500 mx-auto mb-3" />
-            <p className="text-gray-600 dark:text-gray-400 text-sm font-medium">Loading map...</p>
+        <div className="w-full h-full min-h-[300px] bg-gradient-to-br from-slate-50 to-blue-50 rounded-2xl shadow-xl border border-slate-200/50 flex items-center justify-center overflow-hidden">
+          {/* Animated background */}
+          <div className="absolute inset-0 opacity-20">
+            <div className="absolute top-1/4 left-1/4 w-32 h-32 bg-teal-400 rounded-full blur-3xl animate-pulse" />
+            <div className="absolute bottom-1/3 right-1/4 w-24 h-24 bg-blue-400 rounded-full blur-3xl animate-pulse animation-delay-1000" />
+          </div>
+          
+          <div className="text-center relative z-10">
+            <div className="relative mb-4">
+              <div className="animate-spin rounded-full h-12 w-12 border-3 border-teal-200 border-t-teal-500 mx-auto" />
+              <div className="absolute inset-0 rounded-full border-2 border-teal-400/30 animate-ping" />
+            </div>
+            <h3 className="text-slate-700 text-lg font-semibold mb-2">Loading Interactive Map</h3>
+            <p className="text-slate-500 text-sm">Preparing your pet's location data...</p>
+            <div className="flex items-center justify-center gap-1 mt-3">
+              <div className="w-2 h-2 bg-teal-400 rounded-full animate-bounce" />
+              <div className="w-2 h-2 bg-teal-400 rounded-full animate-bounce animation-delay-200" />
+              <div className="w-2 h-2 bg-teal-400 rounded-full animate-bounce animation-delay-400" />
+            </div>
           </div>
         </div>
       </div>
@@ -743,11 +886,11 @@ export function MobileLeafletMap({
   }
 
   return (
-    <div className={`relative ${className}`}>
-      {/* Map container with optimized layout */}
+    <div className={`${className}`}>
+      {/* Full-bleed map container - Google Maps style */}
       <div 
         ref={mapRef} 
-        className="w-full h-full rounded-xl overflow-hidden mobile-map"
+        className="w-full h-full mobile-map"
       />
       
       {/* Enhanced CSS for markers and popups */}
@@ -766,10 +909,23 @@ export function MobileLeafletMap({
           z-index: 100 !important;
         }
         
+        /* Make sure every Leaflet pane is allowed to spill out */
+        .leaflet-marker-pane,
+        .leaflet-overlay-pane,
+        .leaflet-popup-pane,
+        .leaflet-tooltip-pane {
+          overflow: visible !important;
+        }
+        
+        /* Ensure proper z-index layering */
+        .leaflet-marker-pane {
+          z-index: 400 !important;
+        }
+        
         .leaflet-container {
           background: #f8f9fa !important;
           font-family: 'Inter', system-ui, sans-serif !important;
-          border-radius: 12px !important;
+          border-radius: 0 !important;
         }
         
         .custom-popup .leaflet-popup-content-wrapper {
@@ -856,10 +1012,13 @@ export function MobileLeafletMap({
           }
         }
         
-        /* Ensure map fills available space correctly */
+        /* Google Maps style full-bleed map */
         .mobile-map {
-          min-height: 300px !important;
-          position: relative !important;
+          position: absolute !important;
+          top: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
+          bottom: 0 !important;
           width: 100% !important;
           height: 100% !important;
         }
@@ -867,9 +1026,10 @@ export function MobileLeafletMap({
         .mobile-map .leaflet-container {
           height: 100% !important;
           width: 100% !important;
-          min-height: 300px !important;
-          position: relative !important;
-          transform: none !important; /* Remove any transform overrides */
+          position: absolute !important;
+          top: 0 !important;
+          left: 0 !important;
+          transform: none !important;
         }
         
         /* Touch optimization */

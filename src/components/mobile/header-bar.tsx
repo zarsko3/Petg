@@ -23,7 +23,7 @@ export default function HeaderBar() {
             </div>
             <div>
               <h1 className="text-lg font-bold text-gray-900 dark:text-white font-rounded">
-                Pet Collar
+                PETg
               </h1>
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 Keeping your pet safe
@@ -46,7 +46,7 @@ export default function HeaderBar() {
           </div>
           <div>
             <h1 className="text-lg font-bold text-gray-900 dark:text-white font-rounded">
-              Pet Collar
+              PETg
             </h1>
             <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
               Keeping your pet safe & happy

@@ -1,10 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { LiveCameraFrame } from '@/components/mobile/live-camera-frame'
+import { useRef, useState, useEffect } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useCollarPosition, useBeacons } from '@/hooks/useSmartCollarData'
+import { CameraHeader } from '@/components/mobile/camera-header'
+import { FloatingActionButtons } from '@/components/mobile/floating-action-buttons'
+import { BottomInfoPanel } from '@/components/mobile/bottom-info-panel'
 import dynamic from 'next/dynamic'
+import type L from 'leaflet'
 
 // Dynamically import components that use browser APIs
 const MobileLeafletMap = dynamic(() => import('@/components/mobile/leaflet-map').then(mod => ({ default: mod.MobileLeafletMap })), {
@@ -19,64 +22,42 @@ const MobileLeafletMap = dynamic(() => import('@/components/mobile/leaflet-map')
 export default function MobileLocationPage() {
   const { position } = useCollarPosition()
   const { beacons } = useBeacons()
+  const [mapRef, setMapRef] = useState<React.RefObject<L.Map> | null>(null)
+
+  const handleMapReady = (ref: React.RefObject<L.Map>) => {
+    setMapRef(ref)
+  }
+
+
   
   return (
-    <main className="flex flex-col h-screen bg-gradient-to-br from-slate-50 to-blue-50 overflow-hidden">
-      {/* Camera Frame - Fixed height at top */}
-      <section className="flex-shrink-0 w-full" style={{ height: 'min(40vh, 240px)' }}>
-        <LiveCameraFrame className="w-full h-full" />
-      </section>
+    <div className="flex flex-col h-screen bg-gray-50">
+      {/* Camera Header Component - Fixed at top */}
+      <div className="flex-shrink-0 relative z-30">
+        <CameraHeader beacons={beacons} position={position} />
+      </div>
 
-      {/* Map Container - Fills all remaining space */}
-      <section className="flex-1 relative overflow-hidden w-full">
-        {/* Action Buttons */}
-        <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
-          <button
-            onClick={() => window.location.href = '/mobile/zones'}
-            className="bg-gradient-to-r from-orange-500 to-amber-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 text-sm font-medium hover:from-orange-600 hover:to-amber-700 transition-all duration-200"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-              <circle cx="12" cy="10" r="3"/>
-            </svg>
-            Safety Zones
-          </button>
-          <button
-            onClick={() => window.location.href = '/mobile/setup/rooms'}
-            className="bg-gradient-to-r from-violet-500 to-purple-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 text-sm font-medium hover:from-violet-600 hover:to-purple-700 transition-all duration-200"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-              <polyline points="9,22 9,12 15,12 15,22"/>
-            </svg>
-            Setup Rooms
-          </button>
-        </div>
-
-        {/* Refresh Button */}
-        <div className="absolute top-4 left-4 z-[1000]">
-          <button
-            onClick={() => window.location.reload()}
-            className="bg-white/90 hover:bg-white text-gray-700 p-2 rounded-lg shadow-lg transition-all duration-200"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
-              <path d="M21 3v5h-5"/>
-              <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
-              <path d="M3 21v-5h5"/>
-            </svg>
-          </button>
-        </div>
-
-        {/* Map takes full remaining space */}
-        <div className="w-full h-full">
+      {/* Main content area - Properly bounded map section */}
+      <div className="flex-1 relative bg-gray-50 p-4 overflow-visible">
+        {/* Map container - Contained with rounded corners and shadow */}
+        <div className="relative h-full bg-white rounded-2xl shadow-lg overflow-visible border border-gray-200/50">
           <MobileLeafletMap 
             beacons={beacons}
             petPosition={position}
             petName="Buddy"
+            className="w-full h-full rounded-2xl"
+            onMapReady={handleMapReady}
           />
         </div>
-      </section>
-    </main>
+        
+        {/* Floating Action Buttons - Positioned outside map container with high z-index */}
+        <FloatingActionButtons position={position} mapRef={mapRef} />
+      </div>
+
+      {/* Bottom Info Panel - Above mobile navigation with proper spacing */}
+      <div className="flex-shrink-0 relative z-20 pb-[env(safe-area-inset-bottom)]">
+        <BottomInfoPanel position={position} />
+      </div>
+    </div>
   )
 } 

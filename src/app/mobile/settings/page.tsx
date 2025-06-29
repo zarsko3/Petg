@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Plus, Bluetooth, Zap, MapPin, Bell, Palette, Info } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -22,10 +22,16 @@ interface SettingsSection {
 
 export default function MobileSettingsPage() {
   const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
   const [showPairDialog, setShowPairDialog] = useState(false)
   const [notificationsEnabled, setNotificationsEnabled] = useState(true)
   const { collars, isLoading, refresh } = useMobileCollars()
   const { status, connect, disconnect } = useCollarConnection()
+
+  // Prevent hydration mismatch by only showing theme-dependent content after mount
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const handleThemeToggle = () => {
     setTheme(theme === 'dark' ? 'light' : 'dark')
@@ -248,10 +254,14 @@ export default function MobileSettingsPage() {
                     Switch between light and dark appearance
                   </p>
                 </div>
-                <Switch
-                  checked={theme === 'dark'}
-                  onCheckedChange={handleThemeToggle}
-                />
+                {!mounted ? (
+                  <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
+                ) : (
+                  <Switch
+                    checked={theme === 'dark'}
+                    onCheckedChange={handleThemeToggle}
+                  />
+                )}
               </div>
             </Card>
 

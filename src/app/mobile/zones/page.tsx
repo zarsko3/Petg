@@ -206,7 +206,7 @@ export default function MobileZonesPage() {
               No Safety Zones Yet
             </h3>
             <p className="text-gray-500 dark:text-gray-400 mb-6">
-              No safety zones yet—tap ➕ to add one.
+              Create your first safety zone to start protecting your pet
             </p>
             <Button
               onClick={() => {
