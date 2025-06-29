@@ -144,7 +144,8 @@ struct SimpleWiFiCredentials {
 };
 
 SimpleWiFiCredentials wifiNetworks[] = {
-    {PREFERRED_SSID, PREFERRED_PASSWORD, "Primary Network"}
+    {PREFERRED_SSID, PREFERRED_PASSWORD, "Primary Network"},
+    {"g@n", "0547530732", "Backup Network"}
     // Add more real networks here as needed
     // {SECONDARY_SSID, SECONDARY_PASSWORD, "Secondary Network"}
 };

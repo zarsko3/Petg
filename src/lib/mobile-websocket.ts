@@ -1,6 +1,7 @@
 'use client'
 
 import { toast } from 'sonner'
+import { getMQTTClient } from '@/lib/mqtt-client'
 
 export interface CollarWebSocketData {
   type: 'status' | 'location' | 'alert' | 'battery' | 'activity'
@@ -22,7 +23,7 @@ export interface CollarWebSocketData {
 }
 
 export class MobileWebSocketService {
-  private ws: WebSocket | null = null
+  private mqttClient = getMQTTClient()
   private reconnectAttempts = 0
   private maxReconnectAttempts = 5
   private reconnectInterval = 1000
@@ -36,26 +37,11 @@ export class MobileWebSocketService {
 
   private connect() {
     try {
-      // 🔄 PROXY: Use same-origin proxy for collar WebSocket
-      let wsUrl: string;
+      console.log('📱 Mobile: Connecting via MQTT cloud...')
       
-      if (this.url === 'auto' || this.url.includes('collar')) {
-        // Use Vercel proxy for collar connections
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        wsUrl = `${protocol}//${window.location.host}/ws`;
-        console.log('📱 MobileWebSocket: Using Vercel proxy for collar connection');
-      } else {
-        // Legacy URL handling for non-collar WebSockets
-        wsUrl = window.location.protocol === 'https:' 
-          ? this.url.replace('ws://', 'wss://') 
-          : this.url;
-      }
-
-      console.log(`🔗 MobileWebSocket: Connecting to ${wsUrl}`);
-      this.ws = new WebSocket(wsUrl)
-      
-      this.ws.onopen = () => {
-        console.log('Mobile WebSocket connected')
+      // Set up MQTT event handlers
+      this.mqttClient.onConnect = () => {
+        console.log('📱 Mobile MQTT connected')
         this.isConnected = true
         this.reconnectAttempts = 0
         this.startHeartbeat()
@@ -64,19 +50,36 @@ export class MobileWebSocketService {
           timestamp: new Date().toISOString(),
           data: { heartbeat: true }
         })
+        toast.success('Connected to collar via cloud')
       }
 
-      this.ws.onmessage = (event) => {
-        try {
-          const data: CollarWebSocketData = JSON.parse(event.data)
-          this.handleMessage(data)
-        } catch (error) {
-          console.error('Failed to parse WebSocket message:', error)
+      this.mqttClient.onCollarTelemetry = (collarId: string, data: any) => {
+        const mobileData: CollarWebSocketData = {
+          type: 'status',
+          timestamp: new Date().toISOString(),
+          data: {
+            battery_level: data.battery_level,
+            heartbeat: true,
+            ...data
+          }
         }
+        this.handleMessage(mobileData)
       }
 
-      this.ws.onclose = () => {
-        console.log('Mobile WebSocket disconnected')
+      this.mqttClient.onCollarStatus = (collarId: string, data: any) => {
+        const mobileData: CollarWebSocketData = {
+          type: 'status',
+          timestamp: new Date().toISOString(),
+          data: {
+            heartbeat: data.status === 'online',
+            ...data
+          }
+        }
+        this.handleMessage(mobileData)
+      }
+
+      this.mqttClient.onDisconnect = () => {
+        console.log('📱 Mobile MQTT disconnected')
         this.isConnected = false
         this.stopHeartbeat()
         this.emit('connection', { 
@@ -87,14 +90,18 @@ export class MobileWebSocketService {
         this.attemptReconnect()
       }
 
-      this.ws.onerror = (error) => {
-        console.error('Mobile WebSocket error:', error)
+      this.mqttClient.onError = (error: Error) => {
+        console.error('📱 Mobile MQTT error:', error)
         if (this.reconnectAttempts === 0) {
           toast.error('Connection to collar lost. Attempting to reconnect...')
         }
       }
+
+      // Check initial connection status
+      this.isConnected = this.mqttClient.getConnectionStatus().connected
+      
     } catch (error) {
-      console.error('Failed to create WebSocket connection:', error)
+      console.error('Failed to setup MQTT connection:', error)
       this.attemptReconnect()
     }
   }
@@ -135,10 +142,9 @@ export class MobileWebSocketService {
 
   private startHeartbeat() {
     this.heartbeatInterval = setInterval(() => {
-      if (this.ws && this.isConnected) {
-        this.ws.send(JSON.stringify({ type: 'ping' }))
-      }
-    }, 30000) // Send heartbeat every 30 seconds
+      // MQTT handles heartbeat automatically
+      console.log('📱 Mobile: MQTT heartbeat check')
+    }, 30000) // Check heartbeat every 30 seconds
   }
 
   private stopHeartbeat() {
@@ -195,10 +201,11 @@ export class MobileWebSocketService {
   }
 
   public send(data: any) {
-    if (this.ws && this.isConnected) {
-      this.ws.send(JSON.stringify(data))
+    if (this.isConnected) {
+      console.log('📱 Mobile: Sending MQTT command:', data)
+      // TODO: Send command via MQTT when collar command topics are implemented
     } else {
-      console.warn('WebSocket not connected, cannot send data')
+      console.warn('MQTT not connected, cannot send data')
     }
   }
 
@@ -207,12 +214,9 @@ export class MobileWebSocketService {
   }
 
   public disconnect() {
-    if (this.ws) {
-      this.stopHeartbeat()
-      this.ws.close()
-      this.ws = null
-      this.isConnected = false
-    }
+    this.stopHeartbeat()
+    this.mqttClient.disconnect()
+    this.isConnected = false
   }
 
   // Mobile-specific methods

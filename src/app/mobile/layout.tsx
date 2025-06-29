@@ -3,7 +3,7 @@
 import './mobile-globals.css'
 import { Inter } from 'next/font/google'
 import { ThemeProvider } from '@/components/theme-provider'
-import { CollarConnectionProvider } from '@/context/CollarConnectionContext'
+import { CollarServiceProvider } from '@/components/collar-service-provider'
 import { Toaster } from 'sonner'
 import BottomNavBar from '@/components/mobile/bottom-nav-bar'
 import HeaderBar from '@/components/mobile/header-bar'
@@ -18,7 +18,7 @@ export default function MobileLayout({
 }) {
   return (
     <ThemeProvider>
-      <CollarConnectionProvider>
+      <CollarServiceProvider>
         <div className={`${inter.className} mobile-layout bg-pet-surface min-h-screen`}>
           {/* Fixed Header */}
           <HeaderBar />
@@ -49,7 +49,7 @@ export default function MobileLayout({
             }}
           />
         </div>
-      </CollarConnectionProvider>
+      </CollarServiceProvider>
     </ThemeProvider>
   )
 } 
