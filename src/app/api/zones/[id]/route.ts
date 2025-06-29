@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs'
 import { ZoneSchema, ZoneCreateSchema } from '@/lib/types'
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { supabase, supabaseConfig } from '@/lib/supabase'
 
 interface RouteParams {
   params: {
@@ -30,7 +25,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     console.log('📋 Fetching zone:', zoneId)
 
     // Return mock data if Supabase is not configured
-    if (!supabase) {
+    if (!supabaseConfig.hasKey) {
       // Return a demo zone if requested
       if (zoneId === 'demo_zone_1') {
         const mockZone = {
@@ -120,7 +115,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const updates = ZoneCreateSchema.partial().parse(body)
 
     // Handle mock data updates
-    if (!supabase || zoneId === 'demo_zone_1') {
+    if (!supabaseConfig.hasKey || zoneId === 'demo_zone_1') {
       console.log('📝 Mock zone update for:', zoneId)
       const mockZone = {
         id: zoneId,

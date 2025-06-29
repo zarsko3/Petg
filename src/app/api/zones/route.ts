@@ -1,19 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs'
 import { ZoneSchema, ZoneCreateSchema } from '@/lib/types'
-import { createClient } from '@supabase/supabase-js'
-
-// Check if Supabase is configured
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-if (!supabaseUrl || !supabaseKey) {
-  console.warn('⚠️ Supabase not configured, using mock data')
-}
-
-const supabase = supabaseUrl && supabaseKey 
-  ? createClient(supabaseUrl, supabaseKey)
-  : null
+import { supabase, supabaseConfig } from '@/lib/supabase'
 
 export async function GET(request: NextRequest) {
   try {
@@ -33,7 +21,7 @@ export async function GET(request: NextRequest) {
     console.log('📋 Fetching zones for user:', userId)
 
     // Return mock data if Supabase is not configured
-    if (!supabase) {
+    if (!supabaseConfig.hasKey) {
       console.log('📝 Using mock zones data')
       const mockZones = [
         {
@@ -175,7 +163,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Return mock data if Supabase is not configured
-    if (!supabase) {
+    if (!supabaseConfig.hasKey) {
       console.log('📝 Creating mock zone')
       const mockZone = {
         id: `zone_${Date.now()}`,

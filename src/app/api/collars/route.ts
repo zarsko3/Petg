@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs'
 import { CollarSchema } from '@/lib/types'
-import { createClient } from '@supabase/supabase-js'
+import { supabase, supabaseConfig } from '@/lib/supabase'
 
 // Mock data for demo when Supabase not configured
 const DEMO_COLLARS = [
@@ -24,15 +24,10 @@ const DEMO_COLLARS = [
   }
 ]
 
-// Initialize Supabase only if environment variables are available
-const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
-  ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
-  : null
-
 export async function GET(request: NextRequest) {
   try {
     // Check if Supabase is configured
-    if (!supabase) {
+    if (!supabaseConfig.hasKey) {
       console.log('⚠️ Supabase not configured, using mock data')
       return NextResponse.json(DEMO_COLLARS)
     }
