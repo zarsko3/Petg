@@ -4,30 +4,7 @@
       "maxDuration": 30
     }
   },
-  "rewrites": [
-    {
-      "source": "/ws",
-      "destination": "https://collar.ngrok-free.app"
-    }
-  ],
   "headers": [
-    {
-      "source": "/ws",
-      "headers": [
-        {
-          "key": "Connection",
-          "value": "upgrade"
-        },
-        {
-          "key": "Upgrade", 
-          "value": "websocket"
-        },
-        {
-          "key": "Sec-WebSocket-Protocol",
-          "value": "*"
-        }
-      ]
-    },
     {
       "source": "/api/(.*)",
       "headers": [

@@ -1,61 +1,50 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
+import React, { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+// import { Alert, AlertDescription } from '@/components/ui/alert';  // Not available
 import { ChevronDown, ChevronRight, Settings2, Globe, CheckCircle } from 'lucide-react';
-import { getCollarService } from '@/lib/collar-websocket-service';
+import { usePetgStore } from '@/lib/store';
 
 export function MinimalManualConnection() {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [collarIP, setCollarIP] = useState('192.168.1.35');
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
-  const [lastResult, setLastResult] = useState('');
+  const [ip, setIp] = useState('');
+  const [status, setStatus] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
+  const [error, setError] = useState<string | null>(null);
   const [manualConnectionActive, setManualConnectionActive] = useState(false);
 
-  const collarService = getCollarService();
+  // Get MQTT connection state from global store
+  const isConnected = usePetgStore((state) => state.isCollarConnected);
+  const connectionStatus = usePetgStore((state) => state.connectionStatus);
+  const demoMode = usePetgStore((state) => state.demoMode);
 
   useEffect(() => {
-    const checkStatus = () => {
-      const status = collarService.getStatus();
-      setIsConnected(status === 'connected');
-    };
-    
-    checkStatus();
-    const interval = setInterval(checkStatus, 2000);
-    return () => clearInterval(interval);
-  }, [collarService]);
+    // Update status based on MQTT connection state
+    if (isConnected && !demoMode) {
+      setStatus('connected');
+      setError(null);
+    } else if (connectionStatus === 'Connecting') {
+      setStatus('connecting');
+    } else if (connectionStatus === 'Failed') {
+      setStatus('error');
+      setError('MQTT connection failed');
+    } else {
+      setStatus('idle');
+    }
+  }, [isConnected, connectionStatus, demoMode]);
 
   const handleConnect = async () => {
-    setIsConnecting(true);
-    setLastResult('');
-
-    try {
-      // Cache the WebSocket URL in localStorage for other components
-      const wsUrl = `ws://${collarIP}:8080`;
-      localStorage.setItem('petg.wsUrl', wsUrl);
-      console.log(`✅ Manual IP ${collarIP} cached in localStorage`);
-
-      // Connect via WebSocket service
-      await collarService.connectToIP(collarIP);
-      
-      setManualConnectionActive(true);
-      setLastResult('✅ Connected successfully');
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Connection failed';
-      setLastResult(`❌ ${errorMsg}`);
-      // Remove failed URL from cache
-      localStorage.removeItem('petg.wsUrl');
-    } finally {
-      setIsConnecting(false);
-    }
+    // Disable manual WebSocket connections - using MQTT cloud connectivity
+    console.log('🚫 Manual WebSocket connection disabled - using MQTT cloud connectivity');
+    setError('Manual connections disabled - using MQTT cloud connectivity via HiveMQ');
   };
 
   const handleDisconnect = () => {
-    collarService.disconnect();
-    setManualConnectionActive(false);
-    setLastResult('🔌 Disconnected');
+    // Disable manual WebSocket disconnections - using MQTT cloud connectivity
+    console.log('🚫 Manual WebSocket disconnect disabled - MQTT handles connections');
+    setError('Manual disconnections disabled - MQTT cloud connectivity is always active');
   };
 
   return (
@@ -83,47 +72,59 @@ export function MinimalManualConnection() {
 
       {isExpanded && (
         <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg space-y-4">
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 flex items-center gap-1">
-              <Globe className="h-3 w-3" />
-              Manual IP Address
-            </label>
-            <div className="flex gap-2">
+          <h3 className="text-lg font-semibold mb-4">Manual Collar Connection</h3>
+          
+          {/* Show MQTT connectivity status */}
+          <div className="mb-4">
+            🌐 <strong>MQTT Cloud Connectivity Active</strong><br/>
+            Manual WebSocket connections have been disabled. The collar now connects via MQTT cloud service (HiveMQ).<br/>
+            {isConnected && !demoMode ? '✅ Live collar data is active' : '📡 Awaiting collar connection via MQTT...'}
+          </div>
+          
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="collar-ip">Collar IP Address</Label>
               <Input
-                value={collarIP}
-                onChange={(e) => setCollarIP(e.target.value)}
-                placeholder="e.g., 192.168.1.35"
-                className="text-sm h-8"
-                disabled={isConnecting}
+                id="collar-ip"
+                value={ip}
+                onChange={(e) => setIp(e.target.value)}
+                placeholder="192.168.1.100"
+                disabled={true}  // Disabled since we're using MQTT
               />
-              {isConnected ? (
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={handleDisconnect}
-                  className="h-8 text-xs"
-                >
-                  Disconnect
-                </Button>
-              ) : (
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={handleConnect}
-                  disabled={isConnecting || !collarIP}
-                  className="h-8 text-xs"
-                >
-                  {isConnecting ? 'Connecting...' : 'Connect'}
-                </Button>
-              )}
+            </div>
+
+            <div className="flex space-x-2">
+              <Button 
+                onClick={handleConnect}
+                disabled={true}  // Disabled since we're using MQTT
+                variant="outline"
+              >
+                Connect (Disabled - Using MQTT)
+              </Button>
+              <Button 
+                onClick={handleDisconnect}
+                disabled={true}  // Disabled since we're using MQTT
+                variant="outline"
+              >
+                Disconnect (Disabled - Using MQTT)
+              </Button>
+            </div>
+
+            {error && (
+              <div className="text-red-600">
+                {error}
+              </div>
+            )}
+
+            <div className="text-sm text-gray-600">
+              <strong>Connection Status:</strong> {
+                isConnected && !demoMode ? 'Connected via MQTT' :
+                demoMode ? 'Demo Mode (MQTT pending)' :
+                connectionStatus === 'Connecting' ? 'Connecting via MQTT...' :
+                'Awaiting MQTT connection'
+              }
             </div>
           </div>
-
-          {lastResult && (
-            <div className="text-xs p-2 bg-white dark:bg-gray-800 rounded border font-mono">
-              {lastResult}
-            </div>
-          )}
 
           <p className="text-xs text-gray-500 dark:text-gray-400">
             Use this to connect directly to a specific collar IP address, bypassing automatic discovery.

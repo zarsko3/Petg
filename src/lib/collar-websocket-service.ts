@@ -47,13 +47,18 @@ class CollarWebSocketService {
   private isDestroyed = false;
   
   constructor() {
+    // 🚫 DISABLED: WebSocket service disabled - using MQTT cloud connectivity instead
+    console.log('🚫 CollarWebSocketService: Disabled - using MQTT cloud connectivity via CollarServiceProvider');
+    console.log('📡 MQTT handles all collar communication through HiveMQ Cloud');
+    
+    // Don't start any connections - MQTT handles everything
     // Delay initial connection to allow for existing connections to be detected
-    setTimeout(() => {
-      if (!this.isDestroyed && this.status === 'disconnected') {
-        console.log('🚀 CollarService: Starting initial connection after delay...');
-        this.connect();
-      }
-    }, 2000); // 2 second delay to avoid immediate scanning
+    // setTimeout(() => {
+    //   if (!this.isDestroyed && this.status === 'disconnected') {
+    //     console.log('🚀 CollarService: Starting initial connection after delay...');
+    //     this.connect();
+    //   }
+    // }, 2000); // 2 second delay to avoid immediate scanning
   }
 
   // 🔄 PROXY: Get WebSocket URL using same-origin proxy
@@ -82,6 +87,20 @@ class CollarWebSocketService {
 
   // Connect to collar WebSocket
   async connect(skipDiscovery: boolean = false) {
+    // 🚫 DISABLED: WebSocket connections disabled - using MQTT cloud connectivity instead
+    console.log('🚫 CollarWebSocketService.connect(): Disabled - using MQTT cloud connectivity');
+    console.log('📡 All collar communication now handled by CollarServiceProvider via MQTT');
+    console.log('🔗 Use CollarServiceProvider context for live collar data');
+    
+    // Set status to indicate WebSocket service is disabled
+    this.setStatus('disconnected');
+    this.lastError = 'WebSocket service disabled - using MQTT';
+    this.updateStore();
+    
+    // Reject with informative message
+    throw new Error('WebSocket service disabled - using MQTT cloud connectivity via CollarServiceProvider');
+    
+    /* ORIGINAL CODE DISABLED:
     if (this.isDestroyed || this.status === 'connecting') {
       console.log('🔄 CollarService: Connect called but already connecting or destroyed');
       return;
@@ -253,6 +272,7 @@ class CollarWebSocketService {
       
       throw error;
     }
+    */
   }
 
   // Disconnect from collar
