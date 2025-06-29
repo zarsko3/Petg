@@ -11,6 +11,7 @@
  * ✅ Advanced WiFi management with multi-network support
  * ✅ Sophisticated BLE beacon scanning and proximity detection
  * ✅ Real-time WebSocket communication with live dashboard updates
+ * ✅ MQTT cloud integration for remote monitoring
  * ✅ OLED display with intelligent status management  
  * ✅ Battery monitoring and power management
  * ✅ Professional alert system with configurable triggers
@@ -39,6 +40,10 @@
 #include <esp_system.h>
 #include <ESPmDNS.h>
 #include <WiFiUdp.h>
+
+// ==================== MQTT CLOUD INTEGRATION ====================
+#include <WiFiClientSecure.h>
+#include <PubSubClient.h>
 
 // ==================== DEBUG FLAGS ====================
 // Debug flags are now defined in ESP32_S3_Config.h
@@ -71,6 +76,17 @@
 #define HARDWARE_PLATFORM "ESP32-S3"
 #define BUILD_DATE __DATE__ " " __TIME__
 
+// ==================== MQTT CLOUD CONFIGURATION ====================
+// Edit these settings for your HiveMQ Cloud instance
+#define ENABLE_MQTT_CLOUD true                    // Set to false to disable MQTT
+#define MQTT_SERVER "ab14d5df84884fd68d24d7d25cc78f2f.s1.eu.hivemq.cloud"
+#define MQTT_PORT 8883                           // TLS port
+#define MQTT_USER "zarsko"
+#define MQTT_PASSWORD "089430732zG"
+#define DEVICE_ID "001"                          // Unique collar ID
+#define MQTT_TELEMETRY_INTERVAL 30000           // 30 seconds
+#define MQTT_HEARTBEAT_INTERVAL 60000           // 1 minute
+
 // Display configuration
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 32
@@ -92,6 +108,22 @@ WebSocketsServer webSocket(8080);
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET_PIN);
 Preferences preferences;
 BLEScan* pBLEScan = nullptr;
+
+// ==================== MQTT CLOUD OBJECTS ====================
+WiFiClientSecure mqttSecureClient;
+PubSubClient mqttClient(mqttSecureClient);
+
+// MQTT state tracking
+struct MQTTState {
+    bool connected = false;
+    bool enabled = ENABLE_MQTT_CLOUD;
+    unsigned long lastTelemetry = 0;
+    unsigned long lastHeartbeat = 0;
+    unsigned long lastReconnect = 0;
+    int reconnectAttempts = 0;
+    int messagesPublished = 0;
+    int connectionFailures = 0;
+} mqttState;
 
 // Network discovery
 WiFiUDP udp;
@@ -118,6 +150,263 @@ SimpleWiFiCredentials wifiNetworks[] = {
 };
 const int numNetworks = sizeof(wifiNetworks) / sizeof(wifiNetworks[0]);
 int currentNetworkIndex = -1;
+
+// ==================== MQTT CLOUD FUNCTIONS ====================
+
+/**
+ * @brief Initialize MQTT cloud connection
+ */
+void initializeMQTTCloud() {
+    if (!mqttState.enabled) {
+        Serial.println("📡 MQTT Cloud disabled in configuration");
+        return;
+    }
+    
+    Serial.println("🌐 Initializing MQTT Cloud connection...");
+    
+    // Configure TLS (for production, add proper certificates)
+    mqttSecureClient.setInsecure(); // OK for pilot testing
+    
+    // Set MQTT server
+    mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
+    mqttClient.setCallback(onMqttMessage);
+    mqttClient.setKeepAlive(60);
+    mqttClient.setSocketTimeout(15);
+    
+    Serial.printf("📡 MQTT Server: %s:%d\n", MQTT_SERVER, MQTT_PORT);
+}
+
+/**
+ * @brief Connect to MQTT cloud broker
+ */
+void connectToMQTTCloud() {
+    if (!mqttState.enabled || !WiFi.isConnected()) return;
+    
+    // Avoid rapid reconnection attempts
+    if (millis() - mqttState.lastReconnect < 5000) return;
+    mqttState.lastReconnect = millis();
+    
+    Serial.println("🔗 Attempting MQTT cloud connection...");
+    
+    // Generate unique client ID
+    String clientId = "PetCollar-" + String(DEVICE_ID) + "-" + String(random(0xffff), HEX);
+    
+    // Last Will and Testament
+    String statusTopic = "pet-collar/" + String(DEVICE_ID) + "/status";
+    String offlineMessage = "{\"device_id\":\"" + String(DEVICE_ID) + "\",\"status\":\"offline\",\"timestamp\":" + String(millis()) + "}";
+    
+    if (mqttClient.connect(clientId.c_str(), MQTT_USER, MQTT_PASSWORD,
+                          statusTopic.c_str(), 1, true, offlineMessage.c_str())) {
+        Serial.println("✅ MQTT Cloud connected!");
+        mqttState.connected = true;
+        mqttState.reconnectAttempts = 0;
+        
+        // Subscribe to command topics
+        String commandTopic = "pet-collar/" + String(DEVICE_ID) + "/command/+";
+        mqttClient.subscribe(commandTopic.c_str(), 1);
+        
+        // Publish online status
+        publishMQTTStatus("online");
+        
+        Serial.printf("📡 Subscribed to commands for device %s\n", DEVICE_ID);
+        
+    } else {
+        Serial.printf("❌ MQTT connection failed, rc=%d\n", mqttClient.state());
+        mqttState.connected = false;
+        mqttState.connectionFailures++;
+        mqttState.reconnectAttempts++;
+        
+        // Disable MQTT after too many failures
+        if (mqttState.reconnectAttempts > 10) {
+            Serial.println("⚠️ Too many MQTT failures, disabling for this session");
+            mqttState.enabled = false;
+        }
+    }
+}
+
+/**
+ * @brief Handle incoming MQTT messages
+ */
+void onMqttMessage(char* topic, byte* payload, unsigned int length) {
+    String topicStr = String(topic);
+    String message = "";
+    
+    for (int i = 0; i < length; i++) {
+        message += (char)payload[i];
+    }
+    
+    Serial.printf("📨 MQTT Command: %s = %s\n", topic, message.c_str());
+    
+    // Parse JSON command
+    DynamicJsonDocument doc(1024);
+    if (deserializeJson(doc, message) != DeserializationError::Ok) {
+        Serial.println("❌ Invalid JSON in MQTT command");
+        return;
+    }
+    
+    // Handle different command types
+    if (topicStr.indexOf("/command/buzz") > 0) {
+        int duration = doc["duration_ms"] | 3000;
+        String pattern = doc["pattern"] | "pulse";
+        
+        // Use existing alert system with cloud command
+        alertManager.startAlert(AlertReason::REMOTE_COMMAND, AlertMode::BUZZER);
+        Serial.printf("🔊 Cloud buzzer command: %dms, pattern: %s\n", duration, pattern.c_str());
+        
+    } else if (topicStr.indexOf("/command/zone") > 0) {
+        String action = doc["action"] | "status";
+        
+        if (action == "list") {
+            // Publish zone information using existing ZoneManager
+            publishZoneStatus();
+        } else if (action == "alert") {
+            String zoneId = doc["zone_id"] | "";
+            alertManager.startAlert(AlertReason::ZONE_BREACH, AlertMode::BOTH);
+        }
+        
+    } else if (topicStr.indexOf("/command/locate") > 0) {
+        // Trigger location beacon using existing triangulator
+        alertManager.startAlert(AlertReason::LOCATE_REQUEST, AlertMode::BOTH);
+        publishCurrentLocation();
+    }
+}
+
+/**
+ * @brief Publish status to MQTT cloud
+ */
+void publishMQTTStatus(String status) {
+    if (!mqttState.connected) return;
+    
+    DynamicJsonDocument doc(512);
+    doc["device_id"] = String(DEVICE_ID);
+    doc["status"] = status;
+    doc["timestamp"] = millis();
+    doc["ip_address"] = WiFi.localIP().toString();
+    doc["firmware_version"] = FIRMWARE_VERSION;
+    
+    String message;
+    serializeJson(doc, message);
+    
+    String topic = "pet-collar/" + String(DEVICE_ID) + "/status";
+    mqttClient.publish(topic.c_str(), message.c_str(), true);
+    mqttState.messagesPublished++;
+}
+
+/**
+ * @brief Publish comprehensive telemetry to MQTT cloud
+ */
+void publishMQTTTelemetry() {
+    if (!mqttState.connected) return;
+    
+    DynamicJsonDocument doc(2048);
+    
+    // Basic device info
+    doc["device_id"] = String(DEVICE_ID);
+    doc["timestamp"] = millis();
+    doc["uptime"] = millis() - bootTime;
+    doc["firmware_version"] = FIRMWARE_VERSION;
+    doc["free_heap"] = ESP.getFreeHeap();
+    
+    // Network status
+    doc["wifi_connected"] = WiFi.isConnected();
+    doc["wifi_rssi"] = WiFi.RSSI();
+    doc["local_ip"] = WiFi.localIP().toString();
+    
+    // System status from existing SystemStateManager
+    doc["system_state"] = systemStateManager.getCurrentState();
+    doc["battery_level"] = systemStateManager.getBatteryLevel();
+    doc["alert_active"] = alertManager.isAlertActive();
+    
+    // Zone information from existing ZoneManager
+    JsonObject zones = doc.createNestedObject("zones");
+    zones["total_zones"] = zoneManager.getZoneCount();
+    zones["current_zone"] = zoneManager.getCurrentZone();
+    zones["zone_breaches"] = zoneManager.getBreachCount();
+    
+    // Beacon data from existing BeaconManager
+    JsonObject beacons = doc.createNestedObject("beacons");
+    beacons["detected_count"] = beaconManager.getDetectedBeaconCount();
+    beacons["active_beacons"] = beaconManager.getActiveBeaconCount();
+    beacons["last_scan"] = beaconManager.getLastScanTime();
+    
+    // Position data from existing Triangulator
+    if (triangulator.isReady()) {
+        JsonObject position = doc.createNestedObject("position");
+        auto lastPos = triangulator.getLastPosition();
+        position["x"] = lastPos.position.x;
+        position["y"] = lastPos.position.y;
+        position["confidence"] = lastPos.confidence;
+        position["accuracy"] = lastPos.accuracy;
+    }
+    
+    String message;
+    serializeJson(doc, message);
+    
+    String topic = "pet-collar/" + String(DEVICE_ID) + "/telemetry";
+    mqttClient.publish(topic.c_str(), message.c_str());
+    mqttState.messagesPublished++;
+    mqttState.lastTelemetry = millis();
+}
+
+/**
+ * @brief Publish zone status using existing ZoneManager
+ */
+void publishZoneStatus() {
+    if (!mqttState.connected) return;
+    
+    String zonesJson = zoneManager.getStatusJson();
+    String topic = "pet-collar/" + String(DEVICE_ID) + "/zones";
+    mqttClient.publish(topic.c_str(), zonesJson.c_str());
+}
+
+/**
+ * @brief Publish current location using existing Triangulator
+ */
+void publishCurrentLocation() {
+    if (!mqttState.connected || !triangulator.isReady()) return;
+    
+    auto lastPos = triangulator.getLastPosition();
+    
+    DynamicJsonDocument doc(512);
+    doc["device_id"] = String(DEVICE_ID);
+    doc["timestamp"] = millis();
+    doc["position"]["x"] = lastPos.position.x;
+    doc["position"]["y"] = lastPos.position.y;
+    doc["confidence"] = lastPos.confidence;
+    doc["accuracy"] = lastPos.accuracy;
+    doc["method"] = "triangulation";
+    
+    String message;
+    serializeJson(doc, message);
+    
+    String topic = "pet-collar/" + String(DEVICE_ID) + "/location";
+    mqttClient.publish(topic.c_str(), message.c_str());
+}
+
+/**
+ * @brief Check MQTT connection and maintain
+ */
+void maintainMQTTConnection() {
+    if (!mqttState.enabled) return;
+    
+    if (!mqttClient.connected()) {
+        mqttState.connected = false;
+        connectToMQTTCloud();
+    } else {
+        mqttClient.loop();
+        
+        // Periodic telemetry
+        if (millis() - mqttState.lastTelemetry > MQTT_TELEMETRY_INTERVAL) {
+            publishMQTTTelemetry();
+        }
+        
+        // Periodic heartbeat
+        if (millis() - mqttState.lastHeartbeat > MQTT_HEARTBEAT_INTERVAL) {
+            publishMQTTStatus("online");
+            mqttState.lastHeartbeat = millis();
+        }
+    }
+}
 
 // ==================== BLE CALLBACK IMPLEMENTATION ====================
 /**
@@ -163,6 +452,23 @@ public:
         
         // Update system statistics
         systemStateManager.updateBeaconStats(1);
+        
+        // Send beacon detection to MQTT cloud
+        if (mqttState.connected) {
+            DynamicJsonDocument doc(512);
+            doc["device_id"] = String(DEVICE_ID);
+            doc["timestamp"] = millis();
+            doc["beacon_name"] = beacon.name;
+            doc["rssi"] = beacon.rssi;
+            doc["distance"] = beacon.distance;
+            doc["confidence"] = beacon.confidence;
+            
+            String message;
+            serializeJson(doc, message);
+            
+            String topic = "pet-collar/" + String(DEVICE_ID) + "/beacon-detection";
+            mqttClient.publish(topic.c_str(), message.c_str());
+        }
     }
 };
 
@@ -198,13 +504,6 @@ bool scanI2CBus() {
     
     if (DEBUG_I2C) {
         Serial.printf("📊 I2C scan complete: %d device(s) found\n", deviceCount);
-        if (deviceCount == 0) {
-            Serial.println("⚠️ No I2C devices detected!");
-            Serial.println("🔧 Check connections:");
-            Serial.printf("   SDA → GPIO %d\n", I2C_SDA_PIN);
-            Serial.printf("   SCL → GPIO %d\n", I2C_SCL_PIN);
-            Serial.println("   VCC → 3.3V, GND → GND");
-        }
     }
     
     return displayFound;
@@ -659,6 +958,38 @@ void triggerProximityAlert(BeaconConfig& config, const BeaconData& beacon) {
         
         // Broadcast alert via WebSocket
         broadcastAlertStatus(config, beacon);
+        
+        // Send alert to MQTT cloud
+        if (mqttState.connected) {
+            DynamicJsonDocument doc(512);
+            doc["device_id"] = String(DEVICE_ID);
+            doc["timestamp"] = millis();
+            doc["alert_type"] = "proximity";
+            doc["beacon_name"] = beacon.name;
+            doc["beacon_address"] = beacon.address;
+            doc["distance_cm"] = beacon.distance;
+            doc["rssi"] = beacon.rssi;
+            doc["alert_mode"] = config.alertMode;
+            doc["trigger_distance"] = config.triggerDistanceCm;
+            doc["position"] = "unknown"; // Could integrate with triangulator for position
+            
+            // Add position data if available
+            if (triangulator.isReady()) {
+                auto lastPos = triangulator.getLastPosition();
+                JsonObject position = doc.createNestedObject("collar_position");
+                position["x"] = lastPos.position.x;
+                position["y"] = lastPos.position.y;
+                position["confidence"] = lastPos.confidence;
+            }
+            
+            String message;
+            serializeJson(doc, message);
+            
+            String topic = "pet-collar/" + String(DEVICE_ID) + "/alert";
+            mqttClient.publish(topic.c_str(), message.c_str());
+            
+            Serial.println("☁️ Proximity alert sent to MQTT cloud");
+        }
     }
 }
 
@@ -992,8 +1323,11 @@ void printSystemStatus() {
     Serial.printf("🧠 Free Heap: %d KB\n", ESP.getFreeHeap() / 1024);
     Serial.printf("🔋 Battery: %d%%\n", systemStateManager.getBatteryPercent());
     Serial.printf("📡 WiFi: %s\n", systemStateData.wifiConnected ? "Connected" : "Disconnected");
+    Serial.printf("☁️ MQTT: %s (%d msgs)\n", mqttState.connected ? "Connected" : "Disconnected", mqttState.messagesPublished);
     Serial.printf("📱 BLE: %s\n", systemStateData.bleInitialized ? "Active" : "Inactive");
     Serial.printf("🏷️ Active Beacons: %d\n", beaconManager.getActiveBeaconCount());
+    Serial.printf("🎯 Zones: %d\n", zoneManager.getZoneCount());
+    Serial.printf("📍 Position: %s\n", triangulator.isReady() ? "Available" : "No Fix");
     Serial.printf("🚨 Proximity Alerts: %d\n", systemStateManager.getProximityAlerts());
     Serial.printf("❌ Errors: %d\n", systemStateManager.getErrorCount());
     Serial.println("═══════════════════════════════════════");
@@ -1072,6 +1406,9 @@ void setup() {
         initializeWebServices();
         initializeMDNS();
         
+        // Initialize MQTT Cloud Integration
+        initializeMQTTCloud();
+        
         // Initialize UDP for discovery
         udp.begin(DISCOVERY_PORT);
         Serial.printf("✅ UDP discovery service on port %d\n", DISCOVERY_PORT);
@@ -1094,6 +1431,7 @@ void setup() {
                  wifiOK ? WiFi.localIP().toString().c_str() : "No WiFi");
     Serial.printf("🔌 WebSocket: ws://%s:8080\n", 
                  wifiOK ? WiFi.localIP().toString().c_str() : "No WiFi");
+    Serial.printf("☁️ MQTT Cloud: %s\n", mqttState.enabled ? "Enabled" : "Disabled");
     Serial.printf("🖥️ Display: %s\n", isDisplayActive() ? "Active" : "Inactive");
     Serial.printf("📡 BLE Scanner: %s\n", bleOK ? "Active" : "Inactive");
     Serial.println("🔍 Scanning for proximity beacons...");
@@ -1111,6 +1449,9 @@ void loop() {
         server.handleClient();
         webSocket.loop();
     }
+    
+    // Maintain MQTT cloud connection and telemetry
+    maintainMQTTConnection();
     
     // Perform BLE scanning
     if (systemStateData.bleInitialized) {
