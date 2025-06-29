@@ -1,7 +1,23 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { EnhancedKonvaMap } from '@/components/mobile/enhanced-konva-map'
+import dynamic from 'next/dynamic'
+
+// Dynamically import the Konva map component to prevent SSR issues
+const EnhancedKonvaMap = dynamic(
+  () => import('@/components/mobile/enhanced-konva-map').then(mod => ({ default: mod.EnhancedKonvaMap })),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-full flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading interactive map...</p>
+        </div>
+      </div>
+    )
+  }
+)
 
 // Sample data for testing
 const sampleBeacons = [
