@@ -1,4 +1,92 @@
-# ESP32-S3 Pet Collar Firmware
+# ESP32-S3 Pet Collar - WebSocket Local Version
+
+## 🌟 **Local WebSocket Integration**
+This firmware version uses **WebSocket connections** to communicate directly with your local web application, ideal for local development and direct IP connections.
+
+## 📋 **Features**
+- **Direct WebSocket Connection** - Connects to local web server
+- **Real-time Communication** - Instant bidirectional messaging
+- **Local Network Focus** - Works on your LAN without cloud dependency
+- **Simple Setup** - No cloud account needed
+- **Development Friendly** - Easy debugging and testing
+
+## 🆚 **Two Firmware Options Available**
+
+### 🔗 **This Version: WebSocket (Local)**
+- **Best for**: Local development, testing, direct connections
+- **Connection**: WebSocket to local web server (ws://192.168.x.x:8080)
+- **Setup**: Configure WiFi + local server IP
+- **Pros**: Simple, fast, no cloud dependency
+- **Cons**: Requires tunneling for remote access
+
+### ☁️ **Alternative: MQTT Cloud Version**
+- **Location**: `../ESP32-S3_PetCollar_MQTT/`
+- **Best for**: Production, remote monitoring, multiple collars
+- **Connection**: MQTT over TLS to HiveMQ Cloud
+- **Setup**: Configure WiFi + cloud credentials
+- **Pros**: Cloud-native, scalable, remote access
+- **Cons**: Requires cloud account
+
+## 🔧 **Configuration**
+
+### 1. WiFi Settings
+Edit in `ESP32-S3_PetCollar.ino`:
+```cpp
+const char* ssid = "YOUR_WIFI_NAME";
+const char* password = "YOUR_WIFI_PASSWORD";
+```
+
+### 2. WebSocket Server
+The collar will discover and connect to WebSocket servers on port 8080 automatically, or you can configure a specific IP.
+
+## 🚀 **Setup Instructions**
+
+1. **Open in Arduino IDE**
+   - Open `ESP32-S3_PetCollar.ino`
+   - Ensure no other .ino files are in this directory
+
+2. **Install Required Libraries**
+   - ArduinoJson v7.0+
+   - Adafruit GFX Library
+   - Adafruit SSD1306
+   - WebSockets Library
+
+3. **Configure WiFi**
+   - Update WiFi credentials in the code
+
+4. **Upload to ESP32-S3**
+
+5. **Start Web Application**
+   - Run your Next.js web app with WebSocket server
+   - Collar will auto-discover and connect
+
+## 🔌 **Connection Flow**
+```
+ESP32 Collar → WiFi → Local Network → Web App (WebSocket Server)
+```
+
+## 🎯 **Choose Your Version**
+
+| Use Case | Recommended Version |
+|----------|-------------------|
+| **Local Development** | This WebSocket version |
+| **Testing & Debugging** | This WebSocket version |  
+| **Production Deployment** | MQTT Cloud version |
+| **Remote Monitoring** | MQTT Cloud version |
+| **Multiple Collars** | MQTT Cloud version |
+
+## 📁 **Directory Structure**
+```
+firmware/
+├── ESP32-S3_PetCollar/          ← This WebSocket version
+│   ├── ESP32-S3_PetCollar.ino
+│   └── include/...
+└── ESP32-S3_PetCollar_MQTT/     ← MQTT Cloud version
+    ├── ESP32-S3_PetCollar_MQTT.ino
+    └── config.h
+```
+
+Both versions are complete, standalone firmware - choose the one that fits your needs!
 
 ## 📁 **File Structure**
 
