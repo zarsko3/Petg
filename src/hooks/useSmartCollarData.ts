@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useCollarConnection } from '@/context/CollarConnectionContext'
+import { useCollarConnection } from '@/components/collar-service-provider'
 
 // Demo data for fallback
 const DEMO_STATS = {

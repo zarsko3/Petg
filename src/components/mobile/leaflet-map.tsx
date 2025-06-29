@@ -5,7 +5,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { Radio, PawPrint } from 'lucide-react'
 import { Point2D } from '@/lib/floorPlan'
-import { useCollarConnection } from '@/context/CollarConnectionContext'
+import { useCollarConnection } from '@/components/collar-service-provider'
 
 // Extend window to include Leaflet globals for defensive patching
 declare global {

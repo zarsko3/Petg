@@ -9,7 +9,7 @@ import { useTheme } from 'next-themes'
 import { CollarPairDialog } from '@/components/mobile/collar-pair-dialog'
 import { CollarSettingsCard } from '@/components/mobile/collar-settings-card'
 import { useMobileCollars } from '@/hooks/useMobileCollars'
-import { useCollarConnection } from '@/context/CollarConnectionContext'
+import { useCollarConnection } from '@/components/collar-service-provider'
 
 interface SettingsSection {
   id: string

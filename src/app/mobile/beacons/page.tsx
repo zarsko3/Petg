@@ -5,7 +5,7 @@ import { ArrowLeft, Wifi, Zap, Settings, Info } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { BeaconConfigurationPanel } from '@/components/beacon-configuration-panel'
-import { useCollarConnection } from '@/context/CollarConnectionContext'
+import { useCollarConnection } from '@/components/collar-service-provider'
 import { usePetgStore } from '@/lib/store'
 
 export default function MobileBeaconsPage() {

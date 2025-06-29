@@ -263,32 +263,248 @@ async function syncToCollar(config: BeaconConfiguration): Promise<boolean> {
   }
 }
 
-// GET - Retrieve all beacon configurations
+// In-memory store for beacon detections (in production, use a database)
+interface BeaconDetection {
+  id: string;
+  name: string;
+  rssi: number;
+  distance: number;
+  address?: string;
+  collarId: string;
+  timestamp: number;
+  batteryLevel?: number;
+  location?: {
+    x: number;
+    y: number;
+    room?: string;
+  };
+}
+
+interface BeaconSummary {
+  id: string;
+  name: string;
+  lastSeen: number;
+  detectionCount: number;
+  averageRSSI: number;
+  averageDistance: number;
+  detectingCollars: string[];
+  location?: {
+    x: number;
+    y: number;
+    room?: string;
+  };
+}
+
+// Global store (in production, replace with Redis or database)
+const beaconDetections: BeaconDetection[] = [];
+const MAX_DETECTIONS = 1000; // Keep last 1000 detections
+
+// Helper function to calculate distance from RSSI
+function calculateDistance(rssi: number): number {
+  if (rssi === 0) return -1;
+  
+  const ratio = rssi / -59; // -59 dBm at 1 meter
+  if (ratio < 1.0) {
+    return Math.pow(ratio, 10);
+  } else {
+    const accuracy = (0.89976) * Math.pow(ratio, 7.7095) + 0.111;
+    return accuracy;
+  }
+}
+
+// GET: Fetch current beacon detections
 export async function GET(request: NextRequest) {
   try {
-    console.log('📋 GET /api/beacons - Retrieving all configurations');
+    const { searchParams } = new URL(request.url);
+    const format = searchParams.get('format') || 'summary';
+    const collarId = searchParams.get('collar');
+    const limit = parseInt(searchParams.get('limit') || '50');
+    const maxAge = parseInt(searchParams.get('maxAge') || '300000'); // 5 minutes default
     
-    // Initialize configurations from file (with automatic migration)
-    await initializeConfigurations();
-
+    const now = Date.now();
+    
+    // Filter recent detections
+    const recentDetections = beaconDetections.filter(detection => 
+      now - detection.timestamp < maxAge &&
+      (!collarId || detection.collarId === collarId)
+    );
+    
+    if (format === 'raw') {
+      // Return raw detection data
+      return NextResponse.json({
+        success: true,
+        data: recentDetections.slice(-limit),
+        total: recentDetections.length,
+        timestamp: now
+      });
+    }
+    
+    // Return summarized beacon data (default)
+    const beaconSummary = new Map<string, BeaconSummary>();
+    
+    recentDetections.forEach(detection => {
+      const beaconId = detection.address || detection.id;
+      
+      if (!beaconSummary.has(beaconId)) {
+        beaconSummary.set(beaconId, {
+          id: beaconId,
+          name: detection.name,
+          lastSeen: detection.timestamp,
+          detectionCount: 0,
+          averageRSSI: 0,
+          averageDistance: 0,
+          detectingCollars: [],
+          location: detection.location
+        });
+      }
+      
+      const summary = beaconSummary.get(beaconId)!;
+      summary.detectionCount++;
+      summary.lastSeen = Math.max(summary.lastSeen, detection.timestamp);
+      
+      // Calculate running averages
+      summary.averageRSSI = (summary.averageRSSI * (summary.detectionCount - 1) + detection.rssi) / summary.detectionCount;
+      summary.averageDistance = (summary.averageDistance * (summary.detectionCount - 1) + detection.distance) / summary.detectionCount;
+      
+      // Track unique collars
+      if (!summary.detectingCollars.includes(detection.collarId)) {
+        summary.detectingCollars.push(detection.collarId);
+      }
+    });
+    
+    const beacons = Array.from(beaconSummary.values())
+      .sort((a, b) => b.lastSeen - a.lastSeen)
+      .slice(0, limit);
+    
     return NextResponse.json({
       success: true,
-      data: beaconConfigurations,
-      count: beaconConfigurations.length,
-      timestamp: new Date().toISOString()
+      data: beacons,
+      total: beacons.length,
+      activeBeacons: beacons.filter(b => now - b.lastSeen < 60000).length, // Active in last minute
+      timestamp: now,
+      metadata: {
+        totalDetections: recentDetections.length,
+        uniqueBeacons: beaconSummary.size,
+        dataMaxAge: maxAge
+      }
     });
+    
   } catch (error) {
-    console.error('❌ Failed to retrieve beacon configurations:', error);
+    console.error('❌ Beacon API GET error:', error);
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: 'Failed to fetch beacon data',
+        timestamp: Date.now() 
+      },
+      { status: 500 }
+    );
+  }
+}
+
+// POST: Receive beacon detections from collars
+export async function POST(request: NextRequest) {
+  try {
+    const data = await request.json();
+    const timestamp = Date.now();
+    
+    console.log('📡 Received beacon data from collar:', data);
+    
+    // Handle single detection or batch
+    const detections = Array.isArray(data.beacons) ? data.beacons : [data];
+    
+    for (const detection of detections) {
+      // Validate required fields
+      if (!detection.name && !detection.address) {
+        console.warn('⚠️ Skipping beacon without name or address:', detection);
+        continue;
+      }
+      
+      const beaconDetection: BeaconDetection = {
+        id: detection.id || detection.address || detection.name,
+        name: detection.name || 'Unknown Beacon',
+        rssi: detection.rssi || 0,
+        distance: detection.distance || calculateDistance(detection.rssi || 0),
+        address: detection.address,
+        collarId: data.collarId || data.device_id || 'unknown',
+        timestamp: detection.timestamp || timestamp,
+        batteryLevel: data.battery_level,
+        location: detection.location || data.location
+      };
+      
+      // Add to store
+      beaconDetections.push(beaconDetection);
+      
+      console.log(`📍 Beacon detected: ${beaconDetection.name} (${beaconDetection.rssi}dBm, ${beaconDetection.distance.toFixed(1)}m) by collar ${beaconDetection.collarId}`);
+    }
+    
+    // Cleanup old detections
+    if (beaconDetections.length > MAX_DETECTIONS) {
+      const toRemove = beaconDetections.length - MAX_DETECTIONS;
+      beaconDetections.splice(0, toRemove);
+      console.log(`🧹 Cleaned up ${toRemove} old beacon detections`);
+    }
+    
     return NextResponse.json({
-      success: false,
-      error: 'Failed to retrieve beacon configurations',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+      success: true,
+      message: 'Beacon detections processed successfully',
+      processed: detections.length,
+      total: beaconDetections.length,
+      timestamp: timestamp
+    });
+    
+  } catch (error) {
+    console.error('❌ Beacon API POST error:', error);
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: 'Failed to process beacon detections',
+        timestamp: Date.now() 
+      },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE: Clear beacon data (for testing)
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const olderThan = parseInt(searchParams.get('olderThan') || '0');
+    
+    if (olderThan > 0) {
+      const cutoff = Date.now() - olderThan;
+      const originalLength = beaconDetections.length;
+      beaconDetections.splice(0, beaconDetections.findIndex(d => d.timestamp > cutoff));
+      const removed = originalLength - beaconDetections.length;
+      
+      return NextResponse.json({
+        success: true,
+        message: `Removed ${removed} beacon detections older than ${olderThan}ms`,
+        remaining: beaconDetections.length
+      });
+    } else {
+      // Clear all
+      const removed = beaconDetections.length;
+      beaconDetections.length = 0;
+      
+      return NextResponse.json({
+        success: true,
+        message: `Cleared all ${removed} beacon detections`
+      });
+    }
+    
+  } catch (error) {
+    console.error('❌ Beacon API DELETE error:', error);
+    return NextResponse.json(
+      { error: 'Failed to clear beacon data' },
+      { status: 500 }
+    );
   }
 }
 
 // POST - Create new beacon configuration
-export async function POST(request: NextRequest) {
+export async function POST_BEACON_CONFIG(request: NextRequest) {
   try {
     const body = await request.json();
     
@@ -445,7 +661,7 @@ export async function PUT(request: NextRequest) {
 }
 
 // DELETE - Remove beacon configuration
-export async function DELETE(request: NextRequest) {
+export async function DELETE_BEACON_CONFIG(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
