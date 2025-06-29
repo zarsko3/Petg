@@ -7,7 +7,7 @@
   "rewrites": [
     {
       "source": "/ws",
-      "destination": "http://192.168.1.35:8080"
+      "destination": "https://collar.ngrok-free.app"
     }
   ],
   "headers": [

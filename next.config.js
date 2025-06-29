@@ -123,9 +123,11 @@ const nextConfig = {
       // WebSocket proxy for development
       {
         source: '/ws',
-        destination: process.env.COLLAR_IP 
-          ? `http://${process.env.COLLAR_IP}:8080`
-          : 'http://192.168.1.35:8080'
+        destination: process.env.COLLAR_TUNNEL_URL 
+          ? process.env.COLLAR_TUNNEL_URL
+          : process.env.COLLAR_IP 
+            ? `http://${process.env.COLLAR_IP}:8080`
+            : 'http://192.168.1.35:8080'
       }
     ]
   },
