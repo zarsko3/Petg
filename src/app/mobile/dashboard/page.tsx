@@ -31,6 +31,7 @@ import {
   formatTemperature,
   getActivityLevelText
 } from '@/lib/utils'
+import { usePetgStore } from '@/lib/store'
 
 export default function MobileDashboard() {
   const [mounted, setMounted] = useState(false)
@@ -46,7 +47,8 @@ export default function MobileDashboard() {
     last_seen: new Date().toISOString()
   }
   const lastUpdate = new Date()
-  const isConnected = isLive
+  const isConnected = usePetgStore((state) => state.isCollarConnected)
+  const demoMode = usePetgStore((state) => state.demoMode)
   const isLoading = status === 'connecting'
   const refetch = () => window.location.reload()
 
@@ -159,7 +161,7 @@ export default function MobileDashboard() {
             onClick={() => refetch()}
             disabled={isLoading}
             className={`p-4 rounded-2xl transition-all duration-200 mobile-button shadow-pet ${
-              isConnected 
+              isConnected && !demoMode
                 ? 'bg-teal-100 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400 hover:shadow-teal-glow' 
                 : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
             }`}
@@ -170,25 +172,25 @@ export default function MobileDashboard() {
 
         {/* Connection Status */}
         <div className={`flex items-center gap-3 px-6 py-4 rounded-2xl border transition-all duration-200 ${
-          isConnected 
+          isConnected && !demoMode
             ? 'bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800'
             : 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
         }`}>
           <div className="relative">
             <div className={`h-4 w-4 rounded-full ${
-              isConnected ? 'bg-teal-500' : 'bg-amber-500'
+              isConnected && !demoMode ? 'bg-teal-500' : 'bg-amber-500'
             }`}>
               <div className="absolute inset-0 h-4 w-4 rounded-full pulse-ring ${
-                isConnected ? 'bg-teal-500' : 'bg-amber-500'
+                isConnected && !demoMode ? 'bg-teal-500' : 'bg-amber-500'
               }" />
             </div>
           </div>
           <div className="flex-1">
             <p className="font-semibold font-rounded">
-              {isConnected ? `${petName}'s collar is connected` : `Demo mode - ${petName}'s collar offline`}
+              {isConnected && !demoMode ? `${petName}'s collar is connected` : `Demo mode - ${petName}'s collar offline`}
             </p>
             <p className="text-sm opacity-75">
-              {isConnected ? 'Real-time monitoring active' : 'Showing sample data for demonstration'}
+              {isConnected && !demoMode ? 'Real-time monitoring active' : 'Showing sample data for demonstration'}
             </p>
           </div>
         </div>

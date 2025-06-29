@@ -11,6 +11,9 @@ interface PetgState {
   alertMode: 'none' | 'buzzer' | 'vibration' | 'both';
   user: User | null;
   
+  // Demo mode state
+  demoMode: boolean;
+  
   // Connection state
   isCollarConnected: boolean;
   collarConnectionUrl: string;
@@ -27,6 +30,9 @@ interface PetgState {
   setAlertActive: (active: boolean) => void;
   setAlertMode: (mode: 'none' | 'buzzer' | 'vibration' | 'both') => void;
   setUser: (user: User | null) => void;
+  
+  // Demo mode actions
+  setDemoMode: (demo: boolean) => void;
   
   // Connection actions
   setCollarConnected: (connected: boolean) => void;
@@ -45,6 +51,9 @@ export const usePetgStore = create<PetgState>((set) => ({
   alertMode: 'none',
   user: null,
   
+  // Demo mode (starts as true, switches to false when collar comes online)
+  demoMode: true,
+  
   // Connection state
   isCollarConnected: false,
   collarConnectionUrl: '',
@@ -61,6 +70,9 @@ export const usePetgStore = create<PetgState>((set) => ({
   setAlertActive: (active) => set({ alertActive: active }),
   setAlertMode: (mode) => set({ alertMode: mode }),
   setUser: (user) => set({ user }),
+  
+  // Demo mode actions
+  setDemoMode: (demo) => set({ demoMode: demo }),
   
   // Connection actions
   setCollarConnected: (connected) => set({ isCollarConnected: connected }),

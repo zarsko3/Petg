@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react'
 import { toast } from 'sonner'
+import { usePetgStore } from '@/lib/store'
 
 type ConnectionStatus = 'disconnected' | 'connecting' | 'connected'
 
@@ -48,6 +49,10 @@ export function CollarConnectionProvider({ children }: CollarConnectionProviderP
   const connectionFailureCount = useRef<{ [ip: string]: number }>({})
 
   const isLive = status === 'connected'
+  
+  // Get MQTT connection status from global store
+  const isCollarConnected = usePetgStore((state) => state.isCollarConnected)
+  const connectionStatus = usePetgStore((state) => state.connectionStatus)
 
   // Clean up function
   const cleanup = useCallback(() => {
@@ -290,6 +295,13 @@ export function CollarConnectionProvider({ children }: CollarConnectionProviderP
 
   // Retry UDP discovery every 3 seconds
   const retryUntilFound = useCallback(() => {
+    // Stop UDP discovery if MQTT is connected
+    const store = usePetgStore.getState();
+    if (store.isCollarConnected && store.connectionStatus === 'Connected') {
+      console.log('🛑 MQTT connected - stopping UDP retry loop');
+      return;
+    }
+    
     if (retryTimeoutRef.current) {
       clearTimeout(retryTimeoutRef.current);
     }
@@ -297,9 +309,12 @@ export function CollarConnectionProvider({ children }: CollarConnectionProviderP
     retryTimeoutRef.current = setTimeout(() => {
       console.log('🔄 UDP scan retry (waiting for collar broadcasts)...');
       
-      // Check if we got a connection via UDP
-      if (status !== 'connected') {
+      // Check if we got a connection via UDP or if MQTT is now connected
+      const currentStore = usePetgStore.getState();
+      if (status !== 'connected' && !(currentStore.isCollarConnected && currentStore.connectionStatus === 'Connected')) {
         retryUntilFound(); // Continue retrying every 3 seconds
+      } else {
+        console.log('🛑 Stopping UDP retry - connection established or MQTT connected');
       }
     }, 3000);
   }, [status]);
@@ -435,6 +450,27 @@ export function CollarConnectionProvider({ children }: CollarConnectionProviderP
       toast.info('Disconnected from collar – showing demo data')
     }, 500)
   }, [cleanup])
+
+  // Stop UDP discovery if MQTT is connected
+  const stopUdpDiscovery = useCallback(() => {
+    console.log('🛑 Stopping UDP discovery - MQTT is connected');
+    if (discoveryWsRef.current) {
+      discoveryWsRef.current.close()
+      discoveryWsRef.current = null
+    }
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current)
+      retryTimeoutRef.current = null
+    }
+  }, [])
+
+  // Check MQTT connection status and stop UDP discovery if needed
+  useEffect(() => {
+    if (isCollarConnected && connectionStatus === 'Connected') {
+      console.log('🎯 MQTT connected - stopping UDP discovery');
+      stopUdpDiscovery();
+    }
+  }, [isCollarConnected, connectionStatus, stopUdpDiscovery])
 
   const value: CollarConnectionContextType = {
     status,
