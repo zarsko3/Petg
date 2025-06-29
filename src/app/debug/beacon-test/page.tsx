@@ -56,6 +56,23 @@ export default function BeaconTestPage() {
     addLogMessage(`Updated beacon: ${updatedBeacon.name} (${updatedBeacon.rssi}dBm)`);
   };
 
+  const inspectStoreState = () => {
+    const storeState = {
+      beacons: beacons,
+      demoMode: demoMode,
+      isConnected: usePetgStore.getState().isCollarConnected,
+      connectionStatus: usePetgStore.getState().connectionStatus,
+      lastDataReceived: usePetgStore.getState().lastDataReceived
+    };
+    
+    console.log('🔍 Current Store State:', storeState);
+    addLogMessage(`Store state: ${beacons.length} beacons, demoMode: ${demoMode}, connected: ${usePetgStore.getState().isCollarConnected}`);
+    
+    beacons.forEach((beacon, index) => {
+      addLogMessage(`Beacon ${index + 1}: ${beacon.name} (${beacon.rssi}dBm) - ID: ${beacon.id}`);
+    });
+  };
+
   const simulateMQTTBeacon = () => {
     // Simulate what the MQTT handler would receive
     const mqttBeacon = {
@@ -133,6 +150,47 @@ export default function BeaconTestPage() {
             <Button onClick={toggleDemoMode} variant="outline" className="w-full">
               Toggle Demo Mode
             </Button>
+            <Button onClick={inspectStoreState} className="w-full bg-gray-600 hover:bg-gray-700">
+              Inspect Store State
+            </Button>
+          </div>
+        </Card>
+
+        {/* Store State Inspector */}
+        <Card className="p-6">
+          <h2 className="text-xl font-semibold mb-4">
+            Store State Inspector
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h3 className="font-medium mb-2">Connection Status</h3>
+              <div className="text-sm space-y-1">
+                <div>Is Connected: <span className="font-mono">{usePetgStore.getState().isCollarConnected ? 'true' : 'false'}</span></div>
+                <div>Demo Mode: <span className="font-mono">{demoMode ? 'true' : 'false'}</span></div>
+                <div>Connection Status: <span className="font-mono">{usePetgStore.getState().connectionStatus}</span></div>
+                <div>Last Data Received: <span className="font-mono">{new Date(usePetgStore.getState().lastDataReceived).toLocaleTimeString()}</span></div>
+              </div>
+            </div>
+            <div>
+              <h3 className="font-medium mb-2">Raw Store Data</h3>
+              <div className="text-sm">
+                <div>Beacons in Store: <span className="font-mono font-bold">{beacons.length}</span></div>
+                <div className="mt-2">
+                  {beacons.length > 0 ? (
+                    <pre className="bg-gray-100 p-2 rounded text-xs overflow-auto max-h-32">
+{JSON.stringify(beacons.map(b => ({
+  name: b.name,
+  rssi: b.rssi,
+  id: b.id,
+  timestamp: new Date(b.timestamp).toLocaleTimeString()
+})), null, 2)}
+                    </pre>
+                  ) : (
+                    <span className="text-gray-500 italic">No beacons in store</span>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </Card>
 

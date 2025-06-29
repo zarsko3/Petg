@@ -103,9 +103,16 @@ export default function BeaconsPage() {
     if (isConnected && !demoMode) {
       // Primary source: Live beacon detections from MQTT
       if (liveBeacons && liveBeacons.length > 0) {
+        console.log(`🔍 Beacons Page: Processing ${liveBeacons.length} live beacons:`, liveBeacons);
+        
         // Convert live beacons to the expected format
         const formattedBeacons = liveBeacons
-          .filter(beacon => beacon.name && beacon.name.startsWith("PetZone-Home-"))
+          .filter(beacon => {
+            const hasName = beacon.name && beacon.name.length > 0;
+            const isPetZone = beacon.name && beacon.name.startsWith("PetZone-Home-");
+            console.log(`🔍 Beacon filter check: ${beacon.name} - hasName: ${hasName}, isPetZone: ${isPetZone}`);
+            return hasName; // Accept all beacons with names for now to debug filtering
+          })
           .map(beacon => ({
             name: beacon.name,
             rssi: beacon.rssi,
@@ -115,11 +122,15 @@ export default function BeaconsPage() {
             confidence: beacon.confidence
           }));
         
+        console.log(`🔍 Beacons Page: After filtering, ${formattedBeacons.length} beacons remain:`, formattedBeacons);
+        
         setRealBeacons(formattedBeacons);
         setLastUpdate(new Date());
         
         if (formattedBeacons.length > 0) {
           console.log(`✅ Beacons Page: ${formattedBeacons.length} live MQTT beacons detected`);
+        } else {
+          console.log(`⚠️ Beacons Page: No beacons passed filtering despite ${liveBeacons.length} in store`);
         }
         
         // Auto-add to configured beacons
@@ -214,7 +225,7 @@ export default function BeaconsPage() {
             batteryLevel: 100,
             signalStrength: rssiToSignalStrength(detectedBeacon.rssi),
             lastUpdate: 'Just now',
-            status: getBeaconStatus(detectedBeacon.rssi, detectedBeacon.last_seen),
+            status: getBeaconStatus(detectedBeacon.rssi, detectedBeacon.last_seen) || 'online',
             isAutoDetected: true,
             address: detectedBeacon.address,
             lastSeenTimestamp: currentTime
@@ -474,8 +485,8 @@ export default function BeaconsPage() {
             batteryLevel: config.batteryLevel || 100,
             signalStrength: config.signalStrength || 0,
             lastUpdate: config.lastSeen ? new Date(config.lastSeen).toLocaleTimeString() : 'Never',
-            status: config.status,
-            isAutoDetected: config.isAutoDetected,
+            status: config.status || 'offline',
+            isAutoDetected: config.isAutoDetected || false,
             address: config.macAddress,
             lastSeenTimestamp: config.lastSeen ? new Date(config.lastSeen).getTime() : Date.now()
           }));

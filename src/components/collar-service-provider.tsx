@@ -208,9 +208,10 @@ export function CollarServiceProvider({ children }: CollarServiceProviderProps) 
           if (beacon.device_id === "001" || collarId === "001") {
             console.log('🔍 Beacon detection from device 001 - ensuring demo mode is off');
             store.setDemoMode(false);
-            toast.success('Live Beacon Data', {
-              description: `Detected ${beacon.beacon_name} via collar 001`
-            });
+            // TODO: Remove this toast once we confirm the list updates work correctly
+            // toast.success('Live Beacon Data', {
+            //   description: `Detected ${beacon.beacon_name} via collar 001`
+            // });
           }
           
           // Add or update beacon in the store (store handles the logic)

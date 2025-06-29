@@ -26,6 +26,8 @@ export default function MobileBeaconsPage() {
     if (isConnected && !demoMode) {
       // Primary source: Live beacon detections from MQTT
       if (liveBeacons && liveBeacons.length > 0) {
+        console.log(`📱 Mobile Beacons: Processing ${liveBeacons.length} live beacons:`, liveBeacons);
+        
         // Convert live beacons to expected format
         const formattedBeacons = liveBeacons.map(beacon => ({
           name: beacon.name,
@@ -36,6 +38,8 @@ export default function MobileBeaconsPage() {
           confidence: beacon.confidence,
           collarId: beacon.collarId
         }))
+        
+        console.log(`📱 Mobile Beacons: Formatted ${formattedBeacons.length} beacons:`, formattedBeacons);
         
         setRealBeacons(formattedBeacons)
         setLastUpdate(new Date())
