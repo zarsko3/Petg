@@ -165,61 +165,134 @@ void initializeMQTTCloud() {
     
     Serial.println("🌐 Initializing MQTT Cloud connection...");
     
-    // Configure TLS (for production, add proper certificates)
-    mqttSecureClient.setInsecure(); // OK for pilot testing
+    // Enhanced TLS configuration for HiveMQ Cloud
+    mqttSecureClient.setInsecure(); // For testing - should use proper certs in production
     
-    // Set MQTT server
+    // Alternative: Try with specific TLS version
+    // mqttSecureClient.setProtocol(TLSV1_2);
+    
+    // Set MQTT server and configure timeouts
     mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
     mqttClient.setCallback(onMqttMessage);
     mqttClient.setKeepAlive(60);
-    mqttClient.setSocketTimeout(15);
+    mqttClient.setSocketTimeout(30);  // Increased timeout
+    mqttClient.setBufferSize(512);    // Set buffer size
     
     Serial.printf("📡 MQTT Server: %s:%d\n", MQTT_SERVER, MQTT_PORT);
+    Serial.printf("📡 MQTT User: %s\n", MQTT_USER);
+    Serial.printf("📡 TLS Mode: Insecure (Testing)\n");
 }
 
 /**
- * @brief Connect to MQTT cloud broker
+ * @brief Connect to MQTT cloud broker with enhanced debugging
  */
 void connectToMQTTCloud() {
-    if (!mqttState.enabled || !WiFi.isConnected()) return;
+    if (!mqttState.enabled) {
+        Serial.println("⚠️ MQTT disabled, skipping connection");
+        return;
+    }
+    
+    if (!WiFi.isConnected()) {
+        Serial.println("⚠️ WiFi not connected, skipping MQTT");
+        return;
+    }
     
     // Avoid rapid reconnection attempts
-    if (millis() - mqttState.lastReconnect < 5000) return;
+    if (millis() - mqttState.lastReconnect < 10000) return;  // 10 second delay
     mqttState.lastReconnect = millis();
     
     Serial.println("🔗 Attempting MQTT cloud connection...");
+    Serial.printf("📡 Server: %s:%d\n", MQTT_SERVER, MQTT_PORT);
+    Serial.printf("👤 User: %s\n", MQTT_USER);
+    Serial.printf("🌐 WiFi Status: %s (IP: %s)\n", 
+                  WiFi.isConnected() ? "Connected" : "Disconnected",
+                  WiFi.localIP().toString().c_str());
+    
+    // Test basic connectivity first
+    Serial.println("🧪 Testing basic connectivity...");
+    WiFiClient testClient;
+    if (testClient.connect("google.com", 80)) {
+        Serial.println("✅ Internet connectivity confirmed");
+        testClient.stop();
+    } else {
+        Serial.println("❌ No internet connectivity");
+        return;
+    }
     
     // Generate unique client ID
-    String clientId = "PetCollar-" + String(DEVICE_ID) + "-" + String(random(0xffff), HEX);
+    String clientId = "PetCollar-" + String(DEVICE_ID) + "-" + String(ESP.getEfuseMac() & 0xFFFF, HEX);
+    Serial.printf("🆔 Client ID: %s\n", clientId.c_str());
     
     // Last Will and Testament
     String statusTopic = "pet-collar/" + String(DEVICE_ID) + "/status";
     String offlineMessage = "{\"device_id\":\"" + String(DEVICE_ID) + "\",\"status\":\"offline\",\"timestamp\":" + String(millis()) + "}";
     
-    if (mqttClient.connect(clientId.c_str(), MQTT_USER, MQTT_PASSWORD,
-                          statusTopic.c_str(), 1, true, offlineMessage.c_str())) {
-        Serial.println("✅ MQTT Cloud connected!");
+    Serial.printf("🔗 Connecting with credentials: %s / %s\n", MQTT_USER, "***hidden***");
+    
+    // Try connection with detailed error reporting
+    bool connected = mqttClient.connect(clientId.c_str(), MQTT_USER, MQTT_PASSWORD,
+                                       statusTopic.c_str(), 1, true, offlineMessage.c_str());
+    
+    if (connected) {
+        Serial.println("✅ MQTT Cloud connected successfully!");
         mqttState.connected = true;
         mqttState.reconnectAttempts = 0;
         
         // Subscribe to command topics
-        String commandTopic = "pet-collar/" + String(DEVICE_ID) + "/command/+";
-        mqttClient.subscribe(commandTopic.c_str(), 1);
+        String commandTopic = "pet-collar/" + String(DEVICE_ID) + "/command";
+        bool subscribed = mqttClient.subscribe(commandTopic.c_str(), 1);
+        Serial.printf("📡 Subscription to %s: %s\n", commandTopic.c_str(), subscribed ? "✅ Success" : "❌ Failed");
         
         // Publish online status
         publishMQTTStatus("online");
         
-        Serial.printf("📡 Subscribed to commands for device %s\n", DEVICE_ID);
+        Serial.printf("🎉 MQTT setup complete for device %s\n", DEVICE_ID);
         
     } else {
-        Serial.printf("❌ MQTT connection failed, rc=%d\n", mqttClient.state());
+        int errorCode = mqttClient.state();
+        Serial.printf("❌ MQTT connection failed, error code: %d\n", errorCode);
+        
+        // Detailed error explanation
+        switch (errorCode) {
+            case -4: Serial.println("💡 Error: MQTT_CONNECTION_TIMEOUT - Server unreachable"); break;
+            case -3: Serial.println("💡 Error: MQTT_CONNECTION_LOST - Network dropped"); break;
+            case -2: Serial.println("💡 Error: MQTT_CONNECT_FAILED - Network failed"); break;
+            case -1: Serial.println("💡 Error: MQTT_DISCONNECTED - Client disconnected"); break;
+            case 1: Serial.println("💡 Error: MQTT_CONNECT_BAD_PROTOCOL - Protocol version issue"); break;
+            case 2: Serial.println("💡 Error: MQTT_CONNECT_BAD_CLIENT_ID - Client ID rejected"); break;
+            case 3: Serial.println("💡 Error: MQTT_CONNECT_UNAVAILABLE - Server unavailable"); break;
+            case 4: Serial.println("💡 Error: MQTT_CONNECT_BAD_CREDENTIALS - Username/password wrong"); break;
+            case 5: Serial.println("💡 Error: MQTT_CONNECT_UNAUTHORIZED - Not authorized (check credentials)"); break;
+            default: Serial.printf("💡 Error: Unknown error code %d\n", errorCode);
+        }
+        
         mqttState.connected = false;
         mqttState.connectionFailures++;
         mqttState.reconnectAttempts++;
         
+        // Try alternative connection methods
+        if (mqttState.reconnectAttempts == 3) {
+            Serial.println("🔄 Trying without Last Will & Testament...");
+            if (mqttClient.connect(clientId.c_str(), MQTT_USER, MQTT_PASSWORD)) {
+                Serial.println("✅ Connected without LWT!");
+                mqttState.connected = true;
+                return;
+            }
+        }
+        
+        if (mqttState.reconnectAttempts == 5) {
+            Serial.println("🔄 Trying simple client ID...");
+            if (mqttClient.connect("ESP32PetCollar", MQTT_USER, MQTT_PASSWORD)) {
+                Serial.println("✅ Connected with simple ID!");
+                mqttState.connected = true;
+                return;
+            }
+        }
+        
         // Disable MQTT after too many failures
         if (mqttState.reconnectAttempts > 10) {
             Serial.println("⚠️ Too many MQTT failures, disabling for this session");
+            Serial.println("💡 Check your HiveMQ Cloud credentials and account status");
             mqttState.enabled = false;
         }
     }
