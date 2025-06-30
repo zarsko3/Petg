@@ -50,7 +50,7 @@ export function useCollarStats() {
       // Use demo data
       setStats(DEMO_STATS)
     }
-  }, [isLive, collarData, connectionDuration])
+  }, [isLive, collarData?.battery, collarData?.rssi, collarData?.temperature, collarData?.humidity, connectionDuration])
 
   return {
     stats,
@@ -79,7 +79,7 @@ export function useCollarPosition() {
 
       return () => clearInterval(interval)
     }
-  }, [isLive, collarData])
+  }, [isLive, collarData?.position?.x, collarData?.position?.y])
 
   return {
     position,
