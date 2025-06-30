@@ -254,6 +254,48 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
         alertManager.startAlert(AlertReason::REMOTE_COMMAND, AlertMode::BUZZER);
         Serial.printf("🔊 Cloud buzzer command: %dms, pattern: %s\n", duration, pattern.c_str());
         
+    } else if (topicStr.indexOf("/command") > 0 && topicStr.indexOf("/command/") == -1) {
+        // Handle generic command format (pet-collar/001/command)
+        String cmd = doc["cmd"] | "";
+        
+        if (cmd == "test-alert") {
+            String alertMode = doc["alertMode"] | "buzzer";
+            int durationMs = doc["durationMs"] | 1200;
+            int intensity = doc["intensity"] | 128;
+            
+            Serial.printf("🧪 Test Alert Command: mode=%s, duration=%dms, intensity=%d, pin=%d\n", 
+                         alertMode.c_str(), durationMs, intensity, BUZZER_PIN);
+            
+            // Map alert mode to AlertMode enum
+            AlertMode mode = AlertMode::BUZZER;
+            if (alertMode == "vibration") {
+                mode = AlertMode::VIBRATION;
+            } else if (alertMode == "both") {
+                mode = AlertMode::BOTH;
+            }
+            
+            // Trigger alert with test command
+            alertManager.startAlert(AlertReason::REMOTE_COMMAND, mode);
+            
+            // Also trigger buzzer directly for immediate feedback
+            if (alertMode == "buzzer" || alertMode == "both") {
+                Serial.printf("🔊 Direct buzzer test on GPIO %d\n", BUZZER_PIN);
+                pinMode(BUZZER_PIN, OUTPUT);
+                
+                // Generate tone for test duration
+                ledcAttach(BUZZER_PIN, 1000, 8);  // 1kHz frequency, 8-bit resolution
+                ledcWrite(BUZZER_PIN, intensity / 2);  // Convert 0-255 to 0-127 for 8-bit
+                delay(durationMs);
+                ledcWrite(BUZZER_PIN, 0);  // Turn off
+                ledcDetach(BUZZER_PIN);
+                
+                Serial.println("✅ Buzzer test completed");
+            }
+            
+        } else {
+            Serial.printf("❓ Unknown command: %s\n", cmd.c_str());
+        }
+        
     } else if (topicStr.indexOf("/command/zone") > 0) {
         String action = doc["action"] | "status";
         

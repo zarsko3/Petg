@@ -180,7 +180,7 @@
 // GPIO Pin assignments (ESP32-S3 specific)
 #define PIN_STATUS_LED_WIFI      2       // WiFi status LED
 #define PIN_STATUS_LED_BLE       3       // BLE status LED
-#define PIN_BUZZER              4       // Alert buzzer
+#define PIN_BUZZER              18      // Alert buzzer (confirmed pin 18)
 #define PIN_BUTTON              5       // Configuration button
 #define PIN_BATTERY_SENSE       6       // Battery voltage sensing
 

@@ -56,7 +56,7 @@
 // ==========================================
 // Hardware pins
 // ==========================================
-#define BUZZER_PIN         25
+#define BUZZER_PIN         18
 #define VIBRATION_PIN      26
 #define BUTTON_PIN         0
 #define LED_PIN            2
