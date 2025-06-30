@@ -105,13 +105,41 @@ export function CollarServiceProvider({ children }: CollarServiceProviderProps) 
         mqttClient.onCollarStatus = (collarId: string, data) => {
           console.log(`📡 CollarServiceProvider: Status from ${collarId}:`, data);
           
+          // 🛡️ ANTI-SPAM: Check if this is a real status transition
+          const store = usePetgStore.getState();
+          const previousStatus = store.deviceStatusMap[collarId];
+          const shouldShowToast = previousStatus !== data.status;
+          const now = Date.now();
+          const lastToast = store.lastOnlineToastAt[collarId] || 0;
+          const shouldDebounce = data.status === 'online' && (now - lastToast) < 300000; // 5 minutes
+          
+          console.log(`🔄 Status transition: ${previousStatus} -> ${data.status} | Toast: ${shouldShowToast && !shouldDebounce}`);
+          
+          // Update device status in store
+          store.updateDeviceStatus(collarId, data.status);
+          
+          // 📋 ALWAYS add to Recent Updates (no spam here)
+          store.addRecentUpdate({
+            type: 'status',
+            title: `Collar ${collarId}`,
+            message: data.status === 'online' 
+              ? `Connected and online${data.ip_address ? ` (${data.ip_address})` : ''}`
+              : `Status: ${data.status}`,
+            collarId: collarId,
+            severity: data.status === 'online' ? 'success' : 'info'
+          });
+          
           // Check for device_id "001" and status "online" to exit demo mode
           if (data.device_id === "001" && data.status === 'online') {
             console.log('🎯 CollarServiceProvider: Device 001 online - exiting demo mode');
             store.setDemoMode(false);
-            toast.success('Live Mode Activated', {
-              description: 'Collar 001 is now online'
-            });
+            
+            // 🎉 ONLY show toast on real state transitions (no spam!)
+            if (shouldShowToast && !shouldDebounce) {
+              toast.success('Live Mode Activated', {
+                description: 'Collar 001 is now online'
+              });
+            }
           }
           
           if (data.status === 'online') {
@@ -223,7 +251,8 @@ export function CollarServiceProvider({ children }: CollarServiceProviderProps) 
             rssi: beacon.rssi,
             distance: beacon.distance,
             confidence: beacon.confidence,
-            timestamp: beacon.timestamp,
+            timestamp: Date.now(), // 🔧 FIX: Use local time instead of device uptime
+            deviceTimestamp: beacon.timestamp, // Keep original device uptime for debugging
             address: beacon.address,
             collarId: collarId
           };

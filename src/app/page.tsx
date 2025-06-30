@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Battery, Clock, AlertTriangle, Wifi, Activity as LucideActivity, ChevronRight, RefreshCw, Thermometer } from 'lucide-react';
 import { mockRecentActivities } from '@/lib/mock-data';
 import { PageLayout } from '@/components/page-layout';
+import { RecentUpdatesPanel } from '@/components/recent-updates-panel';
 
 import { useCollarData } from '@/hooks/useCollarData';
 import { 
@@ -121,8 +122,6 @@ export default function HomePage() {
           </button>
         </div>
       </div>
-
-
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Main Content - 3 columns */}
@@ -402,6 +401,9 @@ export default function HomePage() {
               </div>
             </div>
           </div>
+
+          {/* Recent Updates Panel */}
+          <RecentUpdatesPanel />
 
           {/* Data Source Indicator */}
           {lastUpdate && (

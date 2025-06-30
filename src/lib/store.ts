@@ -70,9 +70,25 @@ interface PetgState {
     rssi: number;
     distance: number;
     confidence: number;
-    timestamp: number;
+    timestamp: number; // Local time (Date.now())
+    deviceTimestamp?: number; // Original device uptime for debugging
     address?: string;
     collarId: string;
+  }>;
+  
+  // Device status tracking (prevents toast spam)
+  deviceStatusMap: Record<string, string>; // collarId -> last known status
+  lastOnlineToastAt: Record<string, number>; // collarId -> timestamp of last "online" toast
+  
+  // Recent Updates (replaces spammy toasts)
+  recentUpdates: Array<{
+    id: string;
+    type: 'status' | 'connection' | 'battery' | 'alert' | 'beacon';
+    title: string;
+    message: string;
+    timestamp: number;
+    collarId?: string;
+    severity: 'info' | 'success' | 'warning' | 'error';
   }>;
   
   setSystemState: (state: 'normal' | 'alert' | 'lowBattery') => void;
@@ -103,12 +119,26 @@ interface PetgState {
     distance: number;
     confidence: number;
     timestamp: number;
+    deviceTimestamp?: number;
     address?: string;
     collarId: string;
   }) => void;
   removeBeacon: (id: string) => void;
   clearBeacons: () => void;
   cleanupOldBeacons: (maxAgeMs?: number) => void;
+
+  // Recent Updates actions
+  addRecentUpdate: (update: {
+    type: 'status' | 'connection' | 'battery' | 'alert' | 'beacon';
+    title: string;
+    message: string;
+    collarId?: string;
+    severity: 'info' | 'success' | 'warning' | 'error';
+  }) => void;
+  clearRecentUpdates: () => void;
+
+  // Device status actions (prevents toast spam)
+  updateDeviceStatus: (collarId: string, status: string) => void;
 }
 
 export const usePetgStore = create<PetgState>((set) => ({
@@ -135,6 +165,13 @@ export const usePetgStore = create<PetgState>((set) => ({
   // Live beacon detections
   beacons: loadBeaconsFromStorage(),
   
+  // Device status tracking (prevents toast spam)
+  deviceStatusMap: {},
+  lastOnlineToastAt: {},
+  
+  // Recent Updates (replaces spammy toasts)
+  recentUpdates: [],
+  
   setSystemState: (state) => set({ systemState: state }),
   setBatteryLevel: (level) => set({ batteryLevel: level }),
   setAlertActive: (active) => set({ alertActive: active }),
@@ -160,6 +197,14 @@ export const usePetgStore = create<PetgState>((set) => ({
     // 🔍 STEP 3: Enhanced logging for ghost mode creation
     console.log(`🏪 Store: [STEP 3] addOrUpdateBeacon called with:`, beacon);
     console.log(`🏪 Store: [STEP 3] Current store has ${state.beacons.length} beacons`);
+    
+    // 🔧 TIMESTAMP FIX: Debug timestamp comparison
+    if (beacon.deviceTimestamp) {
+      const localTime = beacon.timestamp;
+      const deviceTime = beacon.deviceTimestamp;
+      const timeDiff = localTime - deviceTime;
+      console.log(`⏰ Store: [TIMESTAMP FIX] Local: ${localTime}, Device: ${deviceTime}, Diff: ${timeDiff}ms (${(timeDiff/1000).toFixed(1)}s)`);
+    }
     
     const existingIndex = state.beacons.findIndex(b => 
       b.id === beacon.id || b.name === beacon.name
@@ -191,7 +236,9 @@ export const usePetgStore = create<PetgState>((set) => ({
         id: b.id,
         name: b.name,
         rssi: b.rssi,
-        age_seconds: Math.floor((Date.now() - b.timestamp) / 1000)
+        age_seconds: Math.floor((Date.now() - b.timestamp) / 1000),
+        local_timestamp: new Date(b.timestamp).toLocaleTimeString(),
+        device_timestamp: b.deviceTimestamp
       })));
       
       // 🔍 STEP 5: Save to localStorage
@@ -241,5 +288,48 @@ export const usePetgStore = create<PetgState>((set) => ({
       beacons: filtered,
       lastDataReceived: Date.now(),
     };
-  })
+  }),
+
+  // Recent Updates actions
+  addRecentUpdate: (update) => set((state) => {
+    const newUpdate = {
+      id: `update-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: Date.now(),
+      ...update
+    };
+    
+    // Keep only last 20 updates
+    const newUpdates = [newUpdate, ...state.recentUpdates].slice(0, 20);
+    
+    console.log(`📋 Store: Added recent update:`, newUpdate);
+    return { recentUpdates: newUpdates };
+  }),
+  
+  clearRecentUpdates: () => set({ recentUpdates: [] }),
+
+  // Device status actions (prevents toast spam)
+  updateDeviceStatus: (collarId, status) => set((state) => {
+    const previousStatus = state.deviceStatusMap[collarId];
+    const now = Date.now();
+    const lastToast = state.lastOnlineToastAt[collarId] || 0;
+    
+    // Determine if we should show a toast (only on real state transitions)
+    const shouldShowToast = previousStatus !== status;
+    
+    // Debounce check: don't show another "online" toast for 5 minutes
+    const shouldDebounce = status === 'online' && (now - lastToast) < 300000; // 5 minutes
+    
+    console.log(`🔄 Store: Device ${collarId} status: ${previousStatus} -> ${status} | Toast: ${shouldShowToast && !shouldDebounce}`);
+    
+    // Update the status map
+    const newDeviceStatusMap = { ...state.deviceStatusMap, [collarId]: status };
+    const newLastOnlineToastAt = status === 'online' && shouldShowToast && !shouldDebounce 
+      ? { ...state.lastOnlineToastAt, [collarId]: now }
+      : state.lastOnlineToastAt;
+    
+    return { 
+      deviceStatusMap: newDeviceStatusMap,
+      lastOnlineToastAt: newLastOnlineToastAt
+    };
+     })
 })); 

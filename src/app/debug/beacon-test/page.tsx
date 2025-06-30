@@ -2,9 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { usePetgStore } from '@/lib/store';
 import { getMQTTClient } from '@/lib/mqtt-client';
+import { Badge } from '@/components/ui/badge';
+import { CardDescription } from '@/components/ui/card';
+import { RecentUpdatesPanel } from '@/components/recent-updates-panel';
 
 export default function BeaconTestPage() {
   const [logMessages, setLogMessages] = useState<string[]>([]);
@@ -210,6 +213,38 @@ export default function BeaconTestPage() {
     setLogMessages(prev => [`[${new Date().toLocaleTimeString()}] 🧪 Manual test beacon added: ${testBeacon.name}`, ...prev.slice(0, 49)]);
   };
 
+  // Test anti-spam toast functionality
+  const testAntiSpamToast = () => {
+    const store = usePetgStore.getState();
+    
+    // Simulate status message (this should NOT show a toast if called repeatedly)
+    store.addRecentUpdate({
+      type: 'status',
+      title: 'Collar test-001',
+      message: 'Connected and online (192.168.1.100)',
+      collarId: 'test-001',
+      severity: 'success'
+    });
+    
+    // Check if we should show a toast (this simulates the MQTT handler logic)
+    const previousStatus = store.deviceStatusMap['test-001'];
+    const shouldShowToast = previousStatus !== 'online';
+    
+    // Update device status
+    store.updateDeviceStatus('test-001', 'online');
+    
+    if (shouldShowToast) {
+      console.log('🎉 Would show toast: First time online or status change');
+      setLogMessages(prev => [`[${new Date().toLocaleTimeString()}] 🎉 Toast would show (real status transition)`, ...prev.slice(0, 49)]);
+    } else {
+      console.log('🛡️ Toast suppressed: Status unchanged (anti-spam working)');
+      setLogMessages(prev => [`[${new Date().toLocaleTimeString()}] 🛡️ Toast suppressed (anti-spam working)`, ...prev.slice(0, 49)]);
+    }
+  };
+
+  const mqttConnected = mqttStats.connected;
+  const storeBeacons = beacons;
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -218,94 +253,143 @@ export default function BeaconTestPage() {
           <Button onClick={clearLogs} variant="outline">Clear Logs</Button>
           <Button onClick={testLocalStorage} variant="outline">Test localStorage</Button>
           <Button onClick={forceStoreUpdate} variant="outline">Add Test Beacon</Button>
+          <Button onClick={testAntiSpamToast} variant="outline">Test Anti-Spam</Button>
         </div>
       </div>
 
-      {/* Pipeline Status Dashboard */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        <Card className="p-4">
-          <h3 className="font-semibold text-center">📡 STEP 1</h3>
-          <p className="text-sm text-gray-600 text-center">MQTT Messages</p>
-          <div className="text-2xl font-bold text-center mt-2">{pipelineStats.step1_mqtt_messages}</div>
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Pipeline Status */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              🔍 Pipeline Status
+              <Badge variant={mqttConnected ? "default" : "destructive"}>
+                {mqttConnected ? "Active" : "Offline"}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Step counters */}
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="flex justify-between">
+                  <span>📡 MQTT Messages:</span>
+                  <Badge variant="outline">{pipelineStats.step1_mqtt_messages}</Badge>
+                </div>
+                <div className="flex justify-between">
+                  <span>🏪 Store Updates:</span>
+                  <Badge variant="outline">{pipelineStats.step2_store_updates}</Badge>
+                </div>
+                <div className="flex justify-between">
+                  <span>👻 Ghost Created:</span>
+                  <Badge variant="outline">{pipelineStats.step3_new_beacons}</Badge>
+                </div>
+                <div className="flex justify-between">
+                  <span>💾 localStorage:</span>
+                  <Badge variant="outline">{pipelineStats.step5_localStorage_saves}</Badge>
+                </div>
+              </div>
+              
+              {/* Connection info */}
+              <div className="pt-2 border-t">
+                <div className="flex justify-between text-sm">
+                  <span>🌐 MQTT Status:</span>
+                  <span className={mqttConnected ? "text-green-600" : "text-red-600"}>
+                    {mqttConnected ? "Connected" : "Disconnected"}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>🔗 Store Beacons:</span>
+                  <span>{storeBeacons.length}</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
         </Card>
-        
-        <Card className="p-4">
-          <h3 className="font-semibold text-center">🏪 STEP 2</h3>
-          <p className="text-sm text-gray-600 text-center">Store Updates</p>
-          <div className="text-2xl font-bold text-center mt-2">{pipelineStats.step2_store_updates}</div>
-        </Card>
-        
-        <Card className="p-4">
-          <h3 className="font-semibold text-center">👻 STEP 3</h3>
-          <p className="text-sm text-gray-600 text-center">New Ghosts</p>
-          <div className="text-2xl font-bold text-center mt-2">{pipelineStats.step3_new_beacons}</div>
-        </Card>
-        
-        <Card className="p-4">
-          <h3 className="font-semibold text-center">🎨 STEP 4</h3>
-          <p className="text-sm text-gray-600 text-center">UI Renders</p>
-          <div className="text-2xl font-bold text-center mt-2">{pipelineStats.step4_ui_renders}</div>
-        </Card>
-        
-        <Card className="p-4">
-          <h3 className="font-semibold text-center">💾 STEP 5</h3>
-          <p className="text-sm text-gray-600 text-center">localStorage</p>
-          <div className="text-2xl font-bold text-center mt-2">{pipelineStats.step5_localStorage_saves}</div>
+
+        {/* Anti-Spam Toast Status */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              🛡️ Anti-Spam Toast Status
+              <Badge variant="default">Active</Badge>
+            </CardTitle>
+            <CardDescription>
+              Collar status toasts now only fire on real state transitions
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="p-3 border rounded-lg bg-green-50 dark:bg-green-900/20">
+                <div className="font-medium text-sm text-green-800 dark:text-green-200">✅ Toast Spam Fixed</div>
+                <div className="text-xs text-green-600 dark:text-green-300 mt-1">
+                  • Only show toast on status transitions (offline → online)<br/>
+                  • 5-minute debounce prevents repeat toasts<br/>
+                  • All status messages go to Recent Updates panel<br/>
+                  • Much cleaner UX experience
+                </div>
+              </div>
+              
+              <div className="p-3 border rounded-lg">
+                <div className="font-medium text-sm">Recent Updates Panel</div>
+                <div className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+                  Check the main dashboard sidebar to see all collar status<br/>
+                  messages in a non-intrusive scrollable list.
+                </div>
+              </div>
+            </div>
+          </CardContent>
         </Card>
       </div>
 
-      {/* Connection Status */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="p-6">
-          <h2 className="text-xl font-semibold mb-4">
-            🌐 Connection Status
-          </h2>
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span>MQTT Connected:</span>
-              <span className={mqttStats.connected ? "text-green-600" : "text-red-600"}>
-                {mqttStats.connected ? "✅ Yes" : "❌ No"}
-              </span>
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Timestamp Fix Validation */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              ⏰ Timestamp Fix Status
+              <Badge variant="default">Fixed</Badge>
+            </CardTitle>
+            <CardDescription>
+              Verifying local time vs device uptime timestamps
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {storeBeacons.length > 0 ? (
+                storeBeacons.slice(0, 3).map((beacon) => {
+                  const now = Date.now();
+                  const ageSeconds = Math.floor((now - beacon.timestamp) / 1000);
+                  const deviceTimeDiff = beacon.deviceTimestamp ? 
+                    Math.floor((beacon.timestamp - beacon.deviceTimestamp) / 1000) : 'N/A';
+                  
+                  return (
+                    <div key={beacon.id} className="p-3 border rounded-lg">
+                      <div className="font-medium text-sm">{beacon.name}</div>
+                      <div className="text-xs text-gray-600 space-y-1">
+                        <div>Age: {ageSeconds}s (should be recent)</div>
+                        <div>Local Time: {new Date(beacon.timestamp).toLocaleTimeString()}</div>
+                        {beacon.deviceTimestamp && (
+                          <div>Device vs Local: +{deviceTimeDiff}s difference</div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-sm text-gray-500 text-center py-4">
+                  No beacons detected yet.<br />
+                  Start collar to test timestamp fix.
+                </div>
+              )}
             </div>
-            <div className="flex justify-between">
-              <span>Collar Connected:</span>
-              <span className={isConnected ? "text-green-600" : "text-red-600"}>
-                {isConnected ? "✅ Yes" : "❌ No"}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span>Connection Status:</span>
-              <span>{connectionStatus}</span>
-            </div>
-          </div>
+          </CardContent>
         </Card>
 
-        <Card className="p-6">
-          <h2 className="text-xl font-semibold mb-4">
-            Live Beacons ({beacons.length})
-          </h2>
-          <div className="space-y-3 max-h-64 overflow-y-auto">
-            {beacons.length === 0 ? (
-              <p className="text-gray-500 italic">No beacons detected</p>
-            ) : (
-              beacons.map((beacon) => (
-                <div key={beacon.id} className="border rounded p-3 text-sm">
-                  <div className="font-medium">{beacon.name}</div>
-                  <div className="text-gray-600">
-                    RSSI: {beacon.rssi}dBm | Distance: {beacon.distance.toFixed(1)}cm
-                    <br />
-                    Collar: {beacon.collarId} | Age: {Math.floor((Date.now() - beacon.timestamp) / 1000)}s
-                  </div>
-                  {beacon.address && (
-                    <div className="text-xs text-gray-500">
-                      MAC: {beacon.address}
-                    </div>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-        </Card>
+        {/* Recent Updates Panel (Live Demo) */}
+        <div>
+          <RecentUpdatesPanel />
+        </div>
       </div>
 
       {/* Debug Log */}
