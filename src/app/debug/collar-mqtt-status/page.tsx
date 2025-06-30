@@ -111,24 +111,85 @@ export default function CollarMQTTStatusPage() {
   const testCollarConnectivity = async () => {
     addTestResult('🔍 Testing collar connectivity...');
     
-    // Test 1: Known collar IP from serial log + common IPs
-    const commonIPs = ['192.168.1.35', '192.168.1.100', '192.168.4.1', '192.168.1.31'];
+    // Get collar IP from multiple sources (prioritized)
+    let priorityIPs: string[] = [];
     
-    for (const ip of commonIPs) {
+    // 1. Try to get current IP from collar-proxy discovery
+    try {
+      addTestResult('📡 Attempting collar discovery via proxy...');
+      const response = await fetch('/api/collar-proxy?endpoint=/api/discover', {
+        signal: AbortSignal.timeout(5000)
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const discoveredIP = data.local_ip || data.ip_address;
+        if (discoveredIP) {
+          priorityIPs.push(discoveredIP);
+          addTestResult(`✅ Collar discovered at ${discoveredIP}`);
+        }
+      }
+    } catch (error) {
+      addTestResult('⚠️ Collar discovery failed, trying known IPs...');
+    }
+    
+    // 2. Add known IPs from serial logs and common addresses
+    const knownIPs = ['192.168.1.35', '192.168.1.100', '192.168.4.1', '192.168.1.31'];
+    priorityIPs = [...priorityIPs, ...knownIPs.filter(ip => !priorityIPs.includes(ip))];
+    
+    addTestResult(`🎯 Testing ${priorityIPs.length} IP addresses in priority order...`);
+    
+    for (const ip of priorityIPs) {
+      addTestResult(`\n--- Testing ${ip} ---`);
+      
+      // Test HTTP connectivity
       try {
-        addTestResult(`🌐 Testing HTTP connection to ${ip}...`);
+        addTestResult(`🌐 HTTP test: http://${ip}/`);
         const response = await fetch(`http://${ip}/`, { 
           signal: AbortSignal.timeout(3000),
           mode: 'no-cors' // Avoid CORS issues for connectivity test
         });
-        addTestResult(`✅ HTTP response from ${ip} (may be collar web interface)`);
+        addTestResult(`✅ HTTP response from ${ip} - collar web interface accessible`);
+        
+        // If HTTP works, also test the discovery endpoint
+        try {
+          const discoverResponse = await fetch(`http://${ip}/api/discover`, {
+            signal: AbortSignal.timeout(3000)
+          });
+          if (discoverResponse.ok) {
+            const data = await discoverResponse.json();
+            addTestResult(`📋 Device info: ${data.device || 'Unknown'} v${data.version || '?'}`);
+            
+            // Update collar status if we got good data
+            if (data.device_type === 'ESP32-S3_PetCollar' || data.device?.includes('PetCollar')) {
+              setCollarStatus(prev => ({
+                ...prev,
+                ipAddress: ip,
+                firmwareVersion: data.version || data.firmware_version,
+                batteryLevel: data.battery_percent || data.batteryLevel,
+                wifiRssi: data.wifi_rssi || data.rssi,
+                uptime: data.uptime
+              }));
+            }
+          }
+        } catch {
+          addTestResult(`ℹ️ Discovery endpoint not accessible (normal for some firmware versions)`);
+        }
+        
       } catch (error) {
         addTestResult(`❌ No HTTP response from ${ip}`);
       }
       
       // Test WebSocket
       try {
-        addTestResult(`🔌 Testing WebSocket connection to ws://${ip}:8080...`);
+        addTestResult(`🔌 WebSocket test: ws://${ip}:8080`);
+        
+        // Check for HTTPS/WS security issue
+        if (window.location.protocol === 'https:') {
+          addTestResult(`⚠️ Security Warning: HTTPS page cannot connect to ws:// URLs`);
+          addTestResult(`💡 Try accessing via HTTP: http://localhost:3000${window.location.pathname}`);
+          continue;
+        }
+        
         const ws = new WebSocket(`ws://${ip}:8080`);
         
         await new Promise<void>((resolve, reject) => {
@@ -140,6 +201,15 @@ export default function CollarMQTTStatusPage() {
           ws.onopen = () => {
             clearTimeout(timeout);
             addTestResult(`✅ WebSocket connected to ${ip}:8080`);
+            
+            // Test sending a status request
+            try {
+              ws.send(JSON.stringify({ command: 'get_status' }));
+              addTestResult(`📤 Status request sent`);
+            } catch (sendError) {
+              addTestResult(`⚠️ Could not send status request`);
+            }
+            
             ws.close();
             resolve();
           };
@@ -150,9 +220,14 @@ export default function CollarMQTTStatusPage() {
           };
         });
       } catch (error) {
-        addTestResult(`❌ WebSocket failed for ${ip}:8080`);
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+        addTestResult(`❌ WebSocket failed for ${ip}:8080 - ${errorMsg}`);
       }
+      
+      addTestResult(''); // Add spacing between IP tests
     }
+    
+    addTestResult('🎯 Connectivity test completed');
   };
 
   const sendTestCommand = async () => {

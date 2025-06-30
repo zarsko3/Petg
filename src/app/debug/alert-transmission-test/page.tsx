@@ -78,7 +78,24 @@ export default function AlertTransmissionTestPage() {
     setIsTesting(true);
     
     try {
-      const wsUrl = localStorage.getItem('petg.wsUrl') || 'ws://192.168.1.35:8080';
+      // Try to get current collar IP from discovery
+      let collarIP = localStorage.getItem('petg.collarIP') || '192.168.1.35';
+      
+      // Try to get updated IP from collar-proxy if available
+      try {
+        const response = await fetch('/api/collar-proxy?endpoint=/api/discover', {
+          signal: AbortSignal.timeout(3000)
+        });
+        if (response.ok) {
+          const data = await response.json();
+          collarIP = data.local_ip || data.ip_address || collarIP;
+          console.log(`🔍 Updated collar IP from discovery: ${collarIP}`);
+        }
+      } catch (discoveryError) {
+        console.log('⚠️ Could not update collar IP, using cached/fallback:', collarIP);
+      }
+      
+      const wsUrl = `ws://${collarIP}:8080`;
       
       // Map to collar command format
       let command = 'test_buzzer';
@@ -87,6 +104,20 @@ export default function AlertTransmissionTestPage() {
       const payload = { command };
       
       console.log(`📡 WebSocket Test - URL: ${wsUrl}, Payload:`, payload);
+      
+      // Check for HTTPS/WS security issue
+      if (window.location.protocol === 'https:') {
+        console.warn('⚠️ HTTPS page trying to connect to WS (not WSS) - browser may block this');
+        addLog({
+          method: 'WebSocket',
+          url: wsUrl,
+          payload,
+          success: false,
+          error: 'Failed to construct \'WebSocket\': An insecure WebSocket connection may not be initiated from a page loaded over HTTPS.'
+        });
+        setIsTesting(false);
+        return;
+      }
       
       const ws = new WebSocket(wsUrl);
       
@@ -134,12 +165,19 @@ export default function AlertTransmissionTestPage() {
 
     } catch (error) {
       console.error('WebSocket test error:', error);
+      
+      // Handle specific security error
+      let errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      if (errorMessage.includes('insecure WebSocket connection')) {
+        errorMessage = 'Security Error: HTTPS page cannot connect to WS (non-secure WebSocket). Try accessing via HTTP instead.';
+      }
+      
       addLog({
         method: 'WebSocket',
-        url: 'Unknown',
+        url: 'Security Blocked',
         payload: { alertMode },
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: errorMessage
       });
     }
     
@@ -214,6 +252,29 @@ export default function AlertTransmissionTestPage() {
           Clear Logs
         </Button>
       </div>
+
+      {/* Security Warning for HTTPS */}
+      {typeof window !== 'undefined' && window.location.protocol === 'https:' && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <div className="h-5 w-5 text-amber-600 mt-0.5">⚠️</div>
+            <div>
+              <h3 className="font-semibold text-amber-800">WebSocket Security Limitation</h3>
+              <p className="text-amber-700 mt-1">
+                This page is loaded over HTTPS, which prevents WebSocket connections to non-secure collar endpoints (ws://). 
+              </p>
+              <div className="mt-2 space-y-1 text-sm text-amber-600">
+                <p><strong>Solutions:</strong></p>
+                <ul className="ml-4 space-y-1">
+                  <li>• Access this page via HTTP instead: <code className="bg-amber-100 px-1 rounded">http://localhost:3000{window.location.pathname}</code></li>
+                  <li>• MQTT and HTTP tests will work normally</li>
+                  <li>• WebSocket tests require HTTP access for security reasons</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Test Controls */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

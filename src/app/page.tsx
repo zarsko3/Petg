@@ -2,10 +2,12 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { Battery, Clock, AlertTriangle, Wifi, Activity as LucideActivity, ChevronRight, RefreshCw, Thermometer } from 'lucide-react';
+import { Battery, Clock, AlertTriangle, Wifi, Activity as LucideActivity, ChevronRight, RefreshCw, Thermometer, Volume2 } from 'lucide-react';
 import { mockRecentActivities } from '@/lib/mock-data';
 import { PageLayout } from '@/components/page-layout';
 import { RecentUpdatesPanel } from '@/components/recent-updates-panel';
+import { getMQTTClient } from '@/lib/mqtt-client';
+import { toast } from 'sonner';
 
 import { useCollarData } from '@/hooks/useCollarData';
 import { 
@@ -34,6 +36,7 @@ export default function HomePage() {
   // Client-side state initialization
   const [mounted, setMounted] = useState(false);
   const [selectedTimeframe, setSelectedTimeframe] = useState('This Year');
+  const [isTesting, setIsTesting] = useState(false);
   
   // Use real-time collar data
   const { data: collarData, status: collarStatus, isConnected, isLoading, lastUpdate, refetch } = useCollarData(5000);
@@ -88,6 +91,43 @@ export default function HomePage() {
       sleep_percentage: 35
     };
   }, [collarData?.daily_stats]);
+
+  // Test alert function using MQTT (same method that was successful in testing)
+  const handleTestAlert = async () => {
+    setIsTesting(true);
+    
+    try {
+      const mqttClient = getMQTTClient();
+      const topic = 'pet-collar/001/command';
+      const payload = {
+        cmd: 'test-alert',
+        alertMode: 'both',  // Test both buzzer and vibration
+        durationMs: 1200,
+        intensity: 150
+      };
+
+      console.log(`📡 Sending test alert via MQTT to ${topic}:`, payload);
+      
+      const success = await mqttClient.publish(topic, JSON.stringify(payload));
+      
+      if (success) {
+        toast.success('Test Alert Sent', {
+          description: 'Collar should buzz and vibrate for 1.2 seconds'
+        });
+        console.log('✅ Test alert sent successfully via MQTT');
+      } else {
+        throw new Error('Failed to publish MQTT message');
+      }
+      
+    } catch (error) {
+      console.error('Failed to send test alert:', error);
+      toast.error('Failed to Send Test Alert', {
+        description: 'Please check collar connection and try again'
+      });
+    } finally {
+      setTimeout(() => setIsTesting(false), 2000); // Keep loading state for 2 seconds
+    }
+  };
 
   return (
     <PageLayout background="bg-gray-50/50 dark:bg-gray-900">
@@ -323,6 +363,29 @@ export default function HomePage() {
                 }
               </span>
             </div>
+            
+            {/* Test Alert Button */}
+            <button
+              onClick={handleTestAlert}
+              disabled={isTesting}
+              className={`w-full mt-4 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-medium transition-all duration-200 ${
+                isTesting
+                  ? 'bg-gray-100 dark:bg-gray-700 text-gray-500 cursor-not-allowed'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg'
+              }`}
+            >
+              {isTesting ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
+                  Testing...
+                </>
+              ) : (
+                <>
+                  <Volume2 className="h-4 w-4" />
+                  TEST
+                </>
+              )}
+            </button>
           </div>
 
           {/* Connection Status */}
