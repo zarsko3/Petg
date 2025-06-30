@@ -32,9 +32,14 @@ import {
   getActivityLevelText
 } from '@/lib/utils'
 import { usePetgStore } from '@/lib/store'
+import { getMQTTClient } from '@/lib/mqtt-client'
+import { toast } from 'sonner'
 
 export default function MobileDashboard() {
   const [mounted, setMounted] = useState(false)
+  const [isTesting, setIsTesting] = useState(false)
+  const [notifications, setNotifications] = useState<any[]>([])
+  const [lastCollarData, setLastCollarData] = useState<any>(null)
   const { stats: collarStats, isLive, status } = useCollarStats()
   
   // Map new hook data to old variable names for compatibility
@@ -68,6 +73,110 @@ export default function MobileDashboard() {
   const petName = user?.firstName || 'Buddy'
   const userName = user?.firstName || 'there'
   const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+
+  // Test alert function using MQTT
+  const handleTestAlert = async () => {
+    setIsTesting(true)
+    try {
+      const mqttClient = getMQTTClient()
+      const payload = { cmd: 'test-alert', alertMode: 'both', durationMs: 1200, intensity: 150 }
+      const success = await mqttClient.publish('pet-collar/001/command', JSON.stringify(payload))
+      
+      if (success) {
+        toast.success('Test Alert Sent', { description: 'Collar should buzz and vibrate for 1.2 seconds' })
+      } else {
+        throw new Error('Failed to publish MQTT message')
+      }
+    } catch (error) {
+      toast.error('Failed to Send Test Alert', { description: 'Please check collar connection and try again' })
+    } finally {
+      setTimeout(() => setIsTesting(false), 2000)
+    }
+  }
+
+  // Generate real notifications based on collar data changes
+  useEffect(() => {
+    if (!mounted || !collarData) return
+
+    const newNotifications: any[] = []
+    const now = new Date()
+
+    // Connection status notifications
+    if (isConnected && !demoMode) {
+      if (!lastCollarData || !lastCollarData.wasConnected) {
+        newNotifications.push({
+          type: 'success',
+          icon: CheckCircle2,
+          message: `${petName}'s collar connected successfully`,
+          time: 'Just now',
+          color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800'
+        })
+      }
+    } else if (lastCollarData?.wasConnected) {
+      newNotifications.push({
+        type: 'warning',
+        icon: AlertTriangle,
+        message: `${petName}'s collar disconnected`,
+        time: 'Just now',
+        color: 'text-amber-600 bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+      })
+    }
+
+    // Battery alerts
+    if (collarData.battery_level && collarData.battery_level < 20) {
+      newNotifications.push({
+        type: 'warning',
+        icon: Battery,
+        message: `Low battery: ${collarData.battery_level}% remaining`,
+        time: 'Just now',
+        color: 'text-red-600 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+      })
+    }
+
+    // Signal strength alerts
+    if (collarData.signal_strength && collarData.signal_strength < -80) {
+      newNotifications.push({
+        type: 'warning',
+        icon: Wifi,
+        message: `Weak signal detected: ${getSignalStrengthText(collarData.signal_strength)}`,
+        time: 'Just now',
+        color: 'text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800'
+      })
+    }
+
+    // Temperature alerts
+    if (collarData.temperature && (collarData.temperature > 30 || collarData.temperature < 5)) {
+      const isHot = collarData.temperature > 30
+      newNotifications.push({
+        type: 'warning',
+        icon: Thermometer,
+        message: `${isHot ? 'High' : 'Low'} temperature detected: ${formatTemperature(collarData.temperature)}`,
+        time: 'Just now',
+        color: isHot 
+          ? 'text-red-600 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+          : 'text-blue-600 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+      })
+    }
+
+    // Location/activity updates
+    if (isConnected && !demoMode) {
+      newNotifications.push({
+        type: 'info',
+        icon: MapPin,
+        message: `${petName} is active in ${collarData.location || 'the monitored area'}`,
+        time: 'Just now',
+        color: 'text-teal-600 bg-teal-50 dark:bg-teal-900/20 border-teal-200 dark:border-teal-800'
+      })
+    }
+
+    // Update notifications (keep last 5)
+    if (newNotifications.length > 0) {
+      setNotifications(prev => [...newNotifications, ...prev].slice(0, 5))
+    }
+
+    // Update last collar data for comparison
+    setLastCollarData({ ...collarData, wasConnected: isConnected && !demoMode })
+  }, [collarData, isConnected, demoMode, mounted, lastCollarData, petName])
 
   const stats = [
     {
@@ -104,27 +213,14 @@ export default function MobileDashboard() {
     }
   ]
 
-  const alerts = [
+  // Use real notifications or fallback to demo data
+  const alerts = notifications.length > 0 ? notifications : [
     {
       type: 'info',
       icon: MapPin,
-      message: `${petName} is safe in the Living Room`,
-      time: '2 min ago',
-      color: 'text-teal-600 bg-teal-50 dark:bg-teal-900/20 border-teal-200 dark:border-teal-800'
-    },
-    {
-      type: 'success',
-      icon: Award,
-      message: 'Daily play goal achieved!',
-      time: '1 hour ago',
-      color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800'
-    },
-    {
-      type: 'achievement',
-      icon: CheckCircle2,
-      message: 'All safety zones are active',
-      time: '3 hours ago',
-      color: 'text-blue-600 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+      message: `${petName} location monitoring ready`,
+      time: 'Demo mode',
+      color: 'text-gray-600 bg-gray-50 dark:bg-gray-900/20 border-gray-200 dark:border-gray-800'
     }
   ]
 
@@ -390,9 +486,23 @@ export default function MobileDashboard() {
           </div>
           
           <div className="grid grid-cols-2 gap-4">
-            <button className="mobile-button-primary p-4 rounded-2xl flex flex-col items-center gap-2 shadow-teal-glow hover:shadow-teal-glow-lg transition-all duration-200">
-              <Bell className="h-6 w-6" />
-              <span className="text-sm font-semibold font-rounded">Test Alert</span>
+            <button 
+              onClick={handleTestAlert}
+              disabled={isTesting}
+              className={`mobile-button-primary p-4 rounded-2xl flex flex-col items-center gap-2 transition-all duration-200 ${
+                isTesting 
+                  ? 'opacity-50 cursor-not-allowed' 
+                  : 'shadow-teal-glow hover:shadow-teal-glow-lg'
+              }`}
+            >
+              {isTesting ? (
+                <div className="animate-spin rounded-full h-6 w-6 border-2 border-white border-t-transparent" />
+              ) : (
+                <Bell className="h-6 w-6" />
+              )}
+              <span className="text-sm font-semibold font-rounded">
+                {isTesting ? 'Testing...' : 'Test Alert'}
+              </span>
             </button>
             
             <button className="mobile-button-accent p-4 rounded-2xl flex flex-col items-center gap-2 shadow-coral-glow hover:shadow-coral-glow-lg transition-all duration-200">
