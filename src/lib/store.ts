@@ -1,5 +1,43 @@
 import { create } from 'zustand';
 
+// 🔍 STEP 5: localStorage persistence helpers
+const BEACON_STORAGE_KEY = 'petg-detected-beacons';
+const BEACON_MAX_AGE_MS = 600000; // 10 minutes
+
+const loadBeaconsFromStorage = () => {
+  if (typeof window === 'undefined') return [];
+  
+  try {
+    const stored = localStorage.getItem(BEACON_STORAGE_KEY);
+    if (!stored) return [];
+    
+    const beacons = JSON.parse(stored);
+    const now = Date.now();
+    
+    // Filter out expired beacons
+    const validBeacons = beacons.filter((beacon: any) => 
+      beacon.timestamp && (now - beacon.timestamp) < BEACON_MAX_AGE_MS
+    );
+    
+    console.log(`📦 Store: [STEP 5] Loaded ${validBeacons.length}/${beacons.length} valid beacons from localStorage`);
+    return validBeacons;
+  } catch (error) {
+    console.error('❌ Store: [STEP 5] Failed to load beacons from localStorage:', error);
+    return [];
+  }
+};
+
+const saveBeaconsToStorage = (beacons: any[]) => {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    localStorage.setItem(BEACON_STORAGE_KEY, JSON.stringify(beacons));
+    console.log(`💾 Store: [STEP 5] Saved ${beacons.length} beacons to localStorage`);
+  } catch (error) {
+    console.error('❌ Store: [STEP 5] Failed to save beacons to localStorage:', error);
+  }
+};
+
 interface User {
   name: string;
 }
@@ -95,7 +133,7 @@ export const usePetgStore = create<PetgState>((set) => ({
   lastCollarData: null,
   
   // Live beacon detections
-  beacons: [],
+  beacons: loadBeaconsFromStorage(),
   
   setSystemState: (state) => set({ systemState: state }),
   setBatteryLevel: (level) => set({ batteryLevel: level }),
@@ -119,33 +157,89 @@ export const usePetgStore = create<PetgState>((set) => ({
   
   // Beacon actions
   addOrUpdateBeacon: (beacon) => set((state) => {
+    // 🔍 STEP 3: Enhanced logging for ghost mode creation
+    console.log(`🏪 Store: [STEP 3] addOrUpdateBeacon called with:`, beacon);
+    console.log(`🏪 Store: [STEP 3] Current store has ${state.beacons.length} beacons`);
+    
     const existingIndex = state.beacons.findIndex(b => 
       b.id === beacon.id || b.name === beacon.name
     );
     
     if (existingIndex >= 0) {
       // Update existing beacon
+      console.log(`🔄 Store: [STEP 3] Updating existing beacon at index ${existingIndex}:`, state.beacons[existingIndex]);
       const updatedBeacons = [...state.beacons];
       updatedBeacons[existingIndex] = beacon;
+      
+      console.log(`✅ Store: [STEP 3] Beacon updated:`, beacon);
+      console.log(`📊 Store: [STEP 3] Total beacons after update: ${updatedBeacons.length}`);
+      
+      // 🔍 STEP 5: Save to localStorage
+      saveBeaconsToStorage(updatedBeacons);
+      
       return {
         beacons: updatedBeacons,
         lastDataReceived: Date.now(),
       };
     } else {
-      // Add new beacon
+      // Add new beacon (ghost mode)
+      console.log(`🆕 Store: [STEP 3] Adding NEW beacon (ghost mode):`, beacon);
+      const newBeacons = [...state.beacons, beacon];
+      
+      console.log(`✅ Store: [STEP 3] New beacon added. Total beacons: ${newBeacons.length}`);
+      console.log(`📋 Store: [STEP 3] All beacons now:`, newBeacons.map(b => ({
+        id: b.id,
+        name: b.name,
+        rssi: b.rssi,
+        age_seconds: Math.floor((Date.now() - b.timestamp) / 1000)
+      })));
+      
+      // 🔍 STEP 5: Save to localStorage
+      saveBeaconsToStorage(newBeacons);
+      
       return {
-        beacons: [...state.beacons, beacon],
+        beacons: newBeacons,
         lastDataReceived: Date.now(),
       };
     }
   }),
-  removeBeacon: (id) => set((state) => ({
-    beacons: state.beacons.filter((b) => b.id !== id),
-    lastDataReceived: Date.now(),
-  })),
-  clearBeacons: () => set({ beacons: [] }),
-  cleanupOldBeacons: (maxAgeMs = 300000) => set((state) => ({
-    beacons: state.beacons.filter((b) => Date.now() - b.timestamp < maxAgeMs),
-    lastDataReceived: Date.now(),
-  })),
+  removeBeacon: (id) => set((state) => {
+    console.log(`🗑️ Store: Removing beacon with id: ${id}`);
+    const beforeCount = state.beacons.length;
+    const filtered = state.beacons.filter((b) => b.id !== id);
+    console.log(`📊 Store: Removed ${beforeCount - filtered.length} beacon(s). Remaining: ${filtered.length}`);
+    
+    // 🔍 STEP 5: Save to localStorage
+    saveBeaconsToStorage(filtered);
+    
+    return {
+      beacons: filtered,
+      lastDataReceived: Date.now(),
+    };
+  }),
+  clearBeacons: () => set((state) => {
+    console.log(`🧹 Store: Clearing all ${state.beacons.length} beacons`);
+    return { beacons: [] };
+  }),
+  cleanupOldBeacons: (maxAgeMs = 300000) => set((state) => {
+    const beforeCount = state.beacons.length;
+    const now = Date.now();
+    const filtered = state.beacons.filter((b) => now - b.timestamp < maxAgeMs);
+    
+    if (beforeCount !== filtered.length) {
+      console.log(`🧹 Store: Cleanup removed ${beforeCount - filtered.length} old beacons (older than ${maxAgeMs/1000}s). Remaining: ${filtered.length}`);
+      console.log(`📋 Store: Remaining beacons:`, filtered.map(b => ({
+        name: b.name,
+        age_seconds: Math.floor((now - b.timestamp) / 1000)
+      })));
+      
+      // 🔍 STEP 5: Save to localStorage after cleanup
+      saveBeaconsToStorage(filtered);
+    }
+    
+    return {
+      beacons: filtered,
+      lastDataReceived: Date.now(),
+    };
+  })
 })); 

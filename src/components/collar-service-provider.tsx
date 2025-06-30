@@ -202,7 +202,8 @@ export function CollarServiceProvider({ children }: CollarServiceProviderProps) 
         };
         
         mqttClient.onCollarBeaconDetection = (collarId: string, beacon) => {
-          console.log(`🔍 CollarServiceProvider: Beacon detection from ${collarId}:`, beacon);
+          // 🔍 STEP 2: Enhanced logging for store/context verification
+          console.log(`🔍 CollarServiceProvider: [STEP 2] Beacon detection from ${collarId}:`, beacon);
           
           // Check for device_id "001" and exit demo mode if needed
           if (beacon.device_id === "001" || collarId === "001") {
@@ -227,11 +228,31 @@ export function CollarServiceProvider({ children }: CollarServiceProviderProps) 
             collarId: collarId
           };
           
+          // 🔍 STEP 2: Log store state before and after update
+          const storeBefore = store.beacons.length;
+          console.log(`📊 CollarServiceProvider: [STEP 2] Store state BEFORE update: ${storeBefore} beacons`);
+          console.log(`📊 CollarServiceProvider: [STEP 2] About to store beacon:`, storeBeacon);
+          
           store.addOrUpdateBeacon(storeBeacon);
-          console.log(`📊 Beacon stored: ${beacon.beacon_name} (${beacon.rssi}dBm, ${beacon.distance.toFixed(1)}cm)`);
+          
+          const storeAfter = store.beacons.length;
+          console.log(`📊 CollarServiceProvider: [STEP 2] Store state AFTER update: ${storeAfter} beacons`);
+          console.log(`📊 CollarServiceProvider: [STEP 2] Current store beacons:`, store.beacons.map(b => ({
+            id: b.id,
+            name: b.name,
+            rssi: b.rssi,
+            timestamp: new Date(b.timestamp).toLocaleTimeString()
+          })));
+          
+          console.log(`✅ CollarServiceProvider: [STEP 2] Beacon stored: ${beacon.beacon_name} (${beacon.rssi}dBm, ${beacon.distance.toFixed(1)}cm)`);
           
           // Clean up old beacons (older than 5 minutes)
           store.cleanupOldBeacons(300000);
+          
+          const storeAfterCleanup = store.beacons.length;
+          if (storeAfterCleanup !== storeAfter) {
+            console.log(`🧹 CollarServiceProvider: [STEP 2] Cleanup removed ${storeAfter - storeAfterCleanup} old beacons`);
+          }
         };
         
         mqttClient.onError = (error) => {
