@@ -385,7 +385,9 @@ export function BeaconConfigurationPanel({
       
       // Map alert modes to collar commands
       let collarCommand: string;
-      switch (alertMode.toLowerCase()) {
+      const safeAlertMode = alertMode && typeof alertMode === 'string' ? alertMode.toLowerCase() : 'buzzer';
+      
+      switch (safeAlertMode) {
         case 'buzzer':
           collarCommand = 'test_buzzer';
           break;
@@ -395,7 +397,12 @@ export function BeaconConfigurationPanel({
         case 'both':
           collarCommand = 'test_buzzer'; // Start with buzzer
           break;
+        case 'none':
+          alert('❌ Cannot test "None" alert mode\nPlease select Buzzer, Vibration, or Both first.');
+          setTestingAlert(null);
+          return;
         default:
+          console.warn(`Unknown alert mode: ${alertMode}, defaulting to buzzer`);
           collarCommand = 'test_buzzer';
       }
 
@@ -583,7 +590,7 @@ export function BeaconConfigurationPanel({
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               beaconId,
-              alertMode,
+              alertMode: safeAlertMode || 'buzzer', // Use the safe alert mode we already validated
               duration: 2000,
               intensity: 2000,
               fallback: true
@@ -1640,7 +1647,13 @@ export function BeaconConfigurationPanel({
                       
                       <div className="space-y-2">
                         <button
-                          onClick={() => testAlert(config.id, config.alertMode)}
+                          onClick={() => {
+                            if (!config.alertMode || config.alertMode === 'none') {
+                              alert('❌ Cannot test alert\n\nThis beacon is set to "None" alert mode.\nPlease change the alert mode to Buzzer, Vibration, or Both first.');
+                              return;
+                            }
+                            testAlert(config.id, config.alertMode);
+                          }}
                           disabled={!isConnected || config.alertMode === 'none' || testingAlert === config.id}
                           className={cn(
                             "w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-all duration-200",

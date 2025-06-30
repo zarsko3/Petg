@@ -15,9 +15,20 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString()
     });
 
+    // Validate and safely handle alert mode
+    if (!alertMode || typeof alertMode !== 'string') {
+      return NextResponse.json({
+        success: false,
+        error: 'Invalid alert mode',
+        message: 'Alert mode must be a valid string (buzzer, vibration, both, or none)'
+      }, { status: 400 });
+    }
+
     // Map alert modes to collar commands
     let collarCommand;
-    switch (alertMode.toLowerCase()) {
+    const safeAlertMode = alertMode.toLowerCase();
+    
+    switch (safeAlertMode) {
       case 'buzzer':
         collarCommand = 'test_buzzer';
         break;
@@ -34,6 +45,7 @@ export async function POST(request: NextRequest) {
           message: 'Please select a valid alert mode first'
         }, { status: 400 });
       default:
+        console.warn(`Unknown alert mode: ${alertMode}, defaulting to buzzer`);
         collarCommand = 'test_buzzer'; // Default to buzzer
     }
 
