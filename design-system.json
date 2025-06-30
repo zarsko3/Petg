@@ -12,17 +12,17 @@
 
   "tokens": {
     "colors": {
-      "primaryAccent":   "#FFD84B",       /* warm yellow – buttons, highlights */
-      "backgroundBase":  "#F8F4EF",       /* light cream – app surface */
-      "surfaceCard":     "#FFFFFF",       /* white – cards / modals */
-      "surfaceMuted":    "#F1EFEA",       /* slightly darker cream – alt sections */
-      "textPrimary":     "#151515",       /* almost-black */
-      "textSecondary":   "#6E6E6E",       /* mid-gray copy */
-      "borderSubtle":    "#E5E5E5",       /* card borders / dividers */
-      "iconTint":        "#A0A0A0",       /* placeholder icons */
-      "ratingStar":      "#FFC700",       /* star rating */
-      "infoPositive":    "#4CAF50",       /* (optional) success state */
-      "infoNegative":    "#F44336"        /* (optional) error state */
+      "primaryAccent":   "#FFD84B",
+      "backgroundBase":  "#F8F4EF",
+      "surfaceCard":     "#FFFFFF",
+      "surfaceMuted":    "#F1EFEA",
+      "textPrimary":     "#151515",
+      "textSecondary":   "#6E6E6E",
+      "borderSubtle":    "#E5E5E5",
+      "iconTint":        "#A0A0A0",
+      "ratingStar":      "#FFC700",
+      "infoPositive":    "#4CAF50",
+      "infoNegative":    "#F44336"
     },
 
     "typography": {

@@ -256,9 +256,16 @@ export function CollarServiceProvider({ children }: CollarServiceProviderProps) 
     
     initializeMQTT();
     
+    // 🧹 ENHANCED: Set up periodic beacon cleanup every 30 seconds
+    const cleanupInterval = setInterval(() => {
+      const store = usePetgStore.getState();
+      store.cleanupOldBeacons(300000); // Remove beacons older than 5 minutes
+    }, 30000); // Check every 30 seconds
+    
     return () => {
       console.log('🧹 CollarServiceProvider: Cleaning up MQTT client...');
       resetTelemetryWatchdog();
+      clearInterval(cleanupInterval);
       // Note: MQTT client manages its own lifecycle
     };
   }, []);

@@ -690,11 +690,24 @@ export function BeaconConfigurationPanel({
     let hasChanges = false;
 
     for (const realBeacon of realBeacons) {
-      if (!realBeacon.name || !realBeacon.name.startsWith('PetZone-Home-')) continue;
+      // 🔄 ENHANCED: Accept ALL detected beacons, not just "PetZone-Home-" pattern
+      // Remove restrictive filtering to enable "ghost mode" for any detected beacon
+      if (!realBeacon.name && !realBeacon.address) {
+        console.log('⚠️ Skipping beacon with no name or address:', realBeacon);
+        continue; // Only skip if we have absolutely no identifier
+      }
+
+      // Generate a meaningful identifier and name for the beacon
+      const beaconId = realBeacon.address || realBeacon.name || `unknown-${Date.now()}`;
+      const beaconName = realBeacon.name || 
+                        (realBeacon.address ? `Beacon-${realBeacon.address.slice(-4)}` : '') ||
+                        `Unknown-${beaconId.slice(-4)}`;
 
       const existingConfig = updatedConfigurations.find(
-        config => config.name === realBeacon.name || 
-        (config.macAddress && config.macAddress === realBeacon.address)
+        config => config.name === beaconName || 
+        config.id === beaconId ||
+        (config.macAddress && config.macAddress === realBeacon.address) ||
+        (realBeacon.name && config.name === realBeacon.name)
       );
 
       if (existingConfig) {
@@ -705,37 +718,38 @@ export function BeaconConfigurationPanel({
         existingConfig.lastSeen = new Date().toISOString();
         existingConfig.macAddress = realBeacon.address || existingConfig.macAddress;
         hasChanges = true;
+        console.log(`🔄 Updated existing beacon: ${existingConfig.name}`);
       } else {
-        // Create new auto-detected configuration
+        // 🆕 ENHANCED: Create new auto-detected configuration in "ghost mode"
         const newConfig: BeaconConfiguration = {
           id: `auto-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          name: realBeacon.name,
-          location: extractLocationFromName(realBeacon.name),
-          zone: extractZoneFromName(realBeacon.name),
+          name: beaconName,
+          location: extractLocationFromName(beaconName) || 'Auto-detected',
+          zone: extractZoneFromName(beaconName) || 'Unassigned',
           macAddress: realBeacon.address,
           
-          // Default configuration parameters
-          alertMode: 'buzzer',
+          // 👻 GHOST MODE: Default configuration with minimal alerts until user configures
+          alertMode: realBeacon.name?.startsWith('PetZone-Home-') ? 'buzzer' : 'none', // Only alert for known patterns initially
           proximitySettings: {
-            triggerDistance: 5,           // Default 5cm trigger distance
-            alertDuration: 2000,          // Default 2 second alert duration
-            alertIntensity: 3,            // Default medium intensity
-            enableProximityDelay: false,  // Default disabled for immediate alerts
-            proximityDelayTime: 0,        // No delay by default
-            cooldownPeriod: 3000          // 3 second cooldown between alerts
+            triggerDistance: 5,           // Conservative 5cm trigger distance
+            alertDuration: 1000,          // Short 1 second alert duration
+            alertIntensity: 1,            // Low intensity for unknown beacons
+            enableProximityDelay: true,   // Enable delay to prevent false positives
+            proximityDelayTime: 3000,     // 3 second delay for unknown beacons
+            cooldownPeriod: 10000         // Long 10 second cooldown for ghost mode
           },
           proximityThreshold: -65,
           alertDelay: 3000,
-          alertTimeout: 10000,
+          alertTimeout: 5000,
           
-          // Default zone settings
+          // Default zone settings - conservative for unknown beacons
           safeZone: false,
           boundaryAlert: false,
           
           // Default positioning
           position: { x: 50, y: 50 },
           
-          // Metadata from real beacon
+          // Metadata from real beacon - marked as auto-detected
           isAutoDetected: true,
           lastSeen: new Date().toISOString(),
           batteryLevel: realBeacon.battery_level || 100,
@@ -758,10 +772,17 @@ export function BeaconConfigurationPanel({
           if (response.ok) {
             updatedConfigurations.push(newConfig);
             hasChanges = true;
-            console.log(`✅ Auto-detected beacon added: ${newConfig.name}`);
+            console.log(`✅ Auto-detected beacon added (Ghost Mode): ${newConfig.name} | Address: ${newConfig.macAddress || 'N/A'}`);
+            
+            // 🔔 Optional: Show notification for new beacon detection
+            if (typeof window !== 'undefined' && window.navigator && 'serviceWorker' in window.navigator) {
+              // Could add a subtle notification here for new beacon detection
+            }
+          } else {
+            console.error('❌ Failed to save auto-detected beacon:', await response.text());
           }
         } catch (error) {
-          console.error('Failed to save auto-detected beacon:', error);
+          console.error('❌ Failed to save auto-detected beacon:', error);
         }
       }
     }
@@ -769,6 +790,7 @@ export function BeaconConfigurationPanel({
     if (hasChanges) {
       setConfigurations(updatedConfigurations);
       onConfigurationUpdate?.(updatedConfigurations);
+      console.log(`🔄 Beacon sync completed: ${updatedConfigurations.length} total beacons (${updatedConfigurations.filter(c => c.isAutoDetected).length} auto-detected)`);
     }
   };
 
@@ -1370,8 +1392,17 @@ export function BeaconConfigurationPanel({
                             </span>
                           )}
                           {config.isAutoDetected && (
-                            <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-1 rounded-md font-medium">
-                              Auto-detected
+                            <span className={cn(
+                              "text-xs px-2 py-1 rounded-md font-medium flex items-center gap-1",
+                              config.name?.startsWith('PetZone-Home-') 
+                                ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+                                : "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+                            )}>
+                              {config.name?.startsWith('PetZone-Home-') ? (
+                                <>🔍 Auto-detected</>
+                              ) : (
+                                <>👻 Ghost Mode</>
+                              )}
                             </span>
                           )}
                         </div>
@@ -1719,7 +1750,7 @@ export function BeaconConfigurationPanel({
                       ...prev, 
                       alertMode: e.target.value as 'none' | 'buzzer' | 'vibration' | 'both' 
                     }))}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="none">No Alert</option>
                     <option value="buzzer">Buzzer Only</option>
@@ -1867,6 +1898,45 @@ export function BeaconConfigurationPanel({
           </div>
         </div>
       ) : null}
+
+      {/* Ghost Mode Information Section */}
+      {configurations.some(c => c.isAutoDetected && !c.name?.startsWith('PetZone-Home-')) && (
+        <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+          <div className="flex items-start gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">👻</span>
+              <AlertTriangle className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
+                Ghost Mode Beacons Detected
+              </h3>
+              <p className="text-sm text-blue-800 dark:text-blue-200 mb-3">
+                Your collar has detected {configurations.filter(c => c.isAutoDetected && !c.name?.startsWith('PetZone-Home-')).length} beacon(s) 
+                in "Ghost Mode". These are automatically added with minimal alert settings until you configure them properly.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                  <CheckCircle className="h-4 w-4" />
+                  <span>Automatically detected and added</span>
+                </div>
+                <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                  <XCircle className="h-4 w-4" />
+                  <span>Alerts disabled by default</span>
+                </div>
+                <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                  <Settings className="h-4 w-4" />
+                  <span>Click "Edit" to configure properly</span>
+                </div>
+                <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                  <Shield className="h-4 w-4" />
+                  <span>Conservative settings prevent false alerts</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 
