@@ -331,15 +331,40 @@ export class CollarMQTTClient {
     const topic = MQTT_TOPICS.COLLAR_COMMAND_LED(collarId);
     const payload = JSON.stringify(command);
     
-    this.client.publish(topic, payload, { qos: 1 }, (error?: Error) => {
+    console.log(`📤 MQTT: Sending LED command to ${topic}:`, command);
+    
+    this.client.publish(topic, payload, { qos: 1 }, (error) => {
       if (error) {
         console.error('❌ MQTT: Failed to send LED command:', error);
       } else {
-        console.log(`✅ MQTT: Sent LED command to collar ${collarId}`);
+        console.log('✅ MQTT: LED command sent successfully');
       }
     });
     
     return true;
+  }
+
+  // Generic publish method for beacon config and test alerts
+  public async publish(topic: string, payload: string, options?: { qos?: 0 | 1 | 2; retain?: boolean }): Promise<boolean> {
+    return new Promise((resolve) => {
+      if (!this.client || !this.isConnected) {
+        console.warn('⚠️ MQTT: Not connected, cannot publish message');
+        resolve(false);
+        return;
+      }
+      
+      console.log(`📤 MQTT: Publishing to ${topic}:`, payload);
+      
+      this.client.publish(topic, payload, { qos: 1, ...options }, (error) => {
+        if (error) {
+          console.error('❌ MQTT: Failed to publish message:', error);
+          resolve(false);
+        } else {
+          console.log('✅ MQTT: Message published successfully');
+          resolve(true);
+        }
+      });
+    });
   }
 
   public getConnectionStatus(): { connected: boolean; client_id?: string } {

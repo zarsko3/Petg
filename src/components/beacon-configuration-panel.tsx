@@ -5,10 +5,22 @@ import {
   Edit, Save, X, Plus, Trash, Settings, AlertTriangle, 
   MapPin, Clock, Wifi, Battery, Shield, Volume2, 
   Vibrate, VolumeX, Target, Timer, Zap, Home, Play,
-  Circle, CheckCircle, XCircle, AlertCircle, Radio
+  Circle, CheckCircle, XCircle, AlertCircle, Radio,
+  Info,
+  Trash2,
+  Eye,
+  EyeOff,
+  Search,
+  Filter,
+  Download,
+  Upload,
+  RotateCcw,
+  ExternalLink
 } from 'lucide-react';
-import { Filter, ChevronDown, Square, CheckSquare, Copy, Download, Upload, Wand2 } from 'lucide-react';
+import { ChevronDown, Square, CheckSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { BeaconSettingsDrawer } from '@/components/beacon-settings-drawer';
 
 // Enhanced Beacon Configuration interface with Live Proximity Alerts
 interface BeaconConfiguration {
@@ -155,7 +167,7 @@ export function BeaconConfigurationPanel({
   const [testingAlert, setTestingAlert] = useState<string | null>(null);
   
   // NEW: Priority 2 features
-  const [selectedBeacons, setSelectedBeacons] = useState<Set<string>>(new Set());
+  const [selectedBeacons, setSelectedBeacons] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
     status: 'all',
@@ -165,6 +177,10 @@ export function BeaconConfigurationPanel({
   });
   const [showTemplates, setShowTemplates] = useState(false);
   const [showBatchOps, setShowBatchOps] = useState(false);
+  
+  // Beacon Settings Drawer state
+  const [selectedBeaconForSettings, setSelectedBeaconForSettings] = useState<any>(null);
+  const [isSettingsDrawerOpen, setIsSettingsDrawerOpen] = useState(false);
   
   // Form state for editing/adding
   const [formData, setFormData] = useState<Partial<BeaconConfiguration>>({
@@ -238,7 +254,7 @@ export function BeaconConfigurationPanel({
       }
       
       await Promise.all(updates);
-      setSelectedBeacons(new Set());
+      setSelectedBeacons([]);
       console.log(`✅ Applied ${template.name} template to ${updates.length} beacons`);
     } catch (error) {
       console.error('❌ Failed to apply template to selected beacons:', error);
@@ -265,7 +281,7 @@ export function BeaconConfigurationPanel({
       }
       
       await Promise.all(updates);
-      setSelectedBeacons(new Set());
+      setSelectedBeacons([]);
       console.log(`✅ Updated alert mode for ${updates.length} beacons`);
     } catch (error) {
       console.error('❌ Failed to batch update alert mode:', error);
@@ -275,7 +291,7 @@ export function BeaconConfigurationPanel({
   };
 
   const batchDelete = async () => {
-    if (!window.confirm(`Are you sure you want to delete ${selectedBeacons.size} selected beacons?`)) {
+    if (!window.confirm(`Are you sure you want to delete ${selectedBeacons.length} selected beacons?`)) {
       return;
     }
     
@@ -288,7 +304,7 @@ export function BeaconConfigurationPanel({
       }
       
       await Promise.all(deletions);
-      setSelectedBeacons(new Set());
+      setSelectedBeacons([]);
       console.log(`✅ Deleted ${deletions.length} beacons`);
     } catch (error) {
       console.error('❌ Failed to batch delete beacons:', error);
@@ -324,16 +340,16 @@ export function BeaconConfigurationPanel({
     } else {
       newSelection.add(beaconId);
     }
-    setSelectedBeacons(newSelection);
+    setSelectedBeacons(Array.from(newSelection));
   };
 
   const selectAllFiltered = () => {
     const allFilteredIds = new Set(filteredConfigurations.map(c => c.id));
-    setSelectedBeacons(allFilteredIds);
+    setSelectedBeacons(Array.from(allFilteredIds));
   };
 
   const clearSelection = () => {
-    setSelectedBeacons(new Set());
+    setSelectedBeacons([]);
   };
 
   // Load configurations from API
@@ -1125,7 +1141,7 @@ export function BeaconConfigurationPanel({
                   : "border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
               )}
             >
-              <Wand2 className="h-4 w-4" />
+              <RotateCcw className="h-4 w-4" />
               Templates
             </button>
 
@@ -1142,10 +1158,10 @@ export function BeaconConfigurationPanel({
           <div className="flex items-center gap-3">
             <span className="text-sm text-gray-500 dark:text-gray-400">
               {filteredConfigurations.length} of {configurations.length} beacons
-              {selectedBeacons.size > 0 && ` • ${selectedBeacons.size} selected`}
+              {selectedBeacons.length > 0 && ` • ${selectedBeacons.length} selected`}
             </span>
 
-            {selectedBeacons.size > 0 && (
+            {selectedBeacons.length > 0 && (
               <div className="flex items-center gap-2">
                 <button
                   onClick={clearSelection}
@@ -1163,7 +1179,7 @@ export function BeaconConfigurationPanel({
               </div>
             )}
 
-            {filteredConfigurations.length > 0 && selectedBeacons.size === 0 && (
+            {filteredConfigurations.length > 0 && selectedBeacons.length === 0 && (
               <button
                 onClick={selectAllFiltered}
                 className="flex items-center gap-2 px-3 py-1 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
@@ -1257,10 +1273,10 @@ export function BeaconConfigurationPanel({
                 return (
                   <div
                     key={template.id}
-                    onClick={() => selectedBeacons.size > 0 ? applyTemplateToSelected(template) : null}
+                    onClick={() => selectedBeacons.length > 0 ? applyTemplateToSelected(template) : null}
                     className={cn(
                       "p-4 border rounded-xl cursor-pointer transition-all",
-                      selectedBeacons.size > 0
+                      selectedBeacons.length > 0
                         ? "border-blue-200 hover:border-blue-300 hover:bg-blue-50 dark:border-blue-800 dark:hover:border-blue-700 dark:hover:bg-blue-900/20"
                         : "border-gray-200 bg-gray-50 cursor-not-allowed dark:border-gray-600 dark:bg-gray-700/50"
                     )}
@@ -1268,22 +1284,22 @@ export function BeaconConfigurationPanel({
                     <div className="flex items-center gap-3 mb-2">
                       <TemplateIcon className={cn(
                         "h-5 w-5",
-                        selectedBeacons.size > 0 ? "text-blue-600" : "text-gray-400"
+                        selectedBeacons.length > 0 ? "text-blue-600" : "text-gray-400"
                       )} />
                       <span className={cn(
                         "font-medium",
-                        selectedBeacons.size > 0 ? "text-gray-900 dark:text-white" : "text-gray-500 dark:text-gray-400"
+                        selectedBeacons.length > 0 ? "text-gray-900 dark:text-white" : "text-gray-500 dark:text-gray-400"
                       )}>
                         {template.name}
                       </span>
                     </div>
                     <p className={cn(
                       "text-sm",
-                      selectedBeacons.size > 0 ? "text-gray-600 dark:text-gray-300" : "text-gray-400 dark:text-gray-500"
+                      selectedBeacons.length > 0 ? "text-gray-600 dark:text-gray-300" : "text-gray-400 dark:text-gray-500"
                     )}>
                       {template.description}
                     </p>
-                    {selectedBeacons.size === 0 && (
+                    {selectedBeacons.length === 0 && (
                       <p className="text-xs text-gray-400 mt-2">Select beacons to apply template</p>
                     )}
                   </div>
@@ -1294,10 +1310,10 @@ export function BeaconConfigurationPanel({
         )}
 
         {/* Expandable Batch Operations Panel */}
-        {showBatchOps && selectedBeacons.size > 0 && (
+        {showBatchOps && selectedBeacons.length > 0 && (
           <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-600">
             <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Batch Operations ({selectedBeacons.size} selected)
+              Batch Operations ({selectedBeacons.length} selected)
             </h4>
             <div className="flex flex-wrap gap-3">
               <button
@@ -1348,7 +1364,7 @@ export function BeaconConfigurationPanel({
             const alertDisplay = getAlertModeDisplay(config.alertMode);
             const StatusIcon = realtimeStatus.icon;
             const AlertIcon = alertDisplay.icon;
-            const isSelected = selectedBeacons.has(config.id);
+            const isSelected = selectedBeacons.includes(config.id);
 
             return (
               <div key={config.id} className={cn(
@@ -1411,9 +1427,21 @@ export function BeaconConfigurationPanel({
                     
                     <div className="flex items-center gap-3">
                       <button
+                        onClick={() => {
+                          setSelectedBeaconForSettings(config);
+                          setIsSettingsDrawerOpen(true);
+                        }}
+                        className="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                        title="Configure Alert Settings"
+                      >
+                        <Settings className="h-5 w-5" />
+                      </button>
+                      
+                      <button
                         onClick={() => startEdit(config)}
                         className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                         disabled={editingId === config.id}
+                        title="Edit Basic Information"
                       >
                         <Edit className="h-5 w-5" />
                       </button>
@@ -1422,6 +1450,7 @@ export function BeaconConfigurationPanel({
                         onClick={() => deleteConfiguration(config.id)}
                         className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                         disabled={config.isAutoDetected && realtimeStatus.status === 'active'}
+                        title="Delete Configuration"
                       >
                         <Trash className="h-5 w-5" />
                       </button>
@@ -1937,6 +1966,17 @@ export function BeaconConfigurationPanel({
           </div>
         </div>
       )}
+
+      {/* Beacon Settings Drawer */}
+      <BeaconSettingsDrawer
+        beacon={selectedBeaconForSettings}
+        isOpen={isSettingsDrawerOpen}
+        onClose={() => {
+          setIsSettingsDrawerOpen(false);
+          setSelectedBeaconForSettings(null);
+        }}
+        collarId="001"
+      />
     </div>
   );
 } 
