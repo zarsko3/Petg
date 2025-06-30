@@ -373,7 +373,7 @@ export function BeaconConfigurationPanel({
     }
   };
 
-  // Test alert function
+  // Test alert function using MQTT
   const testAlert = async (beaconId: string, alertMode: string) => {
     if (!isConnected) {
       alert('Collar not connected. Please connect your collar to test alerts.');
@@ -383,275 +383,173 @@ export function BeaconConfigurationPanel({
     try {
       setTestingAlert(beaconId);
       
-      // Map alert modes to collar commands
-      let collarCommand: string;
+      // Find the beacon configuration to get transmitter settings
+      const beaconConfig = configurations.find(config => config.id === beaconId);
       const safeAlertMode = alertMode && typeof alertMode === 'string' ? alertMode.toLowerCase() : 'buzzer';
       
-      switch (safeAlertMode) {
-        case 'buzzer':
-          collarCommand = 'test_buzzer';
-          break;
-        case 'vibration':
-          collarCommand = 'test_vibration';
-          break;
-        case 'both':
-          collarCommand = 'test_buzzer'; // Start with buzzer
-          break;
-        case 'none':
-          alert('❌ Cannot test "None" alert mode\nPlease select Buzzer, Vibration, or Both first.');
-          setTestingAlert(null);
-          return;
-        default:
-          console.warn(`Unknown alert mode: ${alertMode}, defaulting to buzzer`);
-          collarCommand = 'test_buzzer';
-      }
-
-      console.log(`🔊 Sending WebSocket command: ${collarCommand}`);
-
-      // Get cached WebSocket URL from localStorage
-      const wsUrl = localStorage.getItem('petg.wsUrl');
-      if (!wsUrl) {
-        alert('❌ Collar not discovered\n\nPlease reconnect to the collar first:\n• Go to Settings → Advanced Connection\n• Or wait for automatic UDP discovery');
+      if (safeAlertMode === 'none') {
+        alert('❌ Cannot test "None" alert mode\nPlease select Buzzer, Vibration, or Both first.');
+        setTestingAlert(null);
         return;
       }
+
+      // Use MQTT to send test alert with transmitter settings
+      const { getMQTTClient } = await import('@/lib/mqtt-client');
+      const mqttClient = getMQTTClient();
       
-      console.log(`📡 Connecting to collar WebSocket: ${wsUrl}`);
-
-      // Create WebSocket connection with improved error handling
-      const ws = new WebSocket(wsUrl);
+      const payload = {
+        cmd: 'test-alert',
+        alertMode: safeAlertMode,
+        durationMs: beaconConfig?.proximitySettings?.alertDuration || 1200,
+        intensity: Math.min(beaconConfig?.proximitySettings?.alertIntensity || 150, 200) // Cap at 200 for safety
+      };
       
-      const commandPromise = new Promise<void>((resolve, reject) => {
-        let commandSent = false;
-        let responseReceived = false;
-        let connected = false;
-        
-        // Increased timeout for better reliability
-        const timeout = setTimeout(() => {
-          console.warn(`⏰ WebSocket timeout after 8s. Connected: ${connected}, CommandSent: ${commandSent}, ResponseReceived: ${responseReceived}`);
-          if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
-            ws.close();
-          }
-          reject(new Error(`WebSocket timeout (connected: ${connected}, sent: ${commandSent}, received: ${responseReceived})`));
-        }, 8000);
-
-        ws.onopen = () => {
-          connected = true;
-          console.log('✅ WebSocket connected to collar successfully');
-          
-          try {
-            const command = { command: collarCommand };
-            ws.send(JSON.stringify(command));
-            commandSent = true;
-            console.log(`📤 Sent command:`, command);
-            
-            // Auto-resolve after 3 seconds if no response (collar might not respond)
-            setTimeout(() => {
-              if (!responseReceived) {
-                console.log('🔄 No response received after 3s, assuming command executed successfully');
-                clearTimeout(timeout);
-                if (ws.readyState === WebSocket.OPEN) {
-                  ws.close();
-                }
-                resolve();
-              }
-            }, 3000);
-          } catch (sendError) {
-            console.error('❌ Failed to send command:', sendError);
-            clearTimeout(timeout);
-            reject(new Error(`Failed to send WebSocket command: ${sendError instanceof Error ? sendError.message : 'Unknown error'}`));
-          }
-        };
-
-        ws.onmessage = (event) => {
-          console.log(`📥 Received response:`, event.data);
-          responseReceived = true;
-          try {
-            const response = JSON.parse(event.data);
-            if (response.type === 'response' && response.command === collarCommand) {
-              console.log('✅ Command confirmed by collar');
-              clearTimeout(timeout);
-              if (ws.readyState === WebSocket.OPEN) {
-                ws.close();
-              }
-              resolve();
-            } else if (response.type === 'error') {
-              console.error('❌ Collar returned error:', response);
-              clearTimeout(timeout);
-              reject(new Error(`Collar error: ${response.message || 'Unknown collar error'}`));
-            }
-          } catch (e) {
-            // Non-JSON response is also acceptable
-            console.log('✅ Received non-JSON response, assuming success');
-            clearTimeout(timeout);
-            if (ws.readyState === WebSocket.OPEN) {
-              ws.close();
-            }
-            resolve();
-          }
-        };
-
-        ws.onerror = (error) => {
-          console.error('❌ WebSocket error details:', {
-            error,
-            readyState: ws.readyState,
-            url: wsUrl,
-            connected,
-            commandSent,
-            responseReceived
-          });
-          clearTimeout(timeout);
-          
-          // Provide more detailed error messages
-          let errorMessage = `WebSocket connection failed to ${wsUrl}`;
-          if (!connected) {
-            errorMessage += '. The collar may be offline, on a different network, or the WebSocket port (8080) may be blocked.';
-          } else {
-            errorMessage += '. Connection was established but an error occurred during communication.';
-          }
-          
-          reject(new Error(errorMessage));
-        };
-
-        ws.onclose = (event) => {
-          console.log(`🔌 WebSocket closed:`, {
-            code: event.code,
-            reason: event.reason,
-            wasClean: event.wasClean,
-            connected,
-            commandSent,
-            responseReceived
-          });
-          
-          clearTimeout(timeout);
-          
-          // Handle different close codes
-          if (event.code !== 1000 && !responseReceived && !commandSent) {
-            let closeReason = 'Connection closed unexpectedly';
-            switch (event.code) {
-              case 1006:
-                closeReason = 'Connection lost (abnormal closure) - collar may be offline or network issue';
-                break;
-              case 1002:
-                closeReason = 'Protocol error - collar may not support WebSocket properly';
-                break;
-              case 1003:
-                closeReason = 'Unsupported data type';
-                break;
-              case 1011:
-                closeReason = 'Server error on collar';
-                break;
-              default:
-                closeReason = `Connection closed with code ${event.code}: ${event.reason || 'No reason provided'}`;
-            }
-            console.warn(`⚠️ ${closeReason}`);
-          }
-        };
-      });
-
-      try {
-        await commandPromise;
+      console.log(`📡 Publishing test command to pet-collar/001/command:`, payload);
+      
+      const success = await mqttClient.publish('pet-collar/001/command', JSON.stringify(payload));
+      
+      if (success) {
         console.log(`✅ Test alert sent successfully for beacon ${beaconId} (${alertMode})`);
-        
-        // Test both modes if selected
-        if (alertMode === 'both') {
-          setTimeout(async () => {
-            try {
-              console.log('🔄 Sending follow-up vibration command...');
-              const ws2 = new WebSocket(wsUrl);
-              ws2.onopen = () => {
-                ws2.send(JSON.stringify({ command: 'test_vibration' }));
-                setTimeout(() => {
-                  if (ws2.readyState === WebSocket.OPEN) {
-                    ws2.close();
-                  }
-                }, 2000);
-              };
-              ws2.onerror = (error) => {
-                console.warn('Follow-up vibration command failed:', error);
-              };
-            } catch (e) {
-              console.warn('Failed to send vibration test:', e);
-            }
-          }, 2000);
-        }
-        
-        // Brief success indication
-        setTimeout(() => setTestingAlert(null), 4000);
-        
-      } catch (wsError) {
-        const wsErrorMessage = wsError instanceof Error ? wsError.message : 'Unknown WebSocket error';
-        console.warn('WebSocket approach failed, trying HTTP fallback...', wsError);
-        
-        // Enhanced HTTP fallback attempt
-        try {
-          console.log('🔄 Attempting HTTP fallback method...');
-          const httpResponse = await fetch('/api/test-alert', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              beaconId,
-              alertMode: safeAlertMode || 'buzzer', // Use the safe alert mode we already validated
-              duration: 2000,
-              intensity: 2000,
-              fallback: true
-            })
-          });
-          
-          if (httpResponse.ok) {
-            const result = await httpResponse.json();
-            console.log('✅ HTTP fallback successful:', result);
-            setTimeout(() => setTestingAlert(null), 3000);
-          } else {
-            const errorText = await httpResponse.text();
-            throw new Error(`HTTP fallback failed: ${httpResponse.status} - ${errorText}`);
-          }
-        } catch (httpError) {
-          console.error('Both WebSocket and HTTP failed:', httpError);
-          
-          // Provide comprehensive troubleshooting guidance
-          const message = [
-            '❌ Test Alert Failed',
-            '',
-            '🔌 WebSocket Error:',
-            wsErrorMessage,
-            '',
-            '🛠️ Troubleshooting Steps:',
-            '1. Check collar OLED display - confirm IP address matches cached URL',
-            '2. Ensure collar and computer are on the same WiFi network',
-            '3. Check if collar is responding: go to ' + wsUrl.replace('ws://', 'http://').replace(':8080', '') + ' in browser',
-            '4. Try the direct WebSocket test at: /test-websocket.html',
-            '5. Go to Settings → Advanced Connection to reconfigure',
-            '',
-            '💡 If collar shows 192.168.4.1, it\'s in setup mode.',
-            'Connect to "PetCollar-Setup" WiFi and configure at http://192.168.4.1',
-            '',
-            '🔧 Advanced: Check firewall settings for WebSocket port 8080'
-          ].join('\n');
-          
-          alert(message);
-        }
+        const { toast } = await import('sonner');
+        toast.success('Test Alert Sent', {
+          description: `${safeAlertMode.charAt(0).toUpperCase() + safeAlertMode.slice(1)} test sent to collar`
+        });
+        setTimeout(() => setTestingAlert(null), 3000);
+      } else {
+        throw new Error('Failed to publish MQTT message');
       }
       
     } catch (error) {
       console.error('Failed to send test alert:', error);
-      
-      // Provide user-friendly error message
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      const friendlyMessage = [
-        '❌ Test Alert Failed',
-        '',
-        `Error: ${errorMessage}`,
-        '',
-        '🛠️ Quick Solutions:',
-        '1. Check collar power and WiFi status on OLED display',
-        '2. Go to Settings → Advanced Connection',
-        '3. Use Auto-Discover to find collar',
-        '4. Try the WebSocket test page: /test-websocket.html',
-        '5. Verify collar IP on OLED display matches discovered IP'
-      ].join('\n');
-      
-      alert(friendlyMessage);
+      const { toast } = await import('sonner');
+      toast.error('Failed to Send Test Alert', {
+        description: 'Please check collar connection and try again'
+      });
       setTestingAlert(null);
+    }
+  };
+
+  // 🚀 COLLAR PROXIMITY SYNCHRONIZATION SYSTEM
+  // Send individual beacon configuration to collar via MQTT
+  const syncConfigurationToCollar = async (config: BeaconConfiguration, collarId: string = '001'): Promise<boolean> => {
+    if (!isConnected) {
+      console.warn('⚠️ Cannot sync to collar: Not connected');
+      return false;
+    }
+
+    try {
+      const { getMQTTClient } = await import('@/lib/mqtt-client');
+      const mqttClient = getMQTTClient();
+      
+      const topic = `pet-collar/${collarId}/beacon-config`;
+      const payload = {
+        cmd: 'configure_beacon',
+        device_id: collarId,
+        beacon: {
+          id: config.id,
+          name: config.name,
+          macAddress: config.macAddress,
+          alertMode: config.alertMode,
+          
+          // ✨ EXACT TRANSMITTER SETTINGS - The collar will implement these precisely
+          triggerDistance: config.proximitySettings.triggerDistance,     // Distance in cm (e.g., 10cm)
+          alertDuration: config.proximitySettings.alertDuration,         // Duration in ms (e.g., 2000ms = 2 seconds)
+          alertIntensity: config.proximitySettings.alertIntensity,       // Intensity 1-5
+          enableProximityDelay: config.proximitySettings.enableProximityDelay,
+          proximityDelayTime: config.proximitySettings.proximityDelayTime, // Delay in ms (e.g., 2000ms)
+          cooldownPeriod: config.proximitySettings.cooldownPeriod,       // Cooldown in ms
+          
+          // Zone settings
+          safeZone: config.safeZone,
+          boundaryAlert: config.boundaryAlert
+        }
+      };
+
+      console.log(`📡 Syncing beacon config to collar via MQTT (${topic}):`, payload);
+      
+      const success = await mqttClient.publish(topic, JSON.stringify(payload));
+      
+      if (success) {
+        console.log(`✅ Successfully synced beacon "${config.name}" to collar`);
+        const { toast } = await import('sonner');
+        toast.success('Configuration Synced', {
+          description: `"${config.name}" settings sent to collar`
+        });
+        return true;
+      } else {
+        throw new Error('Failed to publish MQTT message');
+      }
+      
+    } catch (error) {
+      console.error('Failed to sync beacon configuration to collar:', error);
+      const { toast } = await import('sonner');
+      toast.error('Sync Failed', {
+        description: 'Could not send configuration to collar'
+      });
+      return false;
+    }
+  };
+
+  // Send all beacon configurations to collar via MQTT
+  const syncAllConfigurationsToCollar = async (collarId: string = '001'): Promise<number> => {
+    if (!isConnected) {
+      console.warn('⚠️ Cannot sync to collar: Not connected');
+      return 0;
+    }
+
+    if (configurations.length === 0) {
+      console.log('📝 No beacon configurations to sync');
+      return 0;
+    }
+
+    try {
+      const { getMQTTClient } = await import('@/lib/mqtt-client');
+      const mqttClient = getMQTTClient();
+      
+      const topic = `pet-collar/${collarId}/beacon-config-batch`;
+      const payload = {
+        cmd: 'configure_beacons_batch',
+        device_id: collarId,
+        beacons: configurations.map(config => ({
+          id: config.id,
+          name: config.name,
+          macAddress: config.macAddress,
+          alertMode: config.alertMode,
+          
+          // ✨ EXACT TRANSMITTER SETTINGS FOR EACH BEACON
+          triggerDistance: config.proximitySettings.triggerDistance,
+          alertDuration: config.proximitySettings.alertDuration,
+          alertIntensity: config.proximitySettings.alertIntensity,
+          enableProximityDelay: config.proximitySettings.enableProximityDelay,
+          proximityDelayTime: config.proximitySettings.proximityDelayTime,
+          cooldownPeriod: config.proximitySettings.cooldownPeriod,
+          safeZone: config.safeZone,
+          boundaryAlert: config.boundaryAlert
+        }))
+      };
+
+      console.log(`📡 Syncing ${configurations.length} beacon configurations to collar:`, payload);
+      
+      const success = await mqttClient.publish(topic, JSON.stringify(payload));
+      
+      if (success) {
+        console.log(`✅ Successfully synced ${configurations.length} beacon configurations to collar`);
+        const { toast } = await import('sonner');
+        toast.success('All Configurations Synced', {
+          description: `${configurations.length} beacon settings sent to collar`
+        });
+        return configurations.length;
+      } else {
+        throw new Error('Failed to publish MQTT message');
+      }
+      
+    } catch (error) {
+      console.error('Failed to sync all beacon configurations to collar:', error);
+      const { toast } = await import('sonner');
+      toast.error('Batch Sync Failed', {
+        description: 'Could not send configurations to collar'
+      });
+      return 0;
     }
   };
 
@@ -844,9 +742,15 @@ export function BeaconConfigurationPanel({
         onConfigurationUpdate?.(configurations);
         setLastSync(new Date());
         
-        // Show collar sync status
-        if (data.collarUpdated) {
-          console.log('✅ Configuration synced to collar');
+        // 🚀 AUTOMATIC COLLAR SYNC - Send configuration to collar immediately
+        let collarSynced = false;
+        if (isConnected) {
+          collarSynced = await syncConfigurationToCollar(data.data);
+        }
+        
+        // Show appropriate success message
+        if (data.collarUpdated || collarSynced) {
+          console.log('✅ Configuration saved and synced to collar');
         } else {
           console.warn('⚠️ Configuration saved but not synced to collar');
         }
@@ -1107,6 +1011,19 @@ export function BeaconConfigurationPanel({
                 <CheckCircle className="h-5 w-5 text-green-600" />
                 <span className="text-green-700 dark:text-green-300 font-medium">Live Sync Active</span>
               </div>
+            )}
+            
+            {/* Sync All to Collar Button */}
+            {isConnected && configurations.length > 0 && (
+              <button
+                onClick={() => syncAllConfigurationsToCollar()}
+                disabled={isSaving}
+                className="flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-medium transition-all duration-200 shadow-lg hover:shadow-xl"
+                title="Send all beacon configurations to collar for proximity-based triggering"
+              >
+                <Radio className="h-5 w-5" />
+                Sync All to Collar
+              </button>
             )}
             
             <button 
@@ -1443,6 +1360,18 @@ export function BeaconConfigurationPanel({
                       >
                         <Settings className="h-5 w-5" />
                       </button>
+                      
+                      {/* Individual Sync to Collar Button */}
+                      {isConnected && (
+                        <button
+                          onClick={() => syncConfigurationToCollar(config)}
+                          disabled={isSaving}
+                          className="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
+                          title="Sync this beacon configuration to collar for proximity triggering"
+                        >
+                          <Radio className="h-5 w-5" />
+                        </button>
+                      )}
                       
                       <button
                         onClick={() => startEdit(config)}

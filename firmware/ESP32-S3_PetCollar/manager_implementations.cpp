@@ -5,6 +5,9 @@
 #include "include/SystemStateManager.h"
 #include "include/ZoneManager.h"
 
+// External references to global objects from main .ino file
+extern AlertManager_Enhanced alertManager;
+
 // ==================== RSSI FILTERING FOR DISTANCE ACCURACY ====================
 /**
  * @brief Simple RSSI filter for smoothing noisy readings
@@ -249,6 +252,157 @@ int BeaconManager_Enhanced::getDetectedBeaconCount() const {
 // Add missing getLastScanTime method
 unsigned long BeaconManager_Enhanced::getLastScanTime() const {
     return millis(); // Simple implementation - return current time
+}
+
+// ========== PROXIMITY-BASED TRIGGERING IMPLEMENTATION ==========
+
+void BeaconManager_Enhanced::configureProximityBeacon(
+    const String& beaconId,
+    const String& beaconName,
+    const String& macAddress,
+    const String& alertMode,
+    int triggerDistance,
+    int alertDuration,
+    int alertIntensity,
+    bool enableProximityDelay,
+    int proximityDelayTime,
+    int cooldownPeriod
+) {
+    // Find existing configuration or create new one
+    ProximityBeaconConfig* config = nullptr;
+    for (auto& existing : proximityConfigs) {
+        if (existing.beaconId == beaconId || 
+            (!macAddress.isEmpty() && existing.macAddress == macAddress)) {
+            config = &existing;
+            break;
+        }
+    }
+    
+    if (!config) {
+        proximityConfigs.push_back(ProximityBeaconConfig());
+        config = &proximityConfigs.back();
+    }
+    
+    // Configure with exact transmitter settings
+    config->beaconId = beaconId;
+    config->beaconName = beaconName;
+    config->macAddress = macAddress;
+    config->alertMode = alertMode;
+    config->triggerDistance = triggerDistance;
+    config->alertDuration = alertDuration;
+    config->alertIntensity = alertIntensity;
+    config->enableProximityDelay = enableProximityDelay;
+    config->proximityDelayTime = proximityDelayTime;
+    config->cooldownPeriod = cooldownPeriod;
+    
+    Serial.printf("✅ Proximity beacon configured: %s (distance: %dcm, delay: %s)\n",
+                 beaconName.c_str(), triggerDistance, 
+                 enableProximityDelay ? String(proximityDelayTime + "ms").c_str() : "none");
+}
+
+void BeaconManager_Enhanced::clearProximityConfigurations() {
+    proximityConfigs.clear();
+    Serial.println("🗑️ Cleared all proximity beacon configurations");
+}
+
+void BeaconManager_Enhanced::processProximityTriggers() {
+    if (proximityConfigs.empty()) return;
+    
+    unsigned long currentTime = millis();
+    
+    // Check each proximity configuration
+    for (auto& config : proximityConfigs) {
+        bool beaconInRange = false;
+        float currentDistance = 999.0f; // Start with a large distance
+        
+        // Find matching beacon in active beacons
+        for (const auto& beacon : activeBeacons) {
+            bool matches = false;
+            
+            // Match by beacon ID (preferred) or MAC address
+            if (!config.beaconId.isEmpty() && beacon.name.indexOf(config.beaconId) >= 0) {
+                matches = true;
+            } else if (!config.macAddress.isEmpty() && beacon.address == config.macAddress) {
+                matches = true;
+            } else if (!config.beaconName.isEmpty() && beacon.name.indexOf(config.beaconName) >= 0) {
+                matches = true;
+            }
+            
+            if (matches && beacon.isActive) {
+                currentDistance = beacon.distance;
+                beaconInRange = (currentDistance <= config.triggerDistance);
+                break;
+            }
+        }
+        
+        // Handle proximity state changes
+        if (beaconInRange && !config.inProximityRange) {
+            // Entering proximity range
+            config.inProximityRange = true;
+            config.proximityStartTime = currentTime;
+            
+            Serial.printf("📍 Entered proximity range for '%s' at %.1fcm (trigger: %dcm)\n",
+                         config.beaconName.c_str(), currentDistance, config.triggerDistance);
+            
+        } else if (!beaconInRange && config.inProximityRange) {
+            // Exiting proximity range
+            config.inProximityRange = false;
+            config.proximityStartTime = 0;
+            
+            Serial.printf("📍 Exited proximity range for '%s' (%.1fcm)\n",
+                         config.beaconName.c_str(), currentDistance);
+        }
+        
+        // Check if alert should be triggered
+        bool shouldTrigger = false;
+        
+        if (config.inProximityRange && !config.alertActive) {
+            // Check cooldown period
+            if (currentTime - config.lastTriggered >= config.cooldownPeriod) {
+                
+                if (config.enableProximityDelay) {
+                    // Check if we've been in range long enough
+                    if (currentTime - config.proximityStartTime >= config.proximityDelayTime) {
+                        shouldTrigger = true;
+                    }
+                } else {
+                    // Immediate trigger
+                    shouldTrigger = true;
+                }
+            }
+        }
+        
+        // Trigger alert if needed
+        if (shouldTrigger) {
+            config.alertActive = true;
+            config.lastTriggered = currentTime;
+            
+            // Map alert mode to AlertMode enum
+            AlertMode mode = AlertMode::BUZZER;
+            if (config.alertMode == "vibration") {
+                mode = AlertMode::VIBRATION;
+            } else if (config.alertMode == "both") {
+                mode = AlertMode::BOTH;
+            } else if (config.alertMode == "none") {
+                continue; // Skip triggering
+            }
+            
+            // Trigger alert with exact transmitter settings
+            Serial.printf("🚨 PROXIMITY ALERT: '%s' triggered at %.1fcm (configured: %dcm)\n",
+                         config.beaconName.c_str(), currentDistance, config.triggerDistance);
+            
+            // Start alert with configured duration and intensity
+            alertManager.startAlert(AlertReason::PROXIMITY_TRIGGER, mode);
+            
+            // Schedule alert end (this would need to be handled in AlertManager)
+            // For now, the alert will run its default duration
+        }
+        
+        // Check if alert should end
+        if (config.alertActive && (currentTime - config.lastTriggered >= config.alertDuration)) {
+            config.alertActive = false;
+        }
+    }
 }
 
 // ==================== ENHANCED ALERT MANAGER IMPLEMENTATIONS ====================

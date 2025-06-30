@@ -64,7 +64,7 @@ export function useAsyncRequest<T = any>(
         setIsLoading(false);
       }
     },
-    [asyncFunction, onSuccess, onError, showSuccessToast, successMessage]
+    [asyncFunction, showSuccessToast, successMessage]
   );
 
   const reset = useCallback(() => {

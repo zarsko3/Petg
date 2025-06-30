@@ -132,7 +132,7 @@ export function useSocket({
             reconnectTimeoutRef.current = setTimeout(() => {
               reconnectAttemptsRef.current += 1;
               connect();
-            }, reconnectInterval);
+            }, reconnectInterval) as unknown as NodeJS.Timeout;
           } else {
             console.error('❌ Max reconnection attempts reached for:', url);
             setError(new Error(`Failed to connect to ${url} after maximum attempts`));
@@ -144,7 +144,7 @@ export function useSocket({
       console.error('❌ Error creating WebSocket:', error);
       setError(error);
     }
-  }, [url, enabled, maxReconnectAttempts, reconnectInterval, onMessage, setBatteryLevel, setAlertActive, setSystemState]);
+  }, [url, enabled, maxReconnectAttempts, reconnectInterval]);
   
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {

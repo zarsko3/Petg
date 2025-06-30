@@ -167,6 +167,42 @@ struct BeaconLocation {
 };
 
 /**
+ * @brief Proximity-based beacon configuration (from transmitter)
+ */
+struct ProximityBeaconConfig {
+    String beaconId;             ///< Beacon identifier
+    String beaconName;           ///< Human-readable name
+    String macAddress;           ///< MAC address (optional)
+    String alertMode;            ///< Alert mode: buzzer, vibration, both, none
+    
+    // Exact transmitter settings
+    int triggerDistance;         ///< Distance in cm to trigger alert
+    int alertDuration;           ///< Alert duration in ms
+    int alertIntensity;          ///< Alert intensity 1-5
+    bool enableProximityDelay;   ///< Enable delay before triggering
+    int proximityDelayTime;      ///< Time in ms to stay in range before triggering
+    int cooldownPeriod;          ///< Minimum time between alerts in ms
+    
+    // Runtime state
+    unsigned long lastTriggered; ///< Last time alert was triggered
+    unsigned long proximityStartTime; ///< When proximity first detected
+    bool inProximityRange;       ///< Currently in trigger range
+    bool alertActive;            ///< Alert currently active
+    
+    ProximityBeaconConfig() :
+        triggerDistance(5),
+        alertDuration(2000),
+        alertIntensity(3),
+        enableProximityDelay(false),
+        proximityDelayTime(0),
+        cooldownPeriod(5000),
+        lastTriggered(0),
+        proximityStartTime(0),
+        inProximityRange(false),
+        alertActive(false) {}
+};
+
+/**
  * @brief BLE scan result callback
  */
 typedef std::function<void(const BeaconInfo& beacon)> BeaconDetectionCallback;
@@ -189,6 +225,9 @@ private:
     // Beacon storage
     std::vector<BeaconInfo> m_beacons;
     std::map<String, BeaconLocation> m_locations;
+    
+    // Proximity-based configurations (from transmitter)
+    std::vector<ProximityBeaconConfig> m_proximityConfigs;
     
     // Configuration
     uint16_t m_scanIntervalMs;
@@ -444,6 +483,44 @@ public:
      */
     void processAdvertisedDevice(BLEAdvertisedDevice advertisedDevice);
     
+    // ========== PROXIMITY-BASED TRIGGERING (TRANSMITTER INTEGRATION) ==========
+    
+    /**
+     * @brief Configure proximity-based beacon triggering
+     * @param beaconId Beacon identifier
+     * @param beaconName Human-readable name
+     * @param macAddress MAC address (optional)
+     * @param alertMode Alert mode: buzzer, vibration, both, none
+     * @param triggerDistance Distance in cm to trigger alert
+     * @param alertDuration Alert duration in ms
+     * @param alertIntensity Alert intensity 1-5
+     * @param enableProximityDelay Enable delay before triggering
+     * @param proximityDelayTime Time in ms to stay in range before triggering
+     * @param cooldownPeriod Minimum time between alerts in ms
+     */
+    void configureProximityBeacon(
+        const String& beaconId,
+        const String& beaconName,
+        const String& macAddress,
+        const String& alertMode,
+        int triggerDistance,
+        int alertDuration,
+        int alertIntensity,
+        bool enableProximityDelay,
+        int proximityDelayTime,
+        int cooldownPeriod
+    );
+    
+    /**
+     * @brief Clear all proximity configurations
+     */
+    void clearProximityConfigurations();
+    
+    /**
+     * @brief Process proximity-based triggering (call in main loop)
+     */
+    void processProximityTriggers();
+    
     /**
      * @brief Get beacons suitable for triangulation
      * @param minBeacons Minimum number of beacons required
@@ -497,6 +574,9 @@ private:
     BeaconList activeBeacons;
     BeaconConfigList beaconConfigs;
     
+    // Proximity-based configurations (from transmitter)
+    std::vector<ProximityBeaconConfig> proximityConfigs;
+    
 public:
     BeaconManager_Enhanced();
     
@@ -523,6 +603,44 @@ public:
     
     // Legacy compatibility
     void processAdvertisedDevice(BLEAdvertisedDevice advertisedDevice);
+    
+    // ========== PROXIMITY-BASED TRIGGERING (TRANSMITTER INTEGRATION) ==========
+    
+    /**
+     * @brief Configure proximity-based beacon triggering
+     * @param beaconId Beacon identifier
+     * @param beaconName Human-readable name
+     * @param macAddress MAC address (optional)
+     * @param alertMode Alert mode: buzzer, vibration, both, none
+     * @param triggerDistance Distance in cm to trigger alert
+     * @param alertDuration Alert duration in ms
+     * @param alertIntensity Alert intensity 1-5
+     * @param enableProximityDelay Enable delay before triggering
+     * @param proximityDelayTime Time in ms to stay in range before triggering
+     * @param cooldownPeriod Minimum time between alerts in ms
+     */
+    void configureProximityBeacon(
+        const String& beaconId,
+        const String& beaconName,
+        const String& macAddress,
+        const String& alertMode,
+        int triggerDistance,
+        int alertDuration,
+        int alertIntensity,
+        bool enableProximityDelay,
+        int proximityDelayTime,
+        int cooldownPeriod
+    );
+    
+    /**
+     * @brief Clear all proximity configurations
+     */
+    void clearProximityConfigurations();
+    
+    /**
+     * @brief Process proximity-based triggering (call in main loop)
+     */
+    void processProximityTriggers();
 };
 
 #endif // BEACON_MANAGER_H 

@@ -295,6 +295,90 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
                 Serial.println("✅ Buzzer test completed");
             }
             
+        } else if (cmd == "configure_beacon") {
+            // 🚀 PROXIMITY-BASED BEACON CONFIGURATION
+            Serial.println("📡 Received beacon configuration from transmitter");
+            
+            if (doc.containsKey("beacon")) {
+                JsonObject beacon = doc["beacon"];
+                
+                // Extract exact transmitter settings
+                String beaconId = beacon["id"] | "";
+                String beaconName = beacon["name"] | "";
+                String macAddress = beacon["macAddress"] | "";
+                String alertMode = beacon["alertMode"] | "buzzer";
+                
+                int triggerDistance = beacon["triggerDistance"] | 5;     // cm
+                int alertDuration = beacon["alertDuration"] | 2000;     // ms
+                int alertIntensity = beacon["alertIntensity"] | 3;      // 1-5
+                bool enableProximityDelay = beacon["enableProximityDelay"] | false;
+                int proximityDelayTime = beacon["proximityDelayTime"] | 0; // ms
+                int cooldownPeriod = beacon["cooldownPeriod"] | 5000;   // ms
+                
+                // Configure the beacon manager with exact settings
+                beaconManager.configureProximityBeacon(
+                    beaconId, 
+                    beaconName, 
+                    macAddress, 
+                    alertMode, 
+                    triggerDistance, 
+                    alertDuration, 
+                    alertIntensity, 
+                    enableProximityDelay, 
+                    proximityDelayTime, 
+                    cooldownPeriod
+                );
+                
+                Serial.printf("✅ Configured beacon '%s' - Distance: %dcm, Duration: %dms, Intensity: %d\n", 
+                             beaconName.c_str(), triggerDistance, alertDuration, alertIntensity);
+                             
+                if (enableProximityDelay) {
+                    Serial.printf("   Proximity delay: %dms, Cooldown: %dms\n", proximityDelayTime, cooldownPeriod);
+                }
+            }
+            
+        } else if (cmd == "configure_beacons_batch") {
+            // 🚀 BATCH BEACON CONFIGURATION
+            Serial.println("📡 Received batch beacon configuration from transmitter");
+            
+            if (doc.containsKey("beacons") && doc["beacons"].is<JsonArray>()) {
+                JsonArray beacons = doc["beacons"];
+                int configuredCount = 0;
+                
+                beaconManager.clearProximityConfigurations(); // Clear existing configs
+                
+                for (JsonObject beacon : beacons) {
+                    String beaconId = beacon["id"] | "";
+                    String beaconName = beacon["name"] | "";
+                    String macAddress = beacon["macAddress"] | "";
+                    String alertMode = beacon["alertMode"] | "buzzer";
+                    
+                    int triggerDistance = beacon["triggerDistance"] | 5;
+                    int alertDuration = beacon["alertDuration"] | 2000;
+                    int alertIntensity = beacon["alertIntensity"] | 3;
+                    bool enableProximityDelay = beacon["enableProximityDelay"] | false;
+                    int proximityDelayTime = beacon["proximityDelayTime"] | 0;
+                    int cooldownPeriod = beacon["cooldownPeriod"] | 5000;
+                    
+                    beaconManager.configureProximityBeacon(
+                        beaconId, 
+                        beaconName, 
+                        macAddress, 
+                        alertMode, 
+                        triggerDistance, 
+                        alertDuration, 
+                        alertIntensity, 
+                        enableProximityDelay, 
+                        proximityDelayTime, 
+                        cooldownPeriod
+                    );
+                    
+                    configuredCount++;
+                }
+                
+                Serial.printf("✅ Configured %d proximity beacons from transmitter\n", configuredCount);
+            }
+            
         } else {
             Serial.printf("❓ Unknown command: %s\n", cmd.c_str());
         }
@@ -1513,6 +1597,9 @@ void loop() {
             }
         }
     }
+    
+    // 🚀 PROCESS PROXIMITY-BASED TRIGGERING FROM TRANSMITTER
+    beaconManager.processProximityTriggers();
     
     // Update display
     updateDisplay();

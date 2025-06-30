@@ -33,7 +33,8 @@ enum class AlertReason : uint8_t {
     // Additional MQTT integration reasons
     REMOTE_COMMAND,         ///< Remote command triggered alert
     ZONE_BREACH,            ///< Zone boundary breach
-    LOCATE_REQUEST          ///< Location request alert
+    LOCATE_REQUEST,         ///< Location request alert
+    PROXIMITY_TRIGGER       ///< Proximity-based triggering from transmitter
 };
 
 // ==================== SHARED STRUCTS ====================

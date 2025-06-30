@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useUser } from '@clerk/nextjs'
 import { 
   Battery, 
@@ -41,21 +41,23 @@ export default function MobileDashboard() {
   const [notifications, setNotifications] = useState<any[]>([])
   const [lastCollarData, setLastCollarData] = useState<any>(null)
   const { stats: collarStats, isLive, status } = useCollarStats()
+  const isConnected = usePetgStore((state) => state.isCollarConnected)
+  const demoMode = usePetgStore((state) => state.demoMode)
+  const isLoading = status === 'connecting'
+  const refetch = () => window.location.reload()
   
-  // Map new hook data to old variable names for compatibility
-  const collarData = {
+  // Memoize collarData to prevent infinite re-renders
+  const collarData = useMemo(() => ({
     battery_level: collarStats.battery,
     signal_strength: collarStats.rssi,
     activity_level: 85, // Mock activity level
     temperature: collarStats.temperature,
     location: 'Living Room',
     last_seen: new Date().toISOString()
-  }
-  const lastUpdate = new Date()
-  const isConnected = usePetgStore((state) => state.isCollarConnected)
-  const demoMode = usePetgStore((state) => state.demoMode)
-  const isLoading = status === 'connecting'
-  const refetch = () => window.location.reload()
+  }), [collarStats.battery, collarStats.rssi, collarStats.temperature])
+  
+  // Memoize lastUpdate to prevent unnecessary re-renders
+  const lastUpdate = useMemo(() => new Date(), [isConnected, collarStats.battery, collarStats.rssi, collarStats.temperature])
 
   
   // Use try-catch for Clerk to handle context issues gracefully
@@ -176,7 +178,7 @@ export default function MobileDashboard() {
 
     // Update last collar data for comparison
     setLastCollarData({ ...collarData, wasConnected: isConnected && !demoMode })
-  }, [collarData, isConnected, demoMode, mounted, lastCollarData, petName])
+  }, [collarData, isConnected, demoMode, mounted, petName])
 
   const stats = [
     {
