@@ -78,7 +78,7 @@ export default function AlertTransmissionTestPage() {
     setIsTesting(true);
     
     try {
-      const wsUrl = localStorage.getItem('petg.wsUrl') || 'ws://192.168.1.100:8080';
+      const wsUrl = localStorage.getItem('petg.wsUrl') || 'ws://192.168.1.35:8080';
       
       // Map to collar command format
       let command = 'test_buzzer';

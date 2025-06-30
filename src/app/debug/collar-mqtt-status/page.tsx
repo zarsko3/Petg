@@ -111,8 +111,8 @@ export default function CollarMQTTStatusPage() {
   const testCollarConnectivity = async () => {
     addTestResult('🔍 Testing collar connectivity...');
     
-    // Test 1: Common collar IPs
-    const commonIPs = ['192.168.1.100', '192.168.4.1', '192.168.1.31'];
+    // Test 1: Known collar IP from serial log + common IPs
+    const commonIPs = ['192.168.1.35', '192.168.1.100', '192.168.4.1', '192.168.1.31'];
     
     for (const ip of commonIPs) {
       try {

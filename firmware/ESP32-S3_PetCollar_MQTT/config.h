@@ -6,7 +6,7 @@
 #define WIFI_PASSWORD "DataSecNet"  // Replace with your actual password
 
 // MQTT Cloud Configuration (HiveMQ Cloud)
-#define MQTT_SERVER "ab14d5df84884fd68d24d7d25cc78f2f.s1.eu.hivemq.cloud"
+#define MQTT_SERVER "ab1d45df84884fd68d24d7d25cc78f2f.s1.eu.hivemq.cloud"
 #define MQTT_PORT 8883  // TLS port for secure connection
 #define MQTT_USER "zarsko"
 #define MQTT_PASSWORD "089430732zG"
@@ -16,7 +16,7 @@
 #define DEVICE_NAME "COLLAR-001"
 
 // Hardware Configuration
-#define BUZZER_PIN 4
+#define BUZZER_PIN 18
 #define BATTERY_ADC_PIN 34
 #define SDA_PIN 21
 #define SCL_PIN 22

@@ -202,14 +202,17 @@ void connectToMQTTCloud() {
         mqttState.connected = true;
         mqttState.reconnectAttempts = 0;
         
-        // Subscribe to command topics
+        // Subscribe to command topics (both base and subtopics)
         String commandTopic = "pet-collar/" + String(DEVICE_ID) + "/command/+";
+        String baseCommandTopic = "pet-collar/" + String(DEVICE_ID) + "/command";
         mqttClient.subscribe(commandTopic.c_str(), 1);
+        mqttClient.subscribe(baseCommandTopic.c_str(), 1);
         
         // Publish online status
         publishMQTTStatus("online");
         
         Serial.printf("📡 Subscribed to commands for device %s\n", DEVICE_ID);
+        Serial.printf("📡 Topics: %s and %s\n", commandTopic.c_str(), baseCommandTopic.c_str());
         
     } else {
         Serial.printf("❌ MQTT connection failed, rc=%d\n", mqttClient.state());
@@ -254,7 +257,7 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
         alertManager.startAlert(AlertReason::REMOTE_COMMAND, AlertMode::BUZZER);
         Serial.printf("🔊 Cloud buzzer command: %dms, pattern: %s\n", duration, pattern.c_str());
         
-    } else if (topicStr.indexOf("/command") > 0 && topicStr.indexOf("/command/") == -1) {
+    } else if (topicStr.endsWith("/command") || (topicStr.indexOf("/command") > 0 && doc.containsKey("cmd"))) {
         // Handle generic command format (pet-collar/001/command)
         String cmd = doc["cmd"] | "";
         
