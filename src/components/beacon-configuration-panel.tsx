@@ -819,7 +819,7 @@ export function BeaconConfigurationPanel({
     });
   };
 
-  const saveEdit = async () => {
+  const saveEdit = async (): Promise<boolean> => {
     if (editingId && formData.name && formData.location) {
       const updatedConfig: BeaconConfiguration = {
         ...configurations.find(c => c.id === editingId)!,
@@ -831,8 +831,10 @@ export function BeaconConfigurationPanel({
       if (success) {
         setEditingId(null);
         cancelEdit();
+        return true;
       }
     }
+    return false;
   };
 
   // Handle add mode
@@ -1437,73 +1439,288 @@ export function BeaconConfigurationPanel({
                       
                       <div className="space-y-3">
                         {editingId === config.id ? (
-                          <div className="space-y-3">
-                            {/* Alert Mode Selection */}
-                            <div>
-                              <label className="block text-sm font-medium mb-1">Alert Type</label>
-                              <select
-                                value={formData.alertMode || 'buzzer'}
-                                onChange={(e) => setFormData((prev: Partial<BeaconConfiguration>) => ({ 
-                                  ...prev, 
-                                  alertMode: e.target.value as 'none' | 'buzzer' | 'vibration' | 'both' 
-                                }))}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          <div className="space-y-4">
+                            {/* Mobile-Optimized Form Layout */}
+                            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border-2 border-blue-200 dark:border-blue-800">
+                              <h5 className="font-semibold text-blue-900 dark:text-blue-100 mb-3 flex items-center gap-2">
+                                <Settings className="h-4 w-4" />
+                                Editing: {config.name}
+                              </h5>
+                              
+                              {/* Basic Information */}
+                              <div className="space-y-3 mb-4">
+                                <div>
+                                  <label className="block text-sm font-medium mb-1 text-blue-800 dark:text-blue-200">
+                                    Transmitter Name
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={formData.name || ''}
+                                    onChange={(e) => setFormData((prev: Partial<BeaconConfiguration>) => ({ 
+                                      ...prev, 
+                                      name: e.target.value 
+                                    }))}
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                                    placeholder="Enter transmitter name"
+                                  />
+                                </div>
+                                
+                                <div>
+                                  <label className="block text-sm font-medium mb-1 text-blue-800 dark:text-blue-200">
+                                    Location
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={formData.location || ''}
+                                    onChange={(e) => setFormData((prev: Partial<BeaconConfiguration>) => ({ 
+                                      ...prev, 
+                                      location: e.target.value 
+                                    }))}
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                                    placeholder="e.g., Living Room, Kitchen"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* Alert Configuration */}
+                            <div className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg border-2 border-orange-200 dark:border-orange-800">
+                              <h5 className="font-semibold text-orange-900 dark:text-orange-100 mb-3 flex items-center gap-2">
+                                <Volume2 className="h-4 w-4" />
+                                Alert Configuration
+                              </h5>
+                              
+                              {/* Alert Mode Selection */}
+                              <div className="mb-4">
+                                <label className="block text-sm font-medium mb-2 text-orange-800 dark:text-orange-200">
+                                  Alert Type
+                                </label>
+                                <select
+                                  value={formData.alertMode || 'buzzer'}
+                                  onChange={(e) => setFormData((prev: Partial<BeaconConfiguration>) => ({ 
+                                    ...prev, 
+                                    alertMode: e.target.value as 'none' | 'buzzer' | 'vibration' | 'both' 
+                                  }))}
+                                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-base"
+                                >
+                                  <option value="none">🚫 No Alert</option>
+                                  <option value="buzzer">🔊 Buzzer Only</option>
+                                  <option value="vibration">📳 Vibration Only</option>
+                                  <option value="both">🔊📳 Buzzer + Vibration</option>
+                                </select>
+                              </div>
+                              
+                              {/* Trigger Distance */}
+                              <div className="mb-4">
+                                <label className="block text-sm font-medium mb-2 text-orange-800 dark:text-orange-200">
+                                  Trigger Distance: <span className="font-bold text-lg">{formData.proximitySettings?.triggerDistance || 5}cm</span>
+                                </label>
+                                <div className="space-y-2">
+                                  <input
+                                    type="range"
+                                    min="2"
+                                    max="30"
+                                    value={formData.proximitySettings?.triggerDistance || 5}
+                                    onChange={(e) => setFormData((prev: Partial<BeaconConfiguration>) => ({ 
+                                      ...prev, 
+                                      proximitySettings: {
+                                        ...prev.proximitySettings!,
+                                        triggerDistance: parseInt(e.target.value)
+                                      }
+                                    }))}
+                                    className="w-full h-2 bg-orange-200 rounded-lg appearance-none cursor-pointer"
+                                  />
+                                  <div className="flex justify-between text-xs text-orange-600 dark:text-orange-400">
+                                    <span>2cm (Very Close)</span>
+                                    <span>15cm (Medium)</span>
+                                    <span>30cm (Far)</span>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {/* Alert Intensity */}
+                              <div className="mb-4">
+                                <label className="block text-sm font-medium mb-2 text-orange-800 dark:text-orange-200">
+                                  Alert Intensity: <span className="font-bold">{formData.proximitySettings?.alertIntensity || 3}/5</span>
+                                </label>
+                                <div className="space-y-2">
+                                  <input
+                                    type="range"
+                                    min="1"
+                                    max="5"
+                                    value={formData.proximitySettings?.alertIntensity || 3}
+                                    onChange={(e) => setFormData((prev: Partial<BeaconConfiguration>) => ({ 
+                                      ...prev, 
+                                      proximitySettings: {
+                                        ...prev.proximitySettings!,
+                                        alertIntensity: parseInt(e.target.value)
+                                      }
+                                    }))}
+                                    className="w-full h-2 bg-orange-200 rounded-lg appearance-none cursor-pointer"
+                                  />
+                                  <div className="flex justify-between text-xs text-orange-600 dark:text-orange-400">
+                                    <span>1 (Gentle)</span>
+                                    <span>3 (Medium)</span>
+                                    <span>5 (Strong)</span>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {/* Alert Duration */}
+                              <div className="mb-4">
+                                <label className="block text-sm font-medium mb-2 text-orange-800 dark:text-orange-200">
+                                  Alert Duration: <span className="font-bold">{(formData.proximitySettings?.alertDuration || 2000)/1000}s</span>
+                                </label>
+                                <div className="space-y-2">
+                                  <input
+                                    type="range"
+                                    min="500"
+                                    max="10000"
+                                    step="500"
+                                    value={formData.proximitySettings?.alertDuration || 2000}
+                                    onChange={(e) => setFormData((prev: Partial<BeaconConfiguration>) => ({ 
+                                      ...prev, 
+                                      proximitySettings: {
+                                        ...prev.proximitySettings!,
+                                        alertDuration: parseInt(e.target.value)
+                                      }
+                                    }))}
+                                    className="w-full h-2 bg-orange-200 rounded-lg appearance-none cursor-pointer"
+                                  />
+                                  <div className="flex justify-between text-xs text-orange-600 dark:text-orange-400">
+                                    <span>0.5s</span>
+                                    <span>5s</span>
+                                    <span>10s</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* Advanced Timing Settings */}
+                            <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg border-2 border-purple-200 dark:border-purple-800">
+                              <h5 className="font-semibold text-purple-900 dark:text-purple-100 mb-3 flex items-center gap-2">
+                                <Clock className="h-4 w-4" />
+                                Timing Settings
+                              </h5>
+                              
+                              {/* Proximity Delay */}
+                              <div className="mb-4">
+                                <label className="flex items-center gap-2 cursor-pointer mb-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={formData.proximitySettings?.enableProximityDelay || false}
+                                    onChange={(e) => setFormData((prev: Partial<BeaconConfiguration>) => ({ 
+                                      ...prev, 
+                                      proximitySettings: {
+                                        ...prev.proximitySettings!,
+                                        enableProximityDelay: e.target.checked
+                                      }
+                                    }))}
+                                    className="w-4 h-4 text-purple-600"
+                                  />
+                                  <span className="text-sm font-medium text-purple-800 dark:text-purple-200">
+                                    Enable Alert Delay (reduces false alerts)
+                                  </span>
+                                </label>
+                                
+                                {formData.proximitySettings?.enableProximityDelay && (
+                                  <div className="ml-6 space-y-2">
+                                    <label className="block text-sm text-purple-700 dark:text-purple-300">
+                                      Delay Time: {(formData.proximitySettings?.proximityDelayTime || 0)/1000}s
+                                    </label>
+                                    <input
+                                      type="range"
+                                      min="0"
+                                      max="10000"
+                                      step="500"
+                                      value={formData.proximitySettings?.proximityDelayTime || 0}
+                                      onChange={(e) => setFormData((prev: Partial<BeaconConfiguration>) => ({ 
+                                        ...prev, 
+                                        proximitySettings: {
+                                          ...prev.proximitySettings!,
+                                          proximityDelayTime: parseInt(e.target.value)
+                                        }
+                                      }))}
+                                      className="w-full h-2 bg-purple-200 rounded-lg appearance-none cursor-pointer"
+                                    />
+                                    <div className="flex justify-between text-xs text-purple-600 dark:text-purple-400">
+                                      <span>Instant</span>
+                                      <span>5s</span>
+                                      <span>10s</span>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {/* Cooldown Period */}
+                              <div>
+                                <label className="block text-sm font-medium mb-2 text-purple-800 dark:text-purple-200">
+                                  Cooldown Period: {(formData.proximitySettings?.cooldownPeriod || 3000)/1000}s
+                                </label>
+                                <div className="space-y-2">
+                                  <input
+                                    type="range"
+                                    min="1000"
+                                    max="30000"
+                                    step="1000"
+                                    value={formData.proximitySettings?.cooldownPeriod || 3000}
+                                    onChange={(e) => setFormData((prev: Partial<BeaconConfiguration>) => ({ 
+                                      ...prev, 
+                                      proximitySettings: {
+                                        ...prev.proximitySettings!,
+                                        cooldownPeriod: parseInt(e.target.value)
+                                      }
+                                    }))}
+                                    className="w-full h-2 bg-purple-200 rounded-lg appearance-none cursor-pointer"
+                                  />
+                                  <div className="flex justify-between text-xs text-purple-600 dark:text-purple-400">
+                                    <span>1s</span>
+                                    <span>15s</span>
+                                    <span>30s</span>
+                                  </div>
+                                  <p className="text-xs text-purple-600 dark:text-purple-400">
+                                    Minimum time between repeated alerts
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* Save/Cancel Buttons */}
+                            <div className="flex gap-3 pt-4">
+                              <button 
+                                onClick={cancelEdit}
+                                className="flex-1 px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                disabled={isSaving}
                               >
-                                <option value="none">No Alert</option>
-                                <option value="buzzer">Buzzer Only</option>
-                                <option value="vibration">Vibration Only</option>
-                                <option value="both">Buzzer + Vibration</option>
-                              </select>
-                            </div>
-                            
-                            {/* Trigger Distance */}
-                            <div>
-                              <label className="block text-sm font-medium mb-1">
-                                Trigger Distance: {formData.proximitySettings?.triggerDistance || 5}cm
-                              </label>
-                              <input
-                                type="range"
-                                min="2"
-                                max="20"
-                                value={formData.proximitySettings?.triggerDistance || 5}
-                                onChange={(e) => setFormData((prev: Partial<BeaconConfiguration>) => ({ 
-                                  ...prev, 
-                                  proximitySettings: {
-                                    ...prev.proximitySettings!,
-                                    triggerDistance: parseInt(e.target.value)
+                                Cancel
+                              </button>
+                              <button 
+                                onClick={async () => {
+                                  const success = await saveEdit();
+                                  if (success && isConnected) {
+                                    // Auto-sync to collar after successful save
+                                    const updatedConfig = configurations.find(c => c.id === editingId);
+                                    if (updatedConfig) {
+                                      console.log('📱 Auto-syncing updated configuration to collar...');
+                                      await syncConfigurationToCollar(updatedConfig);
+                                    }
                                   }
-                                }))}
-                                className="w-full"
-                              />
-                              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                                <span>2cm</span>
-                                <span>20cm</span>
-                              </div>
-                            </div>
-                            
-                            {/* Alert Intensity */}
-                            <div>
-                              <label className="block text-sm font-medium mb-1">
-                                Alert Intensity: {formData.proximitySettings?.alertIntensity || 3}/5
-                              </label>
-                              <input
-                                type="range"
-                                min="1"
-                                max="5"
-                                value={formData.proximitySettings?.alertIntensity || 3}
-                                onChange={(e) => setFormData((prev: Partial<BeaconConfiguration>) => ({ 
-                                  ...prev, 
-                                  proximitySettings: {
-                                    ...prev.proximitySettings!,
-                                    alertIntensity: parseInt(e.target.value)
-                                  }
-                                }))}
-                                className="w-full"
-                              />
-                              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                                <span>Light</span>
-                                <span>Strong</span>
-                              </div>
+                                }}
+                                disabled={!formData.name || !formData.location || isSaving}
+                                className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                              >
+                                {isSaving ? (
+                                  <>
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                    Saving...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Save className="h-4 w-4" />
+                                    Save & Sync to Collar
+                                  </>
+                                )}
+                              </button>
                             </div>
                           </div>
                         ) : (
