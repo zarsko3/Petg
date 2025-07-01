@@ -20,7 +20,13 @@ import {
   CheckCircle2,
   Sparkles,
   Smartphone,
-  Target
+  Target,
+  Video,
+  Camera,
+  Maximize2,
+  ZoomIn,
+  Sun,
+  Moon
 } from 'lucide-react'
 import { useCollarStats } from '@/hooks/useSmartCollarData'
 import { 
@@ -74,7 +80,16 @@ export default function MobileDashboard() {
 
   const petName = user?.firstName || 'Buddy'
   const userName = user?.firstName || 'there'
-  const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+  
+  // Get time-based icon
+  const getTimeIcon = () => {
+    const hour = new Date().getHours()
+    // Daytime: 6 AM to 6 PM (6-18), Nighttime: 6 PM to 6 AM (18-6)
+    return hour >= 6 && hour < 18 ? Sun : Moon
+  }
+  
+  const TimeIcon = getTimeIcon()
 
   // Test alert function using MQTT
   const handleTestAlert = async () => {
@@ -251,9 +266,12 @@ export default function MobileDashboard() {
               </h1>
               <Sparkles className="h-8 w-8 text-amber-500" />
             </div>
-            <p className="text-gray-600 dark:text-gray-400 font-medium">
-              Let's check on {petName} • {currentTime}
-            </p>
+            <div className="flex items-center gap-2">
+              <TimeIcon className="h-4 w-4 text-amber-500" />
+              <p className="text-gray-600 dark:text-gray-400 font-medium">
+                Let's check on {petName} • {currentTime}
+              </p>
+            </div>
           </div>
           <button
             onClick={() => refetch()}
@@ -335,105 +353,96 @@ export default function MobileDashboard() {
           </div>
         </div>
 
-        {/* Recent Notifications */}
-        <div className="mobile-card bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-800 rounded-3xl p-6 border border-gray-200 dark:border-gray-700 shadow-xl hover:shadow-2xl transition-all duration-300">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                <div className="h-16 w-16 bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 rounded-3xl flex items-center justify-center shadow-amber-glow">
-                  <Bell className="h-8 w-8 text-white" />
-                </div>
-                <div className="absolute -top-1 -right-1 h-6 w-6 bg-red-500 rounded-full flex items-center justify-center border-2 border-white dark:border-gray-800">
-                  <span className="text-xs font-bold text-white">3</span>
-                </div>
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white font-rounded mb-1">
-                  Recent Notifications
-                </h2>
-                <div className="flex items-center gap-2">
-                  <div className="h-2 w-2 bg-amber-400 rounded-full animate-pulse" />
-                  <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
-                    3 new alerts today
-                  </p>
-                </div>
-              </div>
-            </div>
+        {/* Live Camera Feed */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white font-rounded">
+              Live Camera Feed
+            </h2>
+            <Video className="h-5 w-5 text-teal-500" />
           </div>
-
-          {/* Notifications List */}
-          <div className="space-y-4">
-            {/* Alert 1 - Restricted Zone */}
-            <div className="group relative overflow-hidden bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/30 dark:to-red-800/30 rounded-2xl p-4 border border-red-200 dark:border-red-700 hover:scale-102 transition-all duration-200">
-              <div className="flex items-start gap-4">
-                <div className="flex-shrink-0">
-                  <div className="h-10 w-10 bg-red-500 rounded-xl flex items-center justify-center shadow-md">
-                    <AlertTriangle className="h-5 w-5 text-white" />
+          
+          <div className="mobile-card bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-800 rounded-3xl p-6 border border-gray-200 dark:border-gray-700 shadow-xl hover:shadow-2xl transition-all duration-300">
+            {/* Status Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <div className="h-12 w-12 bg-gradient-to-br from-teal-400 via-teal-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-teal-glow">
+                    <Camera className="h-6 w-6 text-white" />
+                  </div>
+                  <div className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 rounded-full flex items-center justify-center border-2 border-white dark:border-gray-800">
+                    <div className="h-1.5 w-1.5 bg-white rounded-full animate-pulse" />
                   </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-sm font-bold text-red-700 dark:text-red-300 uppercase tracking-wide">Alert</span>
-                    <span className="text-xs text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/50 px-2 py-1 rounded-full">10:22</span>
+                <div>
+                  <p className="font-semibold text-gray-900 dark:text-white font-rounded">
+                    {petName} • {collarData.location || 'Living Room'}
+                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <div className="h-2 w-2 bg-red-500 rounded-full animate-pulse" />
+                    <span className="text-xs text-red-600 dark:text-red-400 font-semibold uppercase tracking-wide">
+                      LIVE
+                    </span>
                   </div>
-                  <p className="text-sm text-red-900 dark:text-red-100 font-medium leading-relaxed">
-                    Activity detected near the restricted zone in the living room.
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">
+                  {currentTime}
+                </p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                  HD • 1080p
+                </p>
+              </div>
+            </div>
+
+            {/* Camera View */}
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 aspect-video shadow-inner">
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="relative mb-4">
+                    <Video className="h-16 w-16 text-gray-400 mx-auto animate-pulse" />
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
+                  </div>
+                  <p className="text-gray-600 dark:text-gray-300 font-semibold text-lg mb-2">
+                    Connecting to camera...
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Loading high-definition feed
                   </p>
                 </div>
               </div>
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-all duration-700" />
-            </div>
-
-            {/* Alert 2 - Sleep Activity */}
-            <div className="group relative overflow-hidden bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 rounded-2xl p-4 border border-blue-200 dark:border-blue-700 hover:scale-102 transition-all duration-200">
-              <div className="flex items-start gap-4">
-                <div className="flex-shrink-0">
-                  <div className="h-10 w-10 bg-blue-500 rounded-xl flex items-center justify-center shadow-md">
-                    <Activity className="h-5 w-5 text-white" />
-                  </div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-sm font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wide">Alert</span>
-                    <span className="text-xs text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/50 px-2 py-1 rounded-full">8:45</span>
-                  </div>
-                  <p className="text-sm text-blue-900 dark:text-blue-100 font-medium leading-relaxed">
-                    {petName} slept for 1 hour 30 minutes and is now roaming around the house.
-                  </p>
-                </div>
+              
+              {/* Live Status Badge */}
+              <div className="absolute top-4 left-4 bg-red-500 text-white px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 shadow-lg">
+                <div className="h-2 w-2 bg-white rounded-full animate-pulse" />
+                LIVE
               </div>
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-all duration-700" />
-            </div>
 
-            {/* Alert 3 - Barking */}
-            <div className="group relative overflow-hidden bg-gradient-to-r from-orange-50 to-orange-100 dark:from-orange-900/30 dark:to-orange-800/30 rounded-2xl p-4 border border-orange-200 dark:border-orange-700 hover:scale-102 transition-all duration-200">
-              <div className="flex items-start gap-4">
-                <div className="flex-shrink-0">
-                  <div className="h-10 w-10 bg-orange-500 rounded-xl flex items-center justify-center shadow-md">
-                    <Bell className="h-5 w-5 text-white" />
-                  </div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-sm font-bold text-orange-700 dark:text-orange-300 uppercase tracking-wide">Alert</span>
-                    <span className="text-xs text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/50 px-2 py-1 rounded-full">7:15</span>
-                  </div>
-                  <p className="text-sm text-orange-900 dark:text-orange-100 font-medium leading-relaxed">
-                    {petName} has started barking inside the house.
-                  </p>
-                </div>
+              {/* Quality Badge */}
+              <div className="absolute top-4 right-4 bg-black/70 text-white px-3 py-1.5 rounded-full text-xs font-semibold">
+                HD 1080p
               </div>
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-all duration-700" />
+              
+              {/* Timestamp Overlay */}
+              <div className="absolute bottom-4 left-4 bg-black/70 text-white px-3 py-1.5 rounded-lg text-xs font-mono">
+                {new Date().toLocaleDateString()} • {currentTime}
+              </div>
             </div>
-          </div>
 
-          {/* Footer with action button */}
-          <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-            <button className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1 flex items-center justify-center gap-2">
-              <Bell className="h-5 w-5" />
-              View All Notifications
-            </button>
+            {/* Camera Controls */}
+            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+              <div className="grid grid-cols-2 gap-3">
+                <button className="mobile-button-primary flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-semibold shadow-teal-glow hover:shadow-teal-glow-lg transition-all duration-200">
+                  <Maximize2 className="h-4 w-4" />
+                  Full Screen
+                </button>
+                <button className="mobile-button-accent flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-semibold shadow-coral-glow hover:shadow-coral-glow-lg transition-all duration-200">
+                  <ZoomIn className="h-4 w-4" />
+                  Zoom
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -487,11 +496,11 @@ export default function MobileDashboard() {
             <Target className="h-5 w-5 text-coral-500" />
           </div>
           
-          <div className="grid grid-cols-2 gap-4">
+          <div className="flex justify-center">
             <button 
               onClick={handleTestAlert}
               disabled={isTesting}
-              className={`mobile-button-primary p-4 rounded-2xl flex flex-col items-center gap-2 transition-all duration-200 ${
+              className={`mobile-button-primary p-4 rounded-2xl flex flex-col items-center gap-2 transition-all duration-200 w-full max-w-xs ${
                 isTesting 
                   ? 'opacity-50 cursor-not-allowed' 
                   : 'shadow-teal-glow hover:shadow-teal-glow-lg'
@@ -505,11 +514,6 @@ export default function MobileDashboard() {
               <span className="text-sm font-semibold font-rounded">
                 {isTesting ? 'Testing...' : 'Test Alert'}
               </span>
-            </button>
-            
-            <button className="mobile-button-accent p-4 rounded-2xl flex flex-col items-center gap-2 shadow-coral-glow hover:shadow-coral-glow-lg transition-all duration-200">
-              <MapPin className="h-6 w-6" />
-              <span className="text-sm font-semibold font-rounded">Find {petName}</span>
             </button>
           </div>
         </div>

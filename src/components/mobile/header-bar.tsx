@@ -18,8 +18,8 @@ export default function HeaderBar() {
       <header className="fixed top-0 w-full bg-pet-surface-elevated/95 backdrop-blur-md border-b border-gray-200 dark:border-gray-700 z-40 safe-area-top">
         <div className="flex items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 bg-gradient-to-br from-teal-400 to-teal-500 rounded-2xl flex items-center justify-center shadow-teal-glow">
-              <Heart className="h-5 w-5 text-white" />
+            <div className="h-10 w-10 bg-gradient-to-br from-teal-300 to-teal-400 dark:from-teal-600 dark:to-teal-700 rounded-2xl flex items-center justify-center shadow-teal-glow">
+              <Heart className="h-5 w-5 text-teal-700 dark:text-white" />
             </div>
             <div>
               <h1 className="text-lg font-bold text-gray-900 dark:text-white font-rounded">
@@ -41,8 +41,8 @@ export default function HeaderBar() {
       <div className="flex items-center justify-between px-6 py-4">
         {/* Logo and Brand */}
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 bg-gradient-to-br from-teal-400 to-teal-500 rounded-2xl flex items-center justify-center shadow-teal-glow">
-            <Heart className="h-5 w-5 text-white" />
+          <div className="h-10 w-10 bg-gradient-to-br from-teal-300 to-teal-400 dark:from-teal-600 dark:to-teal-700 rounded-2xl flex items-center justify-center shadow-teal-glow">
+            <Heart className="h-5 w-5 text-teal-700 dark:text-white" />
           </div>
           <div>
             <h1 className="text-lg font-bold text-gray-900 dark:text-white font-rounded">
