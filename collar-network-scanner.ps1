@@ -83,6 +83,6 @@ if ($found.Count -eq 0) {
     Write-Host "✅ Scan complete! Found $($found.Count) collar(s)" -ForegroundColor Green
     Write-Host "🔗 Test connection with:" -ForegroundColor Yellow
     foreach ($device in $found) {
-        Write-Host "   curl.exe -s '$($device.URL)'" -ForegroundColor White
+        Write-Host "   curl.exe -s ""$($device.URL)""" -ForegroundColor White
     }
 } 
