@@ -174,7 +174,7 @@
 
 /* Preferred WiFi Networks (hardcoded for priority) */
 #define PREFERRED_SSID              "JenoviceAP"
-#define PREFERRED_PASSWORD          "0547530732"  // JenoviceAP WiFi password
+#define PREFERRED_PASSWORD          "DataSecNet"  // JenoviceAP WiFi password
 // Add secondary networks if needed:
 // #define SECONDARY_SSID           "BackupNetwork"
 // #define SECONDARY_PASSWORD       "backup_password"
