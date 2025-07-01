@@ -1357,7 +1357,7 @@ export function BeaconConfigurationPanel({
                           setSelectedBeaconForSettings(config);
                           setIsSettingsDrawerOpen(true);
                         }}
-                        className="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                        className="p-3 text-gray-700 dark:text-gray-300 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/30 rounded-lg transition-colors border border-gray-300 dark:border-gray-600 shadow-sm min-h-[44px] min-w-[44px] flex items-center justify-center"
                         title="Configure Alert Settings"
                       >
                         <Settings className="h-5 w-5" />
@@ -1368,7 +1368,7 @@ export function BeaconConfigurationPanel({
                         <button
                           onClick={() => syncConfigurationToCollar(config)}
                           disabled={isSaving}
-                          className="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
+                          className="p-3 text-gray-700 dark:text-gray-300 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/30 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors border border-gray-300 dark:border-gray-600 shadow-sm min-h-[44px] min-w-[44px] flex items-center justify-center"
                           title="Sync this beacon configuration to collar for proximity triggering"
                         >
                           <Radio className="h-5 w-5" />
@@ -1377,7 +1377,7 @@ export function BeaconConfigurationPanel({
                       
                       <button
                         onClick={() => startEdit(config)}
-                        className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        className="p-3 text-gray-700 dark:text-gray-300 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors border border-gray-300 dark:border-gray-600 shadow-sm min-h-[44px] min-w-[44px] flex items-center justify-center"
                         disabled={editingId === config.id}
                         title="Edit Basic Information"
                       >
@@ -1386,7 +1386,7 @@ export function BeaconConfigurationPanel({
                       
                       <button
                         onClick={() => deleteConfiguration(config.id)}
-                        className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        className="p-3 text-gray-700 dark:text-gray-300 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors border border-gray-300 dark:border-gray-600 shadow-sm min-h-[44px] min-w-[44px] flex items-center justify-center"
                         disabled={config.isAutoDetected && realtimeStatus.status === 'active'}
                         title="Delete Configuration"
                       >
@@ -1689,7 +1689,7 @@ export function BeaconConfigurationPanel({
                             <div className="flex gap-3 pt-4">
                               <button 
                                 onClick={cancelEdit}
-                                className="flex-1 px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                className="flex-1 px-6 py-4 border-2 border-gray-400 dark:border-gray-500 rounded-xl text-base font-semibold text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-lg"
                                 disabled={isSaving}
                               >
                                 Cancel
@@ -1707,16 +1707,16 @@ export function BeaconConfigurationPanel({
                                   }
                                 }}
                                 disabled={!formData.name || !formData.location || isSaving}
-                                className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                                className="flex-1 px-6 py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-xl text-base font-semibold transition-colors flex items-center justify-center gap-2 shadow-lg"
                               >
                                 {isSaving ? (
                                   <>
-                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                                     Saving...
                                   </>
                                 ) : (
                                   <>
-                                    <Save className="h-4 w-4" />
+                                    <Save className="h-5 w-5" />
                                     Save & Sync to Collar
                                   </>
                                 )}

@@ -379,6 +379,53 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
                 Serial.printf("✅ Configured %d proximity beacons from transmitter\n", configuredCount);
             }
             
+        } else if (cmd == "debug_proximity_configs") {
+            // 🐛 DEBUG: List all proximity configurations
+            Serial.println("📋 === PROXIMITY CONFIGURATIONS ===");
+            
+            // This will help debug configuration issues
+            auto configs = beaconManager.getProximityConfigs();
+            if (configs.empty()) {
+                Serial.println("⚠️ No proximity configurations found!");
+            } else {
+                Serial.printf("📊 Found %d proximity configurations:\n", configs.size());
+                for (const auto& config : configs) {
+                    Serial.printf("  🏷️ ID: %s\n", config.beaconId.c_str());
+                    Serial.printf("     Name: %s\n", config.beaconName.c_str());
+                    Serial.printf("     MAC: %s\n", config.macAddress.c_str());
+                    Serial.printf("     Alert: %s (%d intensity)\n", config.alertMode.c_str(), config.alertIntensity);
+                    Serial.printf("     Trigger: %dcm, Duration: %dms\n", config.triggerDistance, config.alertDuration);
+                    Serial.printf("     Delay: %s (%dms), Cooldown: %dms\n", 
+                                 config.enableProximityDelay ? "enabled" : "disabled", 
+                                 config.proximityDelayTime, config.cooldownPeriod);
+                    Serial.printf("     State: %s, In Range: %s\n", 
+                                 config.alertActive ? "active" : "inactive",
+                                 config.inProximityRange ? "yes" : "no");
+                    Serial.println();
+                }
+            }
+            Serial.println("📋 === END CONFIGURATIONS ===");
+            
+        } else if (cmd == "list_detected_beacons") {
+            // 🐛 DEBUG: List all currently detected beacons
+            Serial.println("📡 === DETECTED BEACONS ===");
+            auto beacons = beaconManager.getActiveBeacons();
+            if (beacons.empty()) {
+                Serial.println("⚠️ No beacons currently detected!");
+            } else {
+                Serial.printf("📊 Found %d active beacons:\n", beacons.size());
+                for (const auto& beacon : beacons) {
+                    Serial.printf("  📡 Name: %s\n", beacon.name.c_str());
+                    Serial.printf("     Address: %s\n", beacon.address.c_str());
+                    Serial.printf("     RSSI: %ddBm, Distance: %.1fcm\n", beacon.rssi, beacon.distance);
+                    Serial.printf("     Confidence: %.1f%%, Active: %s\n", 
+                                 beacon.confidence * 100, beacon.isActive ? "yes" : "no");
+                    Serial.printf("     Last seen: %lums ago\n", millis() - beacon.lastSeen);
+                    Serial.println();
+                }
+            }
+            Serial.println("📡 === END BEACONS ===");
+            
         } else {
             Serial.printf("❓ Unknown command: %s\n", cmd.c_str());
         }
@@ -1038,69 +1085,28 @@ void checkProximityAlerts(const BeaconData& beacon) {
     
     // Skip if no configuration exists for this beacon
     if (!config) {
-        // Debug output for unconfigured beacons
-        if (DEBUG_BLE && beacon.distance < 100) { // Only log close unconfigured beacons
-            Serial.printf("📍 Unconfigured beacon nearby: %s (%.1fcm) - Add configuration to enable alerts\n",
-                         beacon.name.c_str(), beacon.distance);
-        }
+        Serial.printf("📍 Unconfigured beacon nearby: %s (%.1fcm) - Add configuration to enable alerts\n", 
+                     beacon.name.c_str(), beacon.distance);
         return;
     }
     
-    // 🎯 PROXIMITY DETECTION LOGIC
-    // Check if beacon is within the configured trigger distance
-    bool inProximity = (beacon.distance <= config->triggerDistanceCm);
+    // 🚀 FOUND CONFIGURATION! Log it for debugging
+    Serial.printf("✅ Found configuration for beacon: %s\n", beacon.name.c_str());
+    Serial.printf("    Alert Mode: %s\n", config->alertMode.c_str());
+    Serial.printf("    Trigger Distance: %.1fcm (current: %.1fcm)\n", config->triggerDistanceCm, beacon.distance);
+    Serial.printf("    Alert Duration: %dms\n", config->alertDurationMs);
+    Serial.printf("    Alert Intensity: %d\n", config->alertIntensity);
     
-    if (DEBUG_BLE) {
-        Serial.printf("📏 Proximity check: %s - Distance: %.1fcm, Trigger: %dcm, In range: %s\n",
-                     beacon.name.c_str(), beacon.distance, config->triggerDistanceCm, 
-                     inProximity ? "YES" : "NO");
-    }
-    
-    if (inProximity && !config->isInProximity) {
-        // 🚨 ENTERING PROXIMITY RANGE
-        config->isInProximity = true;
-        config->proximityStartTime = millis();
-        
-        Serial.printf("📍 ENTERING proximity: %s at %.1fcm (trigger: %dcm)\n",
+    // Check if beacon is within trigger distance
+    if (beacon.distance <= config->triggerDistanceCm) {
+        Serial.printf("🎯 Beacon %s is within trigger range (%.1fcm <= %.1fcm)\n", 
                      beacon.name.c_str(), beacon.distance, config->triggerDistanceCm);
         
-        // Check proximity delay setting
-        if (!config->enableProximityDelay || config->proximityDelayMs == 0) {
-            // Immediate trigger - no delay
-            Serial.printf("⚡ Immediate alert trigger for %s\n", beacon.name.c_str());
-            triggerProximityAlert(*config, beacon);
-        } else {
-            Serial.printf("⏱️ Proximity delay active: %dms before alert\n", config->proximityDelayMs);
-        }
-        
-    } else if (!inProximity && config->isInProximity) {
-        // 📍 LEAVING PROXIMITY RANGE
-        config->isInProximity = false;
-        config->proximityStartTime = 0;
-        
-        Serial.printf("📍 LEAVING proximity: %s (%.1fcm - outside %dcm range)\n",
+        // Trigger the proximity alert
+        triggerProximityAlert(*config, beacon);
+    } else {
+        Serial.printf("📏 Beacon %s is outside trigger range (%.1fcm > %.1fcm) - no alert\n", 
                      beacon.name.c_str(), beacon.distance, config->triggerDistanceCm);
-        
-        // Stop any active alert for this beacon
-        if (config->alertActive) {
-            alertManager.stopAlert();
-            config->alertActive = false;
-            Serial.printf("🔇 Stopped alert for %s (left proximity)\n", beacon.name.c_str());
-        }
-        
-    } else if (inProximity && config->isInProximity && config->enableProximityDelay) {
-        // 🕐 CHECKING PROXIMITY DELAY
-        // We're still in range, check if delay period has elapsed
-        unsigned long timeInRange = millis() - config->proximityStartTime;
-        
-        if (!config->alertActive && timeInRange >= config->proximityDelayMs) {
-            Serial.printf("⏰ Proximity delay completed (%lums) - triggering alert for %s\n", 
-                         timeInRange, beacon.name.c_str());
-            triggerProximityAlert(*config, beacon);
-        } else if (!config->alertActive) {
-            Serial.printf("⏳ Proximity delay: %lums/%dms for %s\n", 
-                         timeInRange, config->proximityDelayMs, beacon.name.c_str());
-        }
     }
 }
 
@@ -1268,6 +1274,55 @@ void handleWebSocketMessage(const String& message, uint8_t clientNum) {
         sendBeaconData(clientNum);
     } else if (command == "update_beacon_config") {
         handleBeaconConfigUpdate(doc, clientNum);
+    } else if (command == "debug_proximity_configs") {
+        // 🐛 DEBUG: List all proximity configurations
+        Serial.println("📋 === PROXIMITY CONFIGURATIONS ===");
+        
+        // This will help debug configuration issues
+        auto configs = beaconManager.getProximityConfigs();
+        if (configs.empty()) {
+            Serial.println("⚠️ No proximity configurations found!");
+        } else {
+            Serial.printf("📊 Found %d proximity configurations:\n", configs.size());
+            for (const auto& config : configs) {
+                Serial.printf("  🏷️ ID: %s\n", config.beaconId.c_str());
+                Serial.printf("     Name: %s\n", config.beaconName.c_str());
+                Serial.printf("     MAC: %s\n", config.macAddress.c_str());
+                Serial.printf("     Alert: %s (%d intensity)\n", config.alertMode.c_str(), config.alertIntensity);
+                Serial.printf("     Trigger: %dcm, Duration: %dms\n", config.triggerDistance, config.alertDuration);
+                Serial.printf("     Delay: %s (%dms), Cooldown: %dms\n", 
+                             config.enableProximityDelay ? "enabled" : "disabled", 
+                             config.proximityDelayTime, config.cooldownPeriod);
+                Serial.printf("     State: %s, In Range: %s\n", 
+                             config.alertActive ? "active" : "inactive",
+                             config.inProximityRange ? "yes" : "no");
+                Serial.println();
+            }
+        }
+        Serial.println("📋 === END CONFIGURATIONS ===");
+        sendCommandResponse(clientNum, command, "debug_complete");
+        
+    } else if (command == "list_detected_beacons") {
+        // 🐛 DEBUG: List all currently detected beacons
+        Serial.println("📡 === DETECTED BEACONS ===");
+        auto beacons = beaconManager.getActiveBeacons();
+        if (beacons.empty()) {
+            Serial.println("⚠️ No beacons currently detected!");
+        } else {
+            Serial.printf("📊 Found %d active beacons:\n", beacons.size());
+            for (const auto& beacon : beacons) {
+                Serial.printf("  📡 Name: %s\n", beacon.name.c_str());
+                Serial.printf("     Address: %s\n", beacon.address.c_str());
+                Serial.printf("     RSSI: %ddBm, Distance: %.1fcm\n", beacon.rssi, beacon.distance);
+                Serial.printf("     Confidence: %.1f%%, Active: %s\n", 
+                             beacon.confidence * 100, beacon.isActive ? "yes" : "no");
+                Serial.printf("     Last seen: %lums ago\n", millis() - beacon.lastSeen);
+                Serial.println();
+            }
+        }
+        Serial.println("📡 === END BEACONS ===");
+        sendCommandResponse(clientNum, command, "debug_complete");
+        
     } else {
         sendErrorResponse(clientNum, "Unknown command: " + command);
     }
@@ -1664,6 +1719,10 @@ void loop() {
     // Maintain MQTT cloud connection and telemetry
     maintainMQTTConnection();
     
+    // 🚀 CRITICAL: Process proximity-based triggering
+    // This ensures that configured beacons trigger alerts when in range
+    beaconManager.processProximityTriggers();
+    
     // Perform BLE scanning
     if (systemStateData.bleInitialized) {
         static unsigned long lastBLEScan = 0;
@@ -1678,9 +1737,6 @@ void loop() {
             }
         }
     }
-    
-    // 🚀 PROCESS PROXIMITY-BASED TRIGGERING FROM TRANSMITTER
-    beaconManager.processProximityTriggers();
     
     // Update display
     updateDisplay();

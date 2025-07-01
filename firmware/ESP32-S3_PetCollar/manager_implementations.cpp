@@ -189,12 +189,45 @@ float BeaconManager_Enhanced::calculateConfidence(int rssi) const {
 }
 
 BeaconConfig* BeaconManager_Enhanced::getBeaconConfig(const String& address) {
-    // Find beacon configuration by address
+    // 🔍 ENHANCED: Check both legacy beacon configs AND proximity configs
+    
+    // First check legacy beacon configurations
     for (auto& config : beaconConfigs) {
         if (config.id == address) {
             return &config;
         }
     }
+    
+    // 🚀 NEW: Also check proximity-based beacon configurations
+    // This is critical for the proximity detection system to work!
+    for (auto& proximityConfig : proximityConfigs) {
+        if (proximityConfig.beaconId == address || 
+            proximityConfig.beaconName == address ||
+            proximityConfig.macAddress == address) {
+            
+            // Convert ProximityBeaconConfig to BeaconConfig for compatibility
+            static BeaconConfig tempConfig; // Static to persist across function calls
+            tempConfig.id = proximityConfig.beaconId;
+            tempConfig.name = proximityConfig.beaconName;
+            tempConfig.alertMode = proximityConfig.alertMode;
+            tempConfig.alertIntensity = proximityConfig.alertIntensity;
+            tempConfig.alertDurationMs = proximityConfig.alertDuration;
+            tempConfig.triggerDistanceCm = proximityConfig.triggerDistance;
+            tempConfig.enableProximityDelay = proximityConfig.enableProximityDelay;
+            tempConfig.proximityDelayMs = proximityConfig.proximityDelayTime;
+            tempConfig.cooldownPeriodMs = proximityConfig.cooldownPeriod;
+            tempConfig.isInProximity = proximityConfig.inProximityRange;
+            tempConfig.alertActive = proximityConfig.alertActive;
+            tempConfig.lastAlertTime = proximityConfig.lastTriggered;
+            
+            Serial.printf("✅ Found proximity config for: %s (trigger: %dcm)\n", 
+                         address.c_str(), proximityConfig.triggerDistance);
+            
+            return &tempConfig;
+        }
+    }
+    
+    Serial.printf("⚠️ No configuration found for beacon: %s\n", address.c_str());
     return nullptr;
 }
 
@@ -590,3 +623,13 @@ String ZoneManager_Enhanced::getStatusJson() const {
 // ==================== GLOBAL UTILITY FUNCTIONS ====================
 // Note: checkProximityAlerts, triggerProximityAlert, and broadcastAlertStatus
 // are implemented in the main .ino file to avoid multiple definition errors 
+
+// Add missing getProximityConfigs method for debugging
+const std::vector<ProximityBeaconConfig>& BeaconManager_Enhanced::getProximityConfigs() const {
+    return proximityConfigs;
+}
+
+// Add missing getActiveBeacons method for debugging and proximity processing
+const std::vector<BeaconData>& BeaconManager_Enhanced::getActiveBeacons() const {
+    return activeBeacons;
+}

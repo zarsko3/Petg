@@ -641,6 +641,25 @@ public:
      * @brief Process proximity-based triggering (call in main loop)
      */
     void processProximityTriggers();
+    
+    /**
+     * @brief Get proximity configurations for debugging
+     * @return Vector of proximity beacon configurations
+     */
+    const std::vector<ProximityBeaconConfig>& getProximityConfigs() const;
+    
+    /**
+     * @brief Get active beacons for debugging and proximity processing
+     * @return Vector of active beacon data
+     */
+    const std::vector<BeaconData>& getActiveBeacons() const;
+    
+    /**
+     * @brief Get beacons suitable for triangulation
+     * @param minBeacons Minimum number of beacons required
+     * @return Vector of beacons for triangulation
+     */
+    std::vector<BeaconInfo> getTriangulationBeacons(uint8_t minBeacons = 3) const;
 };
 
 #endif // BEACON_MANAGER_H 
