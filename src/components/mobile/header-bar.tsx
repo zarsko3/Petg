@@ -8,7 +8,41 @@ import { SignOutButton, useUser, SignInButton } from '@clerk/nextjs';
 export default function HeaderBar() {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  const { user, isSignedIn, isLoaded } = useUser();
+  
+  // Safe user context hook with error handling
+  const [userState, setUserState] = useState<{
+    user: any;
+    isSignedIn: boolean;
+    isLoaded: boolean;
+  }>({
+    user: null,
+    isSignedIn: false,
+    isLoaded: false
+  });
+
+  // Get user data with error handling
+  let clerkUser = null;
+  let clerkIsSignedIn = false;
+  let clerkIsLoaded = false;
+
+  try {
+    const userHook = useUser();
+    clerkUser = userHook.user;
+    clerkIsSignedIn = Boolean(userHook.isSignedIn);
+    clerkIsLoaded = Boolean(userHook.isLoaded);
+  } catch (error) {
+    console.warn('Clerk user context not available:', error);
+    // Use fallback state
+  }
+
+  // Update state with Clerk data when available
+  useEffect(() => {
+    setUserState({
+      user: clerkUser,
+      isSignedIn: clerkIsSignedIn,
+      isLoaded: clerkIsLoaded
+    });
+  }, [clerkUser, clerkIsSignedIn, clerkIsLoaded]);
 
   // Ensure component is mounted to avoid hydration mismatch
   useEffect(() => {
@@ -72,12 +106,12 @@ export default function HeaderBar() {
           </button>
 
           {/* Authentication Buttons */}
-          {!isLoaded ? (
+          {!userState.isLoaded ? (
             <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-2xl animate-pulse" />
-          ) : isSignedIn ? (
+          ) : userState.isSignedIn && userState.user ? (
             <SignOutButton>
               <button
-                aria-label={`Sign out (${user?.emailAddresses[0]?.emailAddress || 'user'})`}
+                aria-label={`Sign out (${userState.user?.emailAddresses?.[0]?.emailAddress || 'user'})`}
                 className="flex items-center justify-center w-12 h-12 rounded-2xl bg-red-100 hover:bg-red-200 dark:bg-red-900 dark:hover:bg-red-800 transition-all duration-200 mobile-button shadow-pet hover:shadow-pet-lg"
               >
                 <LogOut className="h-5 w-5 text-red-600 dark:text-red-400" />

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs'
+import { auth } from '@clerk/nextjs/server'
 import { CollarSchema } from '@/lib/types'
 import { supabaseAdmin, supabaseConfig } from '@/lib/supabase'
 
@@ -32,11 +32,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(DEMO_COLLARS)
     }
 
-    // Check authentication
+    // Check authentication with Next.js 15 compatible approach
     let userId = null
     try {
-      const authResult = await auth()
-      userId = authResult.userId
+      const { userId: authUserId } = await auth()
+      userId = authUserId
     } catch (error) {
       console.log('⚠️ Auth not available, using demo data')
     }
