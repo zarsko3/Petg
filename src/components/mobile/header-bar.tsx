@@ -1,21 +1,14 @@
 'use client';
 
 import { useTheme } from 'next-themes';
-import { Moon, Sun, Heart, LogOut } from 'lucide-react';
+import { Moon, Sun, Heart, LogOut, User } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { SignOutButton, useUser } from '@clerk/nextjs';
+import { SignOutButton, useUser, SignInButton } from '@clerk/nextjs';
 
 export default function HeaderBar() {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-
-  // Determine sign-in state safely (avoiding server-side errors)
-  let isSignedIn = false;
-  try {
-    isSignedIn = useUser().isSignedIn || false;
-  } catch (error) {
-    // Clerk context not available; treat as signed out
-  }
+  const { user, isSignedIn, isLoaded } = useUser();
 
   // Ensure component is mounted to avoid hydration mismatch
   useEffect(() => {
@@ -63,8 +56,9 @@ export default function HeaderBar() {
           </div>
         </div>
 
-        {/* Theme Toggle */}
+        {/* Actions */}
         <div className="flex items-center gap-2">
+          {/* Theme Toggle */}
           <button
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
             className="flex items-center justify-center w-12 h-12 rounded-2xl bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 transition-all duration-200 mobile-button shadow-pet hover:shadow-pet-lg"
@@ -77,16 +71,27 @@ export default function HeaderBar() {
             )}
           </button>
 
-          {/* Logout Button (visible when signed in) */}
-          {isSignedIn && (
+          {/* Authentication Buttons */}
+          {!isLoaded ? (
+            <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-2xl animate-pulse" />
+          ) : isSignedIn ? (
             <SignOutButton>
               <button
-                aria-label="Sign out"
+                aria-label={`Sign out (${user?.emailAddresses[0]?.emailAddress || 'user'})`}
                 className="flex items-center justify-center w-12 h-12 rounded-2xl bg-red-100 hover:bg-red-200 dark:bg-red-900 dark:hover:bg-red-800 transition-all duration-200 mobile-button shadow-pet hover:shadow-pet-lg"
               >
                 <LogOut className="h-5 w-5 text-red-600 dark:text-red-400" />
               </button>
             </SignOutButton>
+          ) : (
+            <SignInButton mode="modal">
+              <button
+                aria-label="Sign in"
+                className="flex items-center justify-center w-12 h-12 rounded-2xl bg-blue-100 hover:bg-blue-200 dark:bg-blue-900 dark:hover:bg-blue-800 transition-all duration-200 mobile-button shadow-pet hover:shadow-pet-lg"
+              >
+                <User className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </button>
+            </SignInButton>
           )}
         </div>
       </div>
