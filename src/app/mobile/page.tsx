@@ -113,7 +113,7 @@ export default function MobileWelcomePage() {
         <div className="px-6 pb-8 space-y-4">
           {/* Only show SignInButton if Clerk is available */}
           {typeof window !== 'undefined' && (
-            <SignInButton mode="modal">
+            <SignInButton mode="modal" redirectUrl="/mobile/dashboard">
               <button className="w-full bg-white text-purple-700 dark:bg-purple-600 dark:text-white py-4 rounded-2xl font-semibold text-lg shadow-xl hover:shadow-2xl transition-all duration-300 mobile-button touch-target flex items-center justify-center">
                 <User className="h-5 w-5 mr-2" />
                 Sign In to Your Account

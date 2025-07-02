@@ -118,7 +118,7 @@ export default function HeaderBar() {
               </button>
             </SignOutButton>
           ) : (
-            <SignInButton mode="modal">
+            <SignInButton mode="modal" redirectUrl="/mobile/dashboard">
               <button
                 aria-label="Sign in"
                 className="flex items-center justify-center w-12 h-12 rounded-2xl bg-blue-100 hover:bg-blue-200 dark:bg-blue-900 dark:hover:bg-blue-800 transition-all duration-200 mobile-button shadow-pet hover:shadow-pet-lg"
