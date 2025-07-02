@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs'
 import { CollarSettingsUpdateSchema, BLEMessage } from '@/lib/types'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabase'
 
 interface RouteParams {
   params: {
@@ -20,6 +20,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       )
     }
 
+    // Check if Supabase admin is available
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: 'DatabaseNotConfigured', message: 'Database not properly configured' },
+        { status: 500 }
+      )
+    }
+
     const collarId = params.id
     console.log('⚙️ Updating collar settings for:', collarId)
 
@@ -28,11 +36,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const { settings: settingsUpdate } = CollarSettingsUpdateSchema.parse(body)
 
     // Verify collar ownership
-    const { data: collar, error: fetchError } = await supabase
+    const { data: collar, error: fetchError } = await supabaseAdmin
       .from('collars')
-      .select('id, user_id, ble_mac, nickname, settings')
+      .select('id, owner_id, mac_addr, name, settings')
       .eq('id', collarId)
-      .eq('user_id', userId)
+      .eq('owner_id', userId)
       .single()
 
     if (fetchError) {
@@ -51,7 +59,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const newSettings = { ...currentSettings, ...settingsUpdate }
 
     // Update collar settings in database
-    const { data: updatedCollar, error: updateError } = await supabase
+    const { data: updatedCollar, error: updateError } = await supabaseAdmin
       .from('collars')
       .update({
         settings: newSettings,
@@ -95,7 +103,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     // Send BLE messages via WebSocket or direct connection
     // This will be handled by the collar service or WebSocket server
     if (bleMessages.length > 0) {
-      console.log('📡 Sending BLE messages to collar:', collar.ble_mac, bleMessages)
+      console.log('📡 Sending BLE messages to collar:', collar.mac_addr, bleMessages)
       
       // Broadcast to WebSocket clients for real-time collar communication
       try {
@@ -104,7 +112,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
           type: 'collarSettingsUpdated',
           data: {
             collar_id: collarId,
-            ble_mac: collar.ble_mac,
+            mac_addr: collar.mac_addr,
             messages: bleMessages,
             settings: newSettings
           }
@@ -163,15 +171,23 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       )
     }
 
+    // Check if Supabase admin is available
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: 'DatabaseNotConfigured', message: 'Database not properly configured' },
+        { status: 500 }
+      )
+    }
+
     const collarId = params.id
     console.log('📋 Fetching collar settings for:', collarId)
 
     // Fetch collar settings
-    const { data: collar, error: fetchError } = await supabase
+    const { data: collar, error: fetchError } = await supabaseAdmin
       .from('collars')
-      .select('id, nickname, settings, status, battery_level, last_seen')
+      .select('id, name, settings, status, battery_level, last_seen')
       .eq('id', collarId)
-      .eq('user_id', userId)
+      .eq('owner_id', userId)
       .single()
 
     if (fetchError) {

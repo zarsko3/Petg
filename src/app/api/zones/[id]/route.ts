@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs'
 import { ZoneSchema, ZoneCreateSchema } from '@/lib/types'
-import { supabase, supabaseConfig } from '@/lib/supabase'
+import { supabaseAdmin, supabaseConfig } from '@/lib/supabase'
 
 interface RouteParams {
   params: {
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     console.log('📋 Fetching zone:', zoneId)
 
     // Return mock data if Supabase is not configured
-    if (!supabaseConfig.hasKey) {
+    if (!supabaseConfig.hasServiceKey || !supabaseAdmin) {
       // Return a demo zone if requested
       if (zoneId === 'demo_zone_1') {
         const mockZone = {
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     // Fetch zone
-    const { data: zone, error: fetchError } = await supabase
+    const { data: zone, error: fetchError } = await supabaseAdmin
       .from('zones')
       .select('*')
       .eq('id', zoneId)
@@ -115,7 +115,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const updates = ZoneCreateSchema.partial().parse(body)
 
     // Handle mock data updates
-    if (!supabaseConfig.hasKey || zoneId === 'demo_zone_1') {
+    if (!supabaseConfig.hasServiceKey || !supabaseAdmin || zoneId === 'demo_zone_1') {
       console.log('📝 Mock zone update for:', zoneId)
       const mockZone = {
         id: zoneId,
@@ -143,7 +143,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     // Verify zone ownership
-    const { data: existingZone, error: fetchError } = await supabase
+    const { data: existingZone, error: fetchError } = await supabaseAdmin
       .from('zones')
       .select('id, user_id')
       .eq('id', zoneId)
@@ -162,7 +162,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     // Update zone
-    const { data: updatedZone, error: updateError } = await supabase
+    const { data: updatedZone, error: updateError } = await supabaseAdmin
       .from('zones')
       .update({
         ...updates,
@@ -214,33 +214,28 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
-    // Check authentication with fallback
-    let userId = 'demo-user'
-    try {
-      const authResult = auth()
-      userId = authResult.userId || 'demo-user'
-    } catch (error) {
-      console.log('⚠️ Auth not available, using demo user')
-      userId = 'demo-user'
+    // Check authentication
+    const { userId } = auth()
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Unauthorized', message: 'Authentication required' },
+        { status: 401 }
+      )
     }
 
     const zoneId = params.id
     console.log('🗑️ Deleting zone:', zoneId)
 
     // Handle mock data deletion
-    if (!supabase || zoneId === 'demo_zone_1') {
+    if (!supabaseAdmin || zoneId === 'demo_zone_1') {
       console.log('📝 Mock zone deletion for:', zoneId)
-      return NextResponse.json({
-        success: true,
-        message: 'Zone deleted successfully',
-        zone_id: zoneId
-      })
+      return NextResponse.json({ success: true, message: 'Zone deleted successfully' })
     }
 
     // Verify zone ownership
-    const { data: existingZone, error: fetchError } = await supabase
+    const { data: existingZone, error: fetchError } = await supabaseAdmin
       .from('zones')
-      .select('id, user_id, name')
+      .select('id, user_id')
       .eq('id', zoneId)
       .eq('user_id', userId)
       .single()
@@ -256,38 +251,34 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       throw new Error('Database error occurred')
     }
 
-    // Soft delete zone (set active to false)
-    const { error: deleteError } = await supabase
+    // Soft delete the zone (set active = false)
+    const { error: deleteError } = await supabaseAdmin
       .from('zones')
-      .update({
+      .update({ 
         active: false,
-        updated_at: new Date().toISOString(),
+        updated_at: new Date().toISOString() 
       })
       .eq('id', zoneId)
 
     if (deleteError) {
-      console.error('❌ Zone delete error:', deleteError)
+      console.error('❌ Zone deletion error:', deleteError)
       throw new Error('Failed to delete zone')
     }
 
-    console.log('✅ Zone deleted successfully:', existingZone.name)
+    console.log('✅ Zone deleted successfully:', zoneId)
 
-    // Broadcast zone update via WebSocket
+    // Broadcast zone deletion via WebSocket
     // TODO: Implement WebSocket broadcasting
-    console.log('🔄 Broadcasting floorPlanUpdated event')
+    console.log('🔄 Broadcasting zoneDeleted event')
 
-    return NextResponse.json({
-      success: true,
-      message: 'Zone deleted successfully',
-      zone_id: zoneId
-    })
+    return NextResponse.json({ success: true, message: 'Zone deleted successfully' })
 
   } catch (error: any) {
-    console.error('❌ Zone delete API error:', error)
+    console.error('❌ Zone deletion API error:', error)
 
     return NextResponse.json(
       { 
-        error: 'ZoneDeleteFailed', 
+        error: 'ZoneDeletionFailed', 
         message: error.message || 'Failed to delete zone' 
       },
       { status: 500 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs'
 import { ZoneSchema, ZoneCreateSchema } from '@/lib/types'
-import { supabase, supabaseConfig } from '@/lib/supabase'
+import { supabaseAdmin, supabaseConfig } from '@/lib/supabase'
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     console.log('📋 Fetching zones for user:', userId)
 
     // Return mock data if Supabase is not configured
-    if (!supabaseConfig.hasKey) {
+    if (!supabaseConfig.hasServiceKey || !supabaseAdmin) {
       console.log('📝 Using mock zones data')
       const mockZones = [
         {
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch user's zones
     console.log('🗄️ Querying Supabase for zones')
-    const { data: zones, error: fetchError } = await supabase
+    const { data: zones, error: fetchError } = await supabaseAdmin
       .from('zones')
       .select('*')
       .eq('user_id', userId)
@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
     console.log(`✅ Found ${zones?.length || 0} zones for user`)
 
     // Validate and return zones
-    const validatedZones = (zones || []).map(zone => {
+    const validatedZones = (zones || []).map((zone: any) => {
       try {
         return ZoneSchema.parse(zone)
       } catch (error) {
@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Return mock data if Supabase is not configured
-    if (!supabaseConfig.hasKey) {
+    if (!supabaseConfig.hasServiceKey || !supabaseAdmin) {
       console.log('📝 Creating mock zone')
       const mockZone = {
         id: `zone_${Date.now()}`,
@@ -174,7 +174,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(mockZone, { status: 201 })
     }
 
-    const { data: zone, error: insertError } = await supabase
+    const { data: zone, error: insertError } = await supabaseAdmin
       .from('zones')
       .insert(newZone)
       .select()

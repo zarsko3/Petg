@@ -1,17 +1,54 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = 'https://ytambeoajiuacrfjcrvx.supabase.co'
-const supabaseKey = process.env.SUPABASE_KEY
+// Get environment variables
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-if (!supabaseKey) {
-  console.warn('⚠️ SUPABASE_KEY environment variable is not defined')
+// Validate required environment variables
+if (!supabaseUrl) {
+  throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL environment variable')
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey || 'dummy-key-for-build')
+if (!supabaseAnonKey) {
+  throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable')
+}
 
-// Export the configuration for debugging
+// Client-side Supabase client (safe for browser)
+// Uses anon key and respects RLS policies
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true
+  }
+})
+
+// Server-side Supabase client (API routes only)
+// Uses service role key and bypasses RLS - NEVER import in browser code
+export const supabaseAdmin = (() => {
+  if (!supabaseServiceKey) {
+    console.warn('⚠️ SUPABASE_SERVICE_ROLE_KEY not available - admin operations will fail')
+    return null
+  }
+  
+  return createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  })
+})()
+
+// Export configuration for debugging (without exposing sensitive data)
 export const supabaseConfig = {
   url: supabaseUrl,
-  hasKey: !!supabaseKey,
-  keyPrefix: supabaseKey?.substring(0, 10) + '...'
-} 
+  hasAnonKey: !!supabaseAnonKey,
+  hasServiceKey: !!supabaseServiceKey,
+  anonKeyPrefix: supabaseAnonKey?.substring(0, 10) + '...',
+  serviceKeyPrefix: supabaseServiceKey?.substring(0, 10) + '...' || 'not-set'
+}
+
+// Type exports for better TypeScript support
+export type SupabaseClient = typeof supabase
+export type SupabaseAdminClient = typeof supabaseAdmin 

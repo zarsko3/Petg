@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs'
 import { CollarSchema } from '@/lib/types'
-import { supabase, supabaseConfig } from '@/lib/supabase'
+import { supabaseAdmin, supabaseConfig } from '@/lib/supabase'
 
 // Mock data for demo when Supabase not configured
 const DEMO_COLLARS = [
@@ -27,8 +27,8 @@ const DEMO_COLLARS = [
 export async function GET(request: NextRequest) {
   try {
     // Check if Supabase is configured
-    if (!supabaseConfig.hasKey) {
-      console.log('⚠️ Supabase not configured, using mock data')
+    if (!supabaseConfig.hasServiceKey || !supabaseAdmin) {
+      console.log('⚠️ Supabase admin not configured, using mock data')
       return NextResponse.json(DEMO_COLLARS)
     }
 
@@ -44,10 +44,10 @@ export async function GET(request: NextRequest) {
     console.log('📋 Fetching collars for user:', userId)
 
     // Fetch user's collars
-    const { data: collars, error: fetchError } = await supabase
+    const { data: collars, error: fetchError } = await supabaseAdmin
       .from('collars')
       .select('*')
-      .eq('user_id', userId)
+      .eq('owner_id', userId) // Updated to match new schema
       .order('created_at', { ascending: false })
 
     if (fetchError) {
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Validate and return collars
-    const validatedCollars = (collars || []).map(collar => {
+    const validatedCollars = (collars || []).map((collar: any) => {
       try {
         return CollarSchema.parse(collar)
       } catch (error) {
