@@ -12,6 +12,7 @@
     "validate-tokens": "tsx scripts/sync-design-system.ts --validate-only"
   },
   "dependencies": {
+    "@clerk/clerk-sdk-node": "^4.13.23",
     "@clerk/nextjs": "^4.29.9",
     "@radix-ui/react-avatar": "^1.1.7",
     "@radix-ui/react-dialog": "^1.1.13",

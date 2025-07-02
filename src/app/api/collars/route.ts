@@ -35,8 +35,8 @@ export async function GET(request: NextRequest) {
     // Check authentication with Next.js 15 compatible approach
     let userId = null
     try {
-      const { userId: authUserId } = await auth()
-      userId = authUserId
+      const authResult = await auth()
+      userId = authResult?.userId || null
     } catch (error) {
       console.log('⚠️ Auth not available, using demo data')
     }
