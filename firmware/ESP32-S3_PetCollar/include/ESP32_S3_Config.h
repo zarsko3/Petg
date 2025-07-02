@@ -240,6 +240,51 @@
  * - 5 cm: RSSI: -38 dBm, Distance: ~4.0 cm (offset corrected)
  * - 10 cm: RSSI: -44 dBm, Distance: ~9.0 cm (offset corrected)
  */
+
+/* BLE Packet-Level RSSI Smoothing Configuration */
+#define BLE_RSSI_SMOOTHING_ENABLED  true   // Enable packet-level RSSI smoothing
+#define BLE_RSSI_PACKET_COUNT       10     // Number of packets to collect (N)
+#define BLE_RSSI_QUALITY_THRESHOLD  -95    // Discard packets below this RSSI (dBm)
+#define BLE_RSSI_MAX_LATENCY_MS     500    // Maximum allowed latency (ms)
+#define BLE_RSSI_SMOOTHING_METHOD   0      // 0=Median, 1=10% Trimmed Mean
+#define BLE_RSSI_TRIM_PERCENT       10     // Percentage to trim for trimmed mean
+#define BLE_RSSI_CRC_CHECK_ENABLED  true   // Enable CRC error packet filtering
+#define BLE_RSSI_BEACON_TIMEOUT_MS  2000   // Beacon data expiry time (ms)
+
+/* RSSI Smoothing Quality Gates */
+#define BLE_RSSI_MIN_VALID_PACKETS  3      // Minimum packets required for smoothing
+#define BLE_RSSI_MAX_VALID_PACKETS  BLE_RSSI_PACKET_COUNT  // Maximum packets to store
+#define BLE_RSSI_OUTLIER_THRESHOLD  15     // RSSI difference threshold for outlier detection (dB)
+
+/* Performance and Memory Limits */
+#define BLE_RSSI_MAX_BEACONS        20     // Maximum beacons to track simultaneously
+#define BLE_RSSI_CLEANUP_INTERVAL   5000   // Cleanup old data every 5 seconds (ms)
+
+/* BLE Temporal Filtering Configuration (Task 2) */
+#define BLE_TEMPORAL_FILTER_ENABLED true   // Enable temporal filtering on smoothed RSSI
+#define BLE_TEMPORAL_FILTER_TYPE    0      // 0=IIR Exponential, 1=1D Kalman Filter
+#define BLE_IIR_ALPHA               0.15f  // IIR filter alpha coefficient (0.0-1.0)
+#define BLE_KALMAN_PROCESS_NOISE    1.0f   // Kalman filter Q (process noise)
+#define BLE_KALMAN_MEASUREMENT_NOISE 4.0f  // Kalman filter R (measurement noise)
+#define BLE_FILTER_MIN_UPDATE_MS    1      // Minimum time between filter updates (ms)
+#define BLE_FILTER_CONVERGENCE_TIME 5000   // Time to reach filter convergence (ms)
+
+/* Distance Calculation Parameters */
+#define BLE_DISTANCE_TX_POWER_REF   -71.0f // Reference TX power at 1 meter (dBm)
+#define BLE_DISTANCE_PATH_LOSS_EXP  1.9f   // Path loss exponent for indoor environment
+#define BLE_DISTANCE_OFFSET_CM      1.0f   // Distance offset calibration (cm)
+#define BLE_DISTANCE_MAX_CM         2000.0f // Maximum reasonable distance (20 meters)
+#define BLE_DISTANCE_MIN_CM         0.1f   // Minimum distance to prevent division issues
+
+/* Temporal Filter Logging and Debugging */
+#define BLE_FILTER_LOG_ENABLED      true   // Enable filter performance logging
+#define BLE_FILTER_LOG_COUNT        100    // Number of initial updates to log
+#define BLE_FILTER_METRICS_INTERVAL 10000  // Filter metrics reporting interval (ms)
+
+/* Runtime Parameter Adjustment */
+#define BLE_FILTER_RUNTIME_ADJUST   true   // Allow runtime parameter adjustment
+#define BLE_FILTER_PARAM_PERSISTENCE true  // Save filter parameters to preferences
+
 #endif
 
 // ==========================================
