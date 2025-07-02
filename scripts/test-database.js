@@ -12,6 +12,7 @@
  * Usage: node scripts/test-database.js
  */
 
+require('dotenv').config({ path: '.env.local' });
 const { createClient } = require('@supabase/supabase-js');
 
 // Configuration from environment variables
