@@ -33,12 +33,18 @@ export async function GET(request: NextRequest) {
     }
 
     // Check authentication
-    let userId = 'demo-user'
+    let userId = null
     try {
       const authResult = auth()
-      userId = authResult.userId || 'demo-user'
+      userId = authResult.userId
     } catch (error) {
-      console.log('⚠️ Auth not available, using demo user')
+      console.log('⚠️ Auth not available, using demo data')
+    }
+
+    // If no authenticated user, return demo data
+    if (!userId) {
+      console.log('📋 No authenticated user, returning demo collars')
+      return NextResponse.json(DEMO_COLLARS)
     }
 
     console.log('📋 Fetching collars for user:', userId)
