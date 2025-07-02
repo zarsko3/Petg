@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     // Check authentication with fallback
     let userId = 'demo-user'
     try {
-      const authResult = auth()
+      const authResult = await auth()
       userId = authResult.userId || 'demo-user'
       console.log('🔐 Authentication successful:', { userId: userId ? 'present' : 'missing' })
     } catch (error) {
@@ -132,7 +132,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     // Check authentication
-    const { userId } = auth()
+    const { userId } = await auth()
     if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized', message: 'Authentication required' },

@@ -14,7 +14,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // Check authentication with fallback
     let userId = 'demo-user'
     try {
-      const authResult = auth()
+      const authResult = await auth()
       userId = authResult.userId || 'demo-user'
     } catch (error) {
       console.log('⚠️ Auth not available, using demo user')
@@ -100,7 +100,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     // Check authentication with fallback
     let userId = 'demo-user'
     try {
-      const authResult = auth()
+      const authResult = await auth()
       userId = authResult.userId || 'demo-user'
     } catch (error) {
       console.log('⚠️ Auth not available, using demo user')
@@ -215,7 +215,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     // Check authentication
-    const { userId } = auth()
+    const { userId } = await auth()
     if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized', message: 'Authentication required' },

@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     // Check authentication
     let userId = null
     try {
-      const authResult = auth()
+      const authResult = await auth()
       userId = authResult.userId
     } catch (error) {
       console.log('⚠️ Auth not available, using demo data')
