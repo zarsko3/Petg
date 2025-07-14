@@ -25,9 +25,6 @@ export function getCollarWebSocketUrl(): string {
   
   const wsUrl = `${protocol}//${host}/ws`;
   
-  console.log(`🔄 CollarWebSocket: Using proxy URL: ${wsUrl}`);
-  console.log(`📡 This proxies to collar via Vercel configuration`);
-  
   return wsUrl;
 }
 
@@ -36,7 +33,6 @@ export function getCollarWebSocketUrl(): string {
  * @deprecated Use getCollarWebSocketUrl() instead
  */
 export function buildWebSocketUrl(ip?: string): string {
-  console.warn('⚠️ buildWebSocketUrl() is deprecated. Using proxy URL instead of direct IP connection.');
   return getCollarWebSocketUrl();
 }
 

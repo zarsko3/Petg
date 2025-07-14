@@ -104,19 +104,14 @@ class RouterConfigHelper {
     // Return cached result if still valid
     const now = Date.now();
     if (this.cachedRouter && (now - this.lastDetectionTime) < this.CACHE_DURATION) {
-      console.log('🎯 Using cached router detection result');
       return this.cachedRouter;
     }
 
-    console.log('🔍 Detecting router (cached result expired or not found)...');
-    
     // Determine likely gateway based on collar IP
     const commonGateways = this.getOrderedGateways();
     
     for (const gateway of commonGateways) {
       try {
-        console.log(`🌐 Testing gateway: ${gateway}`);
-        
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 1500); // Reduced timeout
         
@@ -148,16 +143,12 @@ class RouterConfigHelper {
         this.cachedRouter = detectedRouter;
         this.lastDetectionTime = now;
         
-        console.log(`✅ Router detected at ${gateway}`);
         return detectedRouter;
         
       } catch (error) {
-        console.log(`❌ Gateway ${gateway} not accessible:`, error instanceof Error ? error.message : 'Unknown error');
         // Continue trying other gateways
       }
     }
-    
-    console.log('❌ No router detected on common gateways');
     
     // Cache null result to prevent repeated failed attempts
     this.cachedRouter = null;
@@ -185,8 +176,6 @@ class RouterConfigHelper {
   // Get collar network information with timeout
   static async getCollarNetworkInfo(collarIP: string): Promise<CollarNetworkInfo | null> {
     try {
-      console.log(`📡 Getting network info from collar at ${collarIP}...`);
-      
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
       
@@ -199,25 +188,20 @@ class RouterConfigHelper {
       
       if (response.ok) {
         const data = await response.json();
-        console.log('✅ Collar network info retrieved:', data);
         return {
           macAddress: data.mac_address,
           currentIP: data.ip_address,
           hostname: data.hostname || 'PetCollar'
         };
-      } else {
-        console.log('❌ Collar network info endpoint returned error:', response.status);
       }
     } catch (error) {
-      console.log('❌ Could not get collar network info:', error instanceof Error ? error.message : 'Unknown error');
+      // Return basic info if network-info endpoint doesn't exist
+      return {
+        currentIP: collarIP,
+        hostname: 'PetCollar',
+        macAddress: undefined // Will be shown as "Check collar device"
+      };
     }
-    
-    // Return basic info if network-info endpoint doesn't exist
-    return {
-      currentIP: collarIP,
-      hostname: 'PetCollar',
-      macAddress: undefined // Will be shown as "Check collar device"
-    };
   }
 
   // Generate step-by-step instructions
@@ -312,7 +296,6 @@ class RouterConfigHelper {
   static clearCache(): void {
     this.cachedRouter = null;
     this.lastDetectionTime = 0;
-    console.log('🗑️ Router detection cache cleared');
   }
 }
 

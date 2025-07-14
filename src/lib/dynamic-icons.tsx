@@ -35,14 +35,12 @@ const loadIcon = (iconName: string): ComponentType<LucideProps> => {
       const IconComponent = (iconModule as any)[iconName];
       
       if (!IconComponent) {
-        console.warn(`Icon "${iconName}" not found in lucide-react`);
         // Return a placeholder icon
         return { default: iconModule.AlertCircle };
       }
       
       return { default: IconComponent };
     } catch (error) {
-      console.error(`Failed to load icon "${iconName}":`, error);
       // Return a placeholder icon on error
       const iconModule = await import('lucide-react');
       return { default: iconModule.AlertCircle };
@@ -86,12 +84,11 @@ export const preloadCommonIcons = async () => {
     try {
       loadIcon(iconName);
     } catch (error) {
-      console.warn(`Failed to preload icon "${iconName}":`, error);
+      // No warning or logging for preloading
     }
   });
   
   await Promise.allSettled(loadPromises);
-  console.log('✅ Common icons preloaded');
 };
 
 // Utility to create a static icon component for frequently used icons

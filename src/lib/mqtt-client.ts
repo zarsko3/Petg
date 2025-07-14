@@ -143,15 +143,9 @@ export class CollarMQTTClient {
 
   private connect() {
     try {
-      console.log('🌐 MQTT: Connecting to HiveMQ cloud...');
-      
-      const wsUrl = `${MQTT_CONFIG.protocol}://${MQTT_CONFIG.host}:${MQTT_CONFIG.port}/mqtt`;
-      console.log(`📡 MQTT: URL: ${wsUrl}`);
-      
-      this.client = mqtt.connect(wsUrl, MQTT_CONFIG);
+      this.client = mqtt.connect(MQTT_CONFIG.protocol + '://' + MQTT_CONFIG.host + ':' + MQTT_CONFIG.port + '/mqtt', MQTT_CONFIG);
       
       this.client.on('connect', () => {
-        console.log('✅ MQTT: Connected to HiveMQ cloud');
         this.isConnected = true;
         
         // Subscribe to collar topics
@@ -172,26 +166,22 @@ export class CollarMQTTClient {
       });
       
       this.client.on('error', (error: Error) => {
-        console.error('❌ MQTT: Connection error:', error);
         this.isConnected = false;
         this.onError?.(error);
         this.scheduleReconnect();
       });
       
       this.client.on('close', () => {
-        console.log('🔌 MQTT: Connection closed');
         this.isConnected = false;
         this.onDisconnect?.();
         this.scheduleReconnect();
       });
       
       this.client.on('offline', () => {
-        console.log('📡 MQTT: Client went offline');
         this.isConnected = false;
       });
       
     } catch (error) {
-      console.error('❌ MQTT: Failed to create connection:', error);
       this.scheduleReconnect();
     }
   }
@@ -211,9 +201,6 @@ export class CollarMQTTClient {
     topics.forEach(topic => {
       this.client?.subscribe(topic, { qos: 1 }, (error: Error | null) => {
         if (error) {
-          console.error(`❌ MQTT: Failed to subscribe to ${topic}:`, error);
-        } else {
-          console.log(`✅ MQTT: Subscribed to ${topic}`);
         }
       });
     });
@@ -222,12 +209,10 @@ export class CollarMQTTClient {
   private handleMessage(topic: string, message: Buffer) {
     try {
       const messageStr = message.toString();
-      console.log(`📨 MQTT: Received on ${topic}:`, messageStr);
       
       // Parse collar ID from topic (e.g., "pet-collar/001/telemetry" → "001")
       const collarIdMatch = topic.match(/^pet-collar\/([^\/]+)\//);
       if (!collarIdMatch) {
-        console.warn('⚠️ MQTT: Could not parse collar ID from topic:', topic);
         return;
       }
       
@@ -241,20 +226,13 @@ export class CollarMQTTClient {
         const data: CollarStatusData = JSON.parse(messageStr);
         this.onCollarStatus?.(collarId, data);
       } else if (topic.includes('/zones')) {
-        console.log(`🗺️ MQTT: Zone data for collar ${collarId}:`, messageStr);
       } else if (topic.includes('/location')) {
-        console.log(`📍 MQTT: Location data for collar ${collarId}:`, messageStr);
       } else if (topic.includes('/beacon-detection')) {
-        // 🔍 STEP 1: Enhanced beacon message logging for debugging pipeline
-        console.log(`📡 MQTT: [Beacon message] Raw payload for collar ${collarId}:`, messageStr);
-        
         // Parse beacon detection data
         const beaconData = JSON.parse(messageStr);
-        console.log(`🔍 MQTT: [Beacon message] Parsed data:`, beaconData);
         
         // Validate required fields
         if (beaconData.beacon_name && beaconData.rssi !== undefined) {
-          console.log(`✅ MQTT: [Beacon message] Valid beacon detection: ${beaconData.beacon_name} (${beaconData.rssi}dBm, ${beaconData.distance}cm)`);
           
           // Call the beacon detection handler
           const processedBeacon = {
@@ -267,26 +245,13 @@ export class CollarMQTTClient {
             address: beaconData.address
           };
           
-          console.log(`🚀 MQTT: [Beacon message] Calling onCollarBeaconDetection handler with:`, processedBeacon);
           this.onCollarBeaconDetection?.(collarId, processedBeacon);
           
-        } else {
-          console.warn('⚠️ MQTT: [Beacon message] Invalid beacon detection data - missing beacon_name or rssi:', beaconData);
-          console.warn('⚠️ MQTT: [Beacon message] Required fields check:', {
-            has_beacon_name: !!beaconData.beacon_name,
-            has_rssi: beaconData.rssi !== undefined,
-            beacon_name_value: beaconData.beacon_name,
-            rssi_value: beaconData.rssi
-          });
         }
       } else if (topic.includes('/alert')) {
-        console.log(`🚨 MQTT: Alert from collar ${collarId}:`, messageStr);
       }
       
     } catch (error) {
-      console.error('❌ MQTT: Error parsing message:', error);
-      console.error('❌ MQTT: Failed message topic:', topic);
-      console.error('❌ MQTT: Failed message content:', message.toString());
     }
   }
 
@@ -296,7 +261,6 @@ export class CollarMQTTClient {
     }
     
     this.reconnectTimeout = setTimeout(() => {
-      console.log('🔄 MQTT: Attempting to reconnect...');
       this.connect();
     }, 5000);
   }
@@ -304,7 +268,6 @@ export class CollarMQTTClient {
   // Public methods for sending commands
   public sendBuzzCommand(collarId: string, command: CollarCommandBuzz): boolean {
     if (!this.client || !this.isConnected) {
-      console.warn('⚠️ MQTT: Not connected, cannot send buzz command');
       return false;
     }
     
@@ -313,9 +276,6 @@ export class CollarMQTTClient {
     
     this.client.publish(topic, payload, { qos: 1 }, (error?: Error) => {
       if (error) {
-        console.error('❌ MQTT: Failed to send buzz command:', error);
-      } else {
-        console.log(`✅ MQTT: Sent buzz command to collar ${collarId}`);
       }
     });
     
@@ -324,20 +284,14 @@ export class CollarMQTTClient {
 
   public sendLEDCommand(collarId: string, command: CollarCommandLED): boolean {
     if (!this.client || !this.isConnected) {
-      console.warn('⚠️ MQTT: Not connected, cannot send LED command');
       return false;
     }
     
     const topic = MQTT_TOPICS.COLLAR_COMMAND_LED(collarId);
     const payload = JSON.stringify(command);
     
-    console.log(`📤 MQTT: Sending LED command to ${topic}:`, command);
-    
     this.client.publish(topic, payload, { qos: 1 }, (error) => {
       if (error) {
-        console.error('❌ MQTT: Failed to send LED command:', error);
-      } else {
-        console.log('✅ MQTT: LED command sent successfully');
       }
     });
     
@@ -348,19 +302,14 @@ export class CollarMQTTClient {
   public async publish(topic: string, payload: string, options?: { qos?: 0 | 1 | 2; retain?: boolean }): Promise<boolean> {
     return new Promise((resolve) => {
       if (!this.client || !this.isConnected) {
-        console.warn('⚠️ MQTT: Not connected, cannot publish message');
         resolve(false);
         return;
       }
       
-      console.log(`📤 MQTT: Publishing to ${topic}:`, payload);
-      
       this.client.publish(topic, payload, { qos: 1, ...options }, (error) => {
         if (error) {
-          console.error('❌ MQTT: Failed to publish message:', error);
           resolve(false);
         } else {
-          console.log('✅ MQTT: Message published successfully');
           resolve(true);
         }
       });

@@ -37,11 +37,8 @@ export class MobileWebSocketService {
 
   private connect() {
     try {
-      console.log('📱 Mobile: Connecting via MQTT cloud...')
-      
       // Set up MQTT event handlers
       this.mqttClient.onConnect = () => {
-        console.log('📱 Mobile MQTT connected')
         this.isConnected = true
         this.reconnectAttempts = 0
         this.startHeartbeat()
@@ -79,7 +76,6 @@ export class MobileWebSocketService {
       }
 
       this.mqttClient.onDisconnect = () => {
-        console.log('📱 Mobile MQTT disconnected')
         this.isConnected = false
         this.stopHeartbeat()
         this.emit('connection', { 
@@ -91,7 +87,6 @@ export class MobileWebSocketService {
       }
 
       this.mqttClient.onError = (error: Error) => {
-        console.error('📱 Mobile MQTT error:', error)
         if (this.reconnectAttempts === 0) {
           toast.error('Connection to collar lost. Attempting to reconnect...')
         }
@@ -101,7 +96,6 @@ export class MobileWebSocketService {
       this.isConnected = this.mqttClient.getConnectionStatus().connected
       
     } catch (error) {
-      console.error('Failed to setup MQTT connection:', error)
       this.attemptReconnect()
     }
   }
@@ -143,7 +137,6 @@ export class MobileWebSocketService {
   private startHeartbeat() {
     this.heartbeatInterval = setInterval(() => {
       // MQTT handles heartbeat automatically
-      console.log('📱 Mobile: MQTT heartbeat check')
     }, 30000) // Check heartbeat every 30 seconds
   }
 
@@ -156,13 +149,11 @@ export class MobileWebSocketService {
 
   private attemptReconnect() {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('Max reconnection attempts reached')
       toast.error('Unable to reconnect to collar. Please check your connection.')
       return
     }
 
     this.reconnectAttempts++
-    console.log(`Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`)
     
     setTimeout(() => {
       this.connect()
@@ -194,7 +185,7 @@ export class MobileWebSocketService {
         try {
           callback(data)
         } catch (error) {
-          console.error('Error in WebSocket listener:', error)
+          // Remove console.error as per the new code
         }
       })
     }
@@ -202,10 +193,7 @@ export class MobileWebSocketService {
 
   public send(data: any) {
     if (this.isConnected) {
-      console.log('📱 Mobile: Sending MQTT command:', data)
       // TODO: Send command via MQTT when collar command topics are implemented
-    } else {
-      console.warn('MQTT not connected, cannot send data')
     }
   }
 

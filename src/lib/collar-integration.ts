@@ -50,19 +50,15 @@ class CollarIntegration {
 
   // Auto-initialize with UDP broadcast discovery
   async autoInit(): Promise<void> {
-    console.log('🚀 CollarIntegration: Starting auto-initialization...');
-    
     // Clear stale addresses on start
     localStorage.removeItem('petg.wsUrl');
     localStorage.removeItem('petg.ipPool');
-    console.log('🧹 Cleared stale cached addresses');
 
     // Always listen to UDP broadcasts
     this.discoverCollarUDP(({ data }) => {
       try {
         const { ws } = JSON.parse(data);          // "ws://192.168.1.35:8080"
         if (ws) {
-          console.log(`📡 UDP discovery found WebSocket URL: ${ws}`);
           localStorage.setItem('petg.wsUrl', ws);
           
           // Try connection with catch for retry logic
@@ -72,7 +68,7 @@ class CollarIntegration {
           });
         }
       } catch (error) {
-        console.log('⚠️ Invalid UDP packet received');
+        // Ignore invalid UDP packets
       }
     });
 
@@ -82,47 +78,37 @@ class CollarIntegration {
 
   // UDP discovery for collar broadcasts
   private discoverCollarUDP(handlePacket: (event: MessageEvent) => void): void {
-    console.log('🔊 CollarIntegration: Starting UDP discovery listener...');
-    
     // Only connect to discovery WebSocket if NEXT_PUBLIC_DISCOVERY_WS_URL is set
     const discoveryWsUrl = process.env.NEXT_PUBLIC_DISCOVERY_WS_URL;
     if (typeof window !== 'undefined' && discoveryWsUrl) {
       try {
-        console.log(`🔗 Connecting to discovery WebSocket: ${discoveryWsUrl}`);
         const discoveryWs = new WebSocket(discoveryWsUrl);
         this.udpDiscoverySocket = discoveryWs;
         
         discoveryWs.onopen = () => {
-          console.log('✅ CollarIntegration: Connected to UDP discovery service');
+          // Ignore connection open
         };
         
         discoveryWs.onmessage = handlePacket;
         
         discoveryWs.onerror = (error) => {
-          console.log('ℹ️ CollarIntegration: Discovery service not available');
+          // Ignore discovery service not available
         };
         
         discoveryWs.onclose = () => {
-          console.log('🔌 CollarIntegration: Discovery service disconnected');
+          // Ignore discovery service disconnected
         };
       } catch (error) {
-        console.log('ℹ️ CollarIntegration: Cannot connect to discovery service');
+        // Ignore connection to discovery service
       }
-    } else {
-      console.log('ℹ️ CollarIntegration: Discovery WebSocket disabled (no NEXT_PUBLIC_DISCOVERY_WS_URL)');
     }
   }
-
-
 
   // Retry discovery until found - UDP scan every 3 seconds
   private retryUntilFound(): void {
     const retryInterval = setInterval(() => {
-      console.log('🔄 CollarIntegration: UDP scan retry (waiting for collar broadcasts)...');
-      
       // Check if we got a connection via UDP
       if (this.wsUrl && this.connection.connected) {
-        console.log(`✅ Collar connected via UDP: ${this.wsUrl}`);
         clearInterval(retryInterval);
       }
     }, 3000); // UDP scan every 3 seconds
@@ -130,9 +116,6 @@ class CollarIntegration {
 
   // Discovery method - now relies only on UDP broadcasts
   async discoverCollar(): Promise<CollarConnection | null> {
-    console.log('🔍 CollarIntegration: Discovery relies on UDP broadcasts only');
-    console.log('ℹ️ CollarIntegration: No IP range scanning - waiting for collar announcements');
-    
     // Return null - discovery happens via UDP broadcasts
     return null;
   }
@@ -140,26 +123,20 @@ class CollarIntegration {
   // Connect to collar with clean fallback if cached URL is dead
   async connectToCollar(url: string): Promise<boolean> {
     try {
-      console.log(`🔗 CollarIntegration: Attempting connection to ${url}`);
-      
       // Try to open WebSocket connection
       await this.openWebSocket(url);
       
       // If we get here, connection was successful
-      console.log(`✅ CollarIntegration: Connected successfully to ${url}`);
       this.wsUrl = url;
       return true;
       
     } catch (error) {
-      console.log(`❌ CollarIntegration: Connection failed to ${url}`);
-      
       // connection failed – forget the stale URL and try UDP again
       localStorage.removeItem('petg.wsUrl');
       this.wsUrl = '';
       this.connection.connected = false;
       
       // Start UDP scan retry
-      console.log('🔄 CollarIntegration: Starting UDP retry after failed connection');
       this.retryUntilFound();          // UDP scan every 3 s
       
       throw error; // Re-throw to allow caller to handle
@@ -204,12 +181,9 @@ class CollarIntegration {
               localStorage.setItem('petg.wsUrl', this.wsUrl);
             }
             
-            console.log(`✅ HTTP verification successful for ${ipAddress}`);
-            console.log(`📱 Device: ${data.device_id || 'PetCollar'} (${data.firmware_version || 'Unknown'})`);
             resolve();
           })
           .catch(error => {
-            console.log(`❌ HTTP verification failed for ${ipAddress}:`, error.message);
             reject(error);
           });
         } else {
@@ -247,12 +221,9 @@ class CollarIntegration {
             localStorage.setItem('petg.wsUrl', this.wsUrl);
           }
           
-          console.log(`✅ Connected to Pet Collar at ${ipAddress}`);
-          console.log(`📱 Device: ${data.device_id || 'PetCollar'} (${data.firmware_version || 'Unknown'})`);
           resolve();
         })
         .catch(error => {
-          console.log(`❌ Connection failed to ${ipAddress}:`, error.message);
           reject(error);
         });
       }
@@ -266,8 +237,6 @@ class CollarIntegration {
     }
 
     try {
-      console.log(`📤 Uploading ${zoneConfig.zones.length} zones to collar...`);
-      
       const response = await fetch(`${this.baseUrl}/zones/config`, {
         method: 'POST',
         headers: {
@@ -278,16 +247,12 @@ class CollarIntegration {
 
       if (response.ok) {
         const result = await response.json();
-        console.log(`✅ Zone configuration uploaded successfully`);
-        console.log(`📍 ${result.count} zones loaded on collar`);
         return true;
       } else {
         const error = await response.json();
-        console.error('❌ Failed to upload zone config:', error.message);
         return false;
       }
     } catch (error) {
-      console.error('❌ Network error uploading zones:', error);
       return false;
     }
   }
@@ -307,10 +272,9 @@ class CollarIntegration {
         return status;
       }
     } catch (error) {
-      console.error('❌ Failed to get zone status:', error);
       this.connection.connected = false;
+      return null;
     }
-
     return null;
   }
 
@@ -326,13 +290,11 @@ class CollarIntegration {
       });
 
       if (response.ok) {
-        console.log('🗑️ All zones cleared on collar');
         return true;
       }
     } catch (error) {
-      console.error('❌ Failed to clear zones:', error);
+      return false;
     }
-
     return false;
   }
 
@@ -351,10 +313,9 @@ class CollarIntegration {
         return data;
       }
     } catch (error) {
-      console.error('❌ Failed to get collar data:', error);
       this.connection.connected = false;
+      return null;
     }
-
     return null;
   }
 
@@ -378,9 +339,8 @@ class CollarIntegration {
         return result.message;
       }
     } catch (error) {
-      console.error('❌ Failed to send command:', error);
+      return null;
     }
-
     return null;
   }
 
@@ -412,8 +372,8 @@ class CollarIntegration {
       }
     } catch (error) {
       this.connection.connected = false;
+      return false;
     }
-
     return false;
   }
 
@@ -456,7 +416,7 @@ export function useCollarIntegration() {
         await collarIntegration.autoInit();
         setConnection(collarIntegration.getConnection());
       } catch (error) {
-        console.error('❌ useCollarIntegration: Auto-init failed:', error);
+        // Ignore auto-init failure
       }
     };
 

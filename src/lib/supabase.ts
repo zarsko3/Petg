@@ -28,7 +28,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 // Uses service role key and bypasses RLS - NEVER import in browser code
 export const supabaseAdmin = (() => {
   if (!supabaseServiceKey) {
-    console.warn('⚠️ SUPABASE_SERVICE_ROLE_KEY not available - admin operations will fail')
     return null
   }
   

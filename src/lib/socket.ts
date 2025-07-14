@@ -48,7 +48,7 @@ export type WebSocketMessage = {
 class CollarConnectionManager {
   private static instance: CollarConnectionManager;
   private ws: WebSocket | null = null;
-  private httpPollingInterval: NodeJS.Timeout | null = null;
+  private httpPollingInterval: ReturnType<typeof setInterval> | null = null;
   private isConnected = false;
   private currentUrl = '';
   private httpFallback = false;
@@ -70,7 +70,6 @@ class CollarConnectionManager {
   private handleCollarDiscovered(event: Event) {
     const customEvent = event as CustomEvent;
     const { collar_ip, websocket_url } = customEvent.detail;
-    console.log(`🎯 Auto-updating collar connection to: ${collar_ip}`);
     
     // Disconnect current connection and reconnect to new address
     this.disconnect();
@@ -89,7 +88,6 @@ class CollarConnectionManager {
   }
 
   async connect(url: string): Promise<void> {
-    console.log('🔗 Connecting to collar:', url);
     this.currentUrl = url;
     
     // Update connection status in store
@@ -108,7 +106,6 @@ class CollarConnectionManager {
       clearInterval(this.httpPollingInterval);
     }
 
-    console.log('📡 Starting HTTP polling to collar...');
     this.httpFallback = true;
     
     // 🔒 SECURITY FIX: Handle both ws:// and wss:// protocols for HTTP polling fallback
@@ -135,7 +132,6 @@ class CollarConnectionManager {
           });
         } catch (corsError) {
           // Fallback to proxy API
-          console.log('🔄 Direct connection failed, using proxy...');
           response = await fetch('/api/collar-proxy?endpoint=/data', {
             method: 'GET',
             headers: {
@@ -151,15 +147,6 @@ class CollarConnectionManager {
         
         if (response.ok) {
           const jsonData = await response.json();
-          console.log('📊 Collar data received:', jsonData);
-          
-          // Log beacon-specific data
-          if (jsonData.beacons && jsonData.beacons.length > 0) {
-            console.log(`🔍 Socket: Received ${jsonData.beacons.length} beacons from collar:`, jsonData.beacons);
-          }
-          if (jsonData.scanner) {
-            console.log(`📡 Socket: Scanner stats:`, jsonData.scanner);
-          }
           
           // Convert ESP32 format to our expected format
           const normalizedData: CollarData = {
@@ -180,7 +167,6 @@ class CollarConnectionManager {
           if (!this.isConnected) {
             this.isConnected = true;
             this.onConnect?.();
-            console.log('✅ Collar connection established');
             
             // Update connection status in store
             const store = usePetgStore.getState();
@@ -202,20 +188,12 @@ class CollarConnectionManager {
           // Update raw collar data for beacon processing
           if (typeof store.setLastCollarData === 'function') {
             store.setLastCollarData(normalizedData);
-            console.log('📝 Socket: Updated store with collar data including beacons:', normalizedData.beacons?.length || 0);
           }
           
         } else {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
       } catch (error) {
-        // Check if it's a CORS error specifically
-        if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-          console.log('🚫 CORS or network error detected:', error.message);
-        } else {
-          console.log('📊 HTTP polling error:', error);
-        }
-        
         // Use mock data to keep UI alive
         const mockData: CollarData = {
           device_id: 'PETCOLLAR001',
@@ -230,7 +208,6 @@ class CollarConnectionManager {
         if (this.isConnected) {
           this.isConnected = false;
           this.onDisconnect?.();
-          console.log('❌ Collar connection lost, using mock data');
           
           // Update connection status in store
           const store = usePetgStore.getState();
@@ -263,7 +240,6 @@ class CollarConnectionManager {
 
   async sendCommand(command: string): Promise<void> {
     if (!this.httpFallback) {
-      console.warn('⚠️ Not connected to collar');
       return;
     }
 
@@ -288,7 +264,6 @@ class CollarConnectionManager {
         });
       } catch (corsError) {
         // Fallback to proxy API
-        console.log('🔄 Direct command failed, using proxy...');
         response = await fetch('/api/collar-proxy?endpoint=/command', {
           method: 'POST',
           headers: { 
@@ -304,7 +279,6 @@ class CollarConnectionManager {
       
       if (response.ok) {
         const result = await response.json();
-        console.log('📤 Command sent successfully:', command, result);
       } else {
         console.log('📤 Command failed:', command, response.status, response.statusText);
       }
@@ -318,8 +292,6 @@ class CollarConnectionManager {
   }
 
   disconnect(): void {
-    console.log('🔌 Disconnecting from collar...');
-    
     if (this.httpPollingInterval) {
       clearInterval(this.httpPollingInterval);
       this.httpPollingInterval = null;
@@ -366,8 +338,6 @@ export async function discoverCollar(): Promise<string[]> {
     'ws://172.16.0.100:8080'
   ];
 
-  console.log('🔍 Auto-discovering collar...');
-  
   const promises = possibleUrls.map(async (url) => {
     try {
       const httpUrl = url.replace('ws://', 'http://').replace(':8080', '');
@@ -385,7 +355,6 @@ export async function discoverCollar(): Promise<string[]> {
       });
       return response.ok ? url : null;
     } catch (error) {
-      console.log(`Discovery failed for ${url}:`, error instanceof TypeError ? 'CORS/Network error' : error);
       return null;
     }
   });
@@ -393,7 +362,6 @@ export async function discoverCollar(): Promise<string[]> {
   const results = await Promise.all(promises);
   const foundUrls = results.filter((url): url is string => url !== null);
   
-  console.log('🎯 Discovery results:', foundUrls);
   return foundUrls;
 }
 

@@ -41,23 +41,9 @@ async function dbConnect() {
 
     try {
       cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
-        console.log('Connected to MongoDB!');
-        // Log information about the database
-        const connectionState = mongoose.connection.readyState;
-        const stateMap = {
-          0: 'disconnected',
-          1: 'connected',
-          2: 'connecting',
-          3: 'disconnecting',
-        };
-        console.log(`MongoDB connection state: ${stateMap[connectionState as 0 | 1 | 2 | 3]}`);
-        console.log(`MongoDB host: ${mongoose.connection.host || 'unknown'}`);
-        console.log(`MongoDB database name: ${mongoose.connection.name || 'unknown'}`);
-
         return mongoose;
       });
     } catch (err) {
-      console.error('MongoDB connection error:', err);
       cached.promise = null;
       throw err;
     }
@@ -67,7 +53,6 @@ async function dbConnect() {
     cached.conn = await cached.promise;
   } catch (e) {
     cached.promise = null;
-    console.error('Failed to connect to MongoDB:', e);
     throw e;
   }
 

@@ -19,10 +19,8 @@ const loadBeaconsFromStorage = () => {
       beacon.timestamp && (now - beacon.timestamp) < BEACON_MAX_AGE_MS
     );
     
-    console.log(`📦 Store: [STEP 5] Loaded ${validBeacons.length}/${beacons.length} valid beacons from localStorage`);
     return validBeacons;
   } catch (error) {
-    console.error('❌ Store: [STEP 5] Failed to load beacons from localStorage:', error);
     return [];
   }
 };
@@ -32,9 +30,7 @@ const saveBeaconsToStorage = (beacons: any[]) => {
   
   try {
     localStorage.setItem(BEACON_STORAGE_KEY, JSON.stringify(beacons));
-    console.log(`💾 Store: [STEP 5] Saved ${beacons.length} beacons to localStorage`);
   } catch (error) {
-    console.error('❌ Store: [STEP 5] Failed to save beacons to localStorage:', error);
   }
 };
 
@@ -194,32 +190,15 @@ export const usePetgStore = create<PetgState>((set) => ({
   
   // Beacon actions
   addOrUpdateBeacon: (beacon) => set((state) => {
-    // 🔍 STEP 3: Enhanced logging for ghost mode creation
-    console.log(`🏪 Store: [STEP 3] addOrUpdateBeacon called with:`, beacon);
-    console.log(`🏪 Store: [STEP 3] Current store has ${state.beacons.length} beacons`);
-    
-    // 🔧 TIMESTAMP FIX: Debug timestamp comparison
-    if (beacon.deviceTimestamp) {
-      const localTime = beacon.timestamp;
-      const deviceTime = beacon.deviceTimestamp;
-      const timeDiff = localTime - deviceTime;
-      console.log(`⏰ Store: [TIMESTAMP FIX] Local: ${localTime}, Device: ${deviceTime}, Diff: ${timeDiff}ms (${(timeDiff/1000).toFixed(1)}s)`);
-    }
-    
     const existingIndex = state.beacons.findIndex(b => 
       b.id === beacon.id || b.name === beacon.name
     );
     
     if (existingIndex >= 0) {
       // Update existing beacon
-      console.log(`🔄 Store: [STEP 3] Updating existing beacon at index ${existingIndex}:`, state.beacons[existingIndex]);
       const updatedBeacons = [...state.beacons];
       updatedBeacons[existingIndex] = beacon;
       
-      console.log(`✅ Store: [STEP 3] Beacon updated:`, beacon);
-      console.log(`📊 Store: [STEP 3] Total beacons after update: ${updatedBeacons.length}`);
-      
-      // 🔍 STEP 5: Save to localStorage
       saveBeaconsToStorage(updatedBeacons);
       
       return {
@@ -228,20 +207,8 @@ export const usePetgStore = create<PetgState>((set) => ({
       };
     } else {
       // Add new beacon (ghost mode)
-      console.log(`🆕 Store: [STEP 3] Adding NEW beacon (ghost mode):`, beacon);
       const newBeacons = [...state.beacons, beacon];
       
-      console.log(`✅ Store: [STEP 3] New beacon added. Total beacons: ${newBeacons.length}`);
-      console.log(`📋 Store: [STEP 3] All beacons now:`, newBeacons.map(b => ({
-        id: b.id,
-        name: b.name,
-        rssi: b.rssi,
-        age_seconds: Math.floor((Date.now() - b.timestamp) / 1000),
-        local_timestamp: new Date(b.timestamp).toLocaleTimeString(),
-        device_timestamp: b.deviceTimestamp
-      })));
-      
-      // 🔍 STEP 5: Save to localStorage
       saveBeaconsToStorage(newBeacons);
       
       return {
@@ -251,12 +218,9 @@ export const usePetgStore = create<PetgState>((set) => ({
     }
   }),
   removeBeacon: (id) => set((state) => {
-    console.log(`🗑️ Store: Removing beacon with id: ${id}`);
     const beforeCount = state.beacons.length;
     const filtered = state.beacons.filter((b) => b.id !== id);
-    console.log(`📊 Store: Removed ${beforeCount - filtered.length} beacon(s). Remaining: ${filtered.length}`);
     
-    // 🔍 STEP 5: Save to localStorage
     saveBeaconsToStorage(filtered);
     
     return {
@@ -265,7 +229,6 @@ export const usePetgStore = create<PetgState>((set) => ({
     };
   }),
   clearBeacons: () => set((state) => {
-    console.log(`🧹 Store: Clearing all ${state.beacons.length} beacons`);
     return { beacons: [] };
   }),
   cleanupOldBeacons: (maxAgeMs = 300000) => set((state) => {
@@ -274,13 +237,6 @@ export const usePetgStore = create<PetgState>((set) => ({
     const filtered = state.beacons.filter((b) => now - b.timestamp < maxAgeMs);
     
     if (beforeCount !== filtered.length) {
-      console.log(`🧹 Store: Cleanup removed ${beforeCount - filtered.length} old beacons (older than ${maxAgeMs/1000}s). Remaining: ${filtered.length}`);
-      console.log(`📋 Store: Remaining beacons:`, filtered.map(b => ({
-        name: b.name,
-        age_seconds: Math.floor((now - b.timestamp) / 1000)
-      })));
-      
-      // 🔍 STEP 5: Save to localStorage after cleanup
       saveBeaconsToStorage(filtered);
     }
     
@@ -301,7 +257,6 @@ export const usePetgStore = create<PetgState>((set) => ({
     // Keep only last 20 updates
     const newUpdates = [newUpdate, ...state.recentUpdates].slice(0, 20);
     
-    console.log(`📋 Store: Added recent update:`, newUpdate);
     return { recentUpdates: newUpdates };
   }),
   
@@ -318,8 +273,6 @@ export const usePetgStore = create<PetgState>((set) => ({
     
     // Debounce check: don't show another "online" toast for 5 minutes
     const shouldDebounce = status === 'online' && (now - lastToast) < 300000; // 5 minutes
-    
-    console.log(`🔄 Store: Device ${collarId} status: ${previousStatus} -> ${status} | Toast: ${shouldShowToast && !shouldDebounce}`);
     
     // Update the status map
     const newDeviceStatusMap = { ...state.deviceStatusMap, [collarId]: status };

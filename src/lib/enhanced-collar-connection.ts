@@ -51,7 +51,9 @@ class EnhancedCollarConnection {
    * Main connection method - tries all strategies in order
    */
   async connect(): Promise<CollarConnectionResult> {
-    console.log('🚀 Starting enhanced collar connection...');
+    const startTime = Date.now();
+    const hostname = 'petg-collar.local';
+    const wsUrl = `ws://${hostname}:8080`;
     
     // Strategy 1: mDNS Discovery
     try {
@@ -61,40 +63,41 @@ class EnhancedCollarConnection {
         return mdnsResult;
       }
     } catch (error) {
-      console.log('🔍 mDNS discovery failed, trying UDP cache...');
-    }
-
-    // Strategy 2: UDP Cache
-    try {
-      const udpResult = await this.tryUDPCacheConnection();
-      if (udpResult.success) {
-        this.notifyListeners(udpResult);
-        return udpResult;
+      // Strategy 2: UDP Cache
+      try {
+        const udpResult = await this.tryUDPCacheConnection();
+        if (udpResult.success) {
+          this.notifyListeners(udpResult);
+          return udpResult;
+        }
+      } catch (error) {
+        // Strategy 3: Cloud Relay (future implementation)
+        try {
+          const cloudResult = await this.tryCloudConnection();
+          if (cloudResult.success) {
+            this.notifyListeners(cloudResult);
+            return cloudResult;
+          }
+        } catch (error) {
+          // All strategies failed
+          const failResult: CollarConnectionResult = {
+            success: false,
+            method: 'manual',
+            error: 'All connection strategies failed. Please check collar is powered on and connected to WiFi.'
+          };
+          
+          this.notifyListeners(failResult);
+          return failResult;
+        }
       }
-    } catch (error) {
-      console.log('📡 UDP cache failed, trying cloud relay...');
     }
 
-    // Strategy 3: Cloud Relay (future implementation)
-    try {
-      const cloudResult = await this.tryCloudConnection();
-      if (cloudResult.success) {
-        this.notifyListeners(cloudResult);
-        return cloudResult;
-      }
-    } catch (error) {
-      console.log('☁️ Cloud relay not available');
-    }
-
-    // All strategies failed
-    const failResult: CollarConnectionResult = {
+    // Fallback in case all try/catch blocks fail unexpectedly
+    return {
       success: false,
       method: 'manual',
-      error: 'All connection strategies failed. Please check collar is powered on and connected to WiFi.'
+      error: 'Unknown error occurred in collar connection.'
     };
-    
-    this.notifyListeners(failResult);
-    return failResult;
   }
 
   /**
@@ -102,8 +105,6 @@ class EnhancedCollarConnection {
    * Try to connect using petg-collar.local hostname
    */
   private async tryMDNSConnection(): Promise<CollarConnectionResult> {
-    console.log('🔍 Trying mDNS discovery (petg-collar.local)...');
-    
     const startTime = Date.now();
     const hostname = 'petg-collar.local';
     const wsUrl = `ws://${hostname}:8080`;
@@ -114,7 +115,6 @@ class EnhancedCollarConnection {
       
       if (testResult) {
         const latency = Date.now() - startTime;
-        console.log(`✅ mDNS connection successful! (${latency}ms)`);
         
         return {
           success: true,
@@ -125,7 +125,7 @@ class EnhancedCollarConnection {
         };
       }
     } catch (error) {
-      console.log(`❌ mDNS connection failed:`, error);
+      // console.log(`❌ mDNS connection failed:`, error);
     }
 
     throw new Error('mDNS connection failed');
@@ -136,12 +136,8 @@ class EnhancedCollarConnection {
    * Use cached collar info from UDP broadcasts
    */
   private async tryUDPCacheConnection(): Promise<CollarConnectionResult> {
-    console.log('📡 Trying UDP cache connection...');
-    
     // Check if we have recent UDP data
     if (!this.hasRecentUDPData()) {
-      console.log('⏰ Waiting for fresh UDP broadcast...');
-      
       // Wait briefly for UDP update
       await this.waitForUDPUpdate(3000);
       
@@ -159,7 +155,6 @@ class EnhancedCollarConnection {
         const testResult = await this.testWebSocketConnection(collarInfo.mdns_websocket_url, 3000);
         if (testResult) {
           const latency = Date.now() - startTime;
-          console.log(`✅ UDP cache (mDNS URL) connection successful! (${latency}ms)`);
           
           return {
             success: true,
@@ -171,7 +166,7 @@ class EnhancedCollarConnection {
           };
         }
       } catch (error) {
-        console.log('⚠️ mDNS URL from UDP failed, trying direct IP...');
+        // console.log('⚠️ mDNS URL from UDP failed, trying direct IP...');
       }
     }
 
@@ -180,7 +175,6 @@ class EnhancedCollarConnection {
       const testResult = await this.testWebSocketConnection(collarInfo.websocket_url, 3000);
       if (testResult) {
         const latency = Date.now() - startTime;
-        console.log(`✅ UDP cache (direct IP) connection successful! (${latency}ms)`);
         
         return {
           success: true,
@@ -191,7 +185,7 @@ class EnhancedCollarConnection {
         };
       }
     } catch (error) {
-      console.log(`❌ UDP cache connection failed:`, error);
+      // console.log(`❌ UDP cache connection failed:`, error);
     }
 
     throw new Error('UDP cache connection failed');
@@ -201,7 +195,6 @@ class EnhancedCollarConnection {
    * Strategy 3: Cloud Relay (Future Implementation)
    */
   private async tryCloudConnection(): Promise<CollarConnectionResult> {
-    console.log('☁️ Cloud relay not implemented yet');
     throw new Error('Cloud relay not implemented');
   }
 
@@ -242,7 +235,6 @@ class EnhancedCollarConnection {
    * Update collar info from UDP broadcast
    */
   updateFromUDP(collarInfo: CollarInfo): void {
-    console.log(`📡 UDP update received: ${collarInfo.ip_address} (${collarInfo.mdns_hostname})`);
     this.cachedCollarInfo = collarInfo;
     this.lastUDPUpdate = Date.now();
   }
@@ -312,7 +304,7 @@ class EnhancedCollarConnection {
       try {
         listener(result);
       } catch (error) {
-        console.error('Error in connection listener:', error);
+        // console.error('Error in connection listener:', error);
       }
     });
   }
@@ -321,8 +313,6 @@ class EnhancedCollarConnection {
    * Force reconnection with fresh discovery
    */
   async forceReconnect(): Promise<CollarConnectionResult> {
-    console.log('🔄 Forcing fresh collar discovery...');
-    
     // Clear cache to force fresh discovery
     this.cachedCollarInfo = null;
     this.lastUDPUpdate = 0;

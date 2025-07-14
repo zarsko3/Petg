@@ -42,7 +42,6 @@ export async function fetchWithErrorHandling(
   } catch (error) {
     if (error instanceof ApiError) {
       // Already formatted error
-      console.error('API request failed:', error);
       toast.error(error.message);
       throw error;
     } else if (error instanceof TypeError && error.message.includes('fetch')) {
@@ -51,7 +50,6 @@ export async function fetchWithErrorHandling(
         'Network error: Please check your connection', 
         0
       );
-      console.error('Network request failed:', error);
       toast.error(networkError.message);
       throw networkError;
     } else {
@@ -61,7 +59,6 @@ export async function fetchWithErrorHandling(
         500,
         { originalError: String(error) }
       );
-      console.error('Unknown error during API request:', error);
       toast.error(unknownError.message);
       throw unknownError;
     }
