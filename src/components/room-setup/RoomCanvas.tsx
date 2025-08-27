@@ -15,20 +15,36 @@ function CanvasPlaceholder({ message }: { message: string }) {
   )
 }
 
-// Completely client-side only canvas that never renders on server
+// Completely client-side only canvas that renders actual Konva components
 function ClientSideCanvas() {
   const { state, dispatch } = useFloorPlan()
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 })
   const containerRef = useRef<HTMLDivElement>(null)
-  const [canvasLoaded, setCanvasLoaded] = useState(false)
+  const [KonvaComponents, setKonvaComponents] = useState<{
+    Stage: any
+    Layer: any
+    Line: any
+    Circle: any
+    Group: any
+    Text: any
+  } | null>(null)
 
-  // Load canvas after component mounts and we're definitely on client
+  // Load Konva components after component mounts
   useEffect(() => {
-    // Use multiple checks to ensure we're really on the client
-    if (typeof window !== 'undefined' && window.document) {
-      // Small delay to ensure React is fully ready
+    if (typeof window !== 'undefined') {
       const timer = setTimeout(() => {
-        setCanvasLoaded(true)
+        import('react-konva').then((konva) => {
+          setKonvaComponents({
+            Stage: konva.Stage,
+            Layer: konva.Layer,
+            Line: konva.Line,
+            Circle: konva.Circle,
+            Group: konva.Group,
+            Text: konva.Text
+          })
+        }).catch((err) => {
+          console.warn('Failed to load Konva for ClientSideCanvas:', err)
+        })
       }, 200)
 
       return () => clearTimeout(timer)
@@ -37,7 +53,7 @@ function ClientSideCanvas() {
 
   // Handle canvas sizing
   useEffect(() => {
-    if (!canvasLoaded || !containerRef.current) return
+    if (!containerRef.current) return
 
     const updateDimensions = () => {
       if (!containerRef.current) return
@@ -61,7 +77,7 @@ function ClientSideCanvas() {
       window.removeEventListener('resize', updateDimensions)
       window.removeEventListener('orientationchange', updateDimensions)
     }
-  }, [canvasLoaded])
+  }, [])
 
   // Convert coordinates
   const percentToPixels = (percent: number, dimension: 'width' | 'height') => {
@@ -74,7 +90,7 @@ function ClientSideCanvas() {
     }
   }
 
-  if (!canvasLoaded) {
+  if (!KonvaComponents) {
     return <CanvasPlaceholder message="Loading canvas..." />
   }
 
@@ -82,20 +98,128 @@ function ClientSideCanvas() {
     return <CanvasPlaceholder message="Initializing canvas..." />
   }
 
-  // This should never render until Konva is loaded
+  const { Stage, Layer, Line, Circle, Group, Text } = KonvaComponents
+
+  // Generate grid lines
+  const gridLines = []
+  const gridSpacing = (dimensions.width * 2) / 100 // 2% grid
+
+  // Vertical lines
+  for (let i = 0; i <= 100; i += 2) {
+    const x = (i / 100) * dimensions.width
+    gridLines.push(
+      <Line
+        key={`v-${i}`}
+        points={[x, 0, x, dimensions.height]}
+        stroke="#E5E7EB"
+        strokeWidth={0.5}
+        opacity={0.5}
+      />
+    )
+  }
+
+  // Horizontal lines
+  for (let i = 0; i <= 100; i += 2) {
+    const y = (i / 100) * dimensions.height
+    gridLines.push(
+      <Line
+        key={`h-${i}`}
+        points={[0, y, dimensions.width, y]}
+        stroke="#E5E7EB"
+        strokeWidth={0.5}
+        opacity={0.5}
+      />
+    )
+  }
+
   return (
     <div ref={containerRef} className="w-full h-full flex items-center justify-center p-4">
-      <div className="w-full h-full bg-white border border-gray-200 rounded-lg shadow-sm flex items-center justify-center">
-        <div className="text-center text-gray-400">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="mx-auto mb-3 opacity-50">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-            <circle cx="9" cy="9" r="2"/>
-            <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
-          </svg>
-          <p className="text-sm">Canvas ready</p>
-          <p className="text-xs text-gray-500 mt-1">Konva components will load here</p>
-        </div>
-      </div>
+      <Stage
+        width={dimensions.width}
+        height={dimensions.height}
+        onClick={handleStageClick}
+        className="border border-gray-200 rounded-lg shadow-sm bg-white"
+      >
+        <Layer>
+          {/* Grid */}
+          {gridLines}
+
+          {/* Rooms */}
+          {state.rooms.map((room: any) => {
+            // Convert room points from percentage to pixels
+            const roomPoints = room.points.map((point: any) => ({
+              x: percentToPixels(point.x, 'width'),
+              y: percentToPixels(point.y, 'height')
+            }))
+
+            // Create polygon points array for Konva Line
+            const polygonPoints = roomPoints.flatMap((point: any) => [point.x, point.y])
+
+            // Calculate room bounds for handles
+            const bounds = roomPoints.reduce(
+              (acc: any, point: any) => ({
+                minX: Math.min(acc.minX, point.x),
+                maxX: Math.max(acc.maxX, point.x),
+                minY: Math.min(acc.minY, point.y),
+                maxY: Math.max(acc.maxY, point.y)
+              }),
+              { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }
+            )
+
+            // Calculate center for text label
+            const centerX = (bounds.minX + bounds.maxX) / 2
+            const centerY = (bounds.minY + bounds.maxY) / 2
+
+            return (
+              <Group key={room.id} draggable>
+                {/* Room polygon */}
+                <Line
+                  points={polygonPoints}
+                  closed
+                  fill={room.color}
+                  fillOpacity={0.3}
+                  stroke={room.color}
+                  strokeWidth={state.selectedRoom === room.id ? 3 : 2}
+                  strokeOpacity={0.8}
+                  shadowColor={room.color}
+                  shadowOpacity={0.3}
+                  shadowOffsetX={2}
+                  shadowOffsetY={2}
+                  shadowBlur={8}
+                />
+
+                {/* Room label */}
+                <Text
+                  x={centerX}
+                  y={centerY}
+                  text={room.name}
+                  fontSize={14}
+                  fontFamily="system-ui, -apple-system, sans-serif"
+                  fontStyle="600"
+                  fill="#1F2937"
+                  align="center"
+                  verticalAlign="middle"
+                  offsetX={room.name.length * 4}
+                  offsetY={7}
+                  listening={false}
+                />
+
+                {/* Selection outline */}
+                {state.selectedRoom === room.id && (
+                  <Line
+                    points={polygonPoints}
+                    closed
+                    stroke="#3B82F6"
+                    strokeWidth={2}
+                    dash={[8, 4]}
+                    listening={false}
+                  />
+                )}
+              </Group>
+            )
+          })}
+        </Layer>
+      </Stage>
     </div>
   )
 }
