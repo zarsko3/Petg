@@ -1,9 +1,14 @@
 'use client'
 
 import { useEffect, useRef, useState, Component, ReactNode } from 'react'
-import { Stage, Layer, Line, Circle } from 'react-konva'
 import { useFloorPlan, snapToGrid, GRID_SIZE } from '@/components/context/FloorPlanContext'
 import { RoomShape } from './RoomShape'
+
+// Dynamically import Konva components to prevent SSR issues
+let Stage: any = null
+let Layer: any = null
+let Line: any = null
+let Circle: any = null
 
 // Error Boundary for Konva components
 interface ErrorBoundaryProps {
@@ -85,6 +90,21 @@ export function RoomCanvas() {
   const containerRef = useRef<HTMLDivElement>(null)
   const [mounted, setMounted] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [konvaLoaded, setKonvaLoaded] = useState(false)
+
+  // Dynamically load Konva components
+  useEffect(() => {
+    import('react-konva').then((konva) => {
+      Stage = konva.Stage
+      Layer = konva.Layer
+      Line = konva.Line
+      Circle = konva.Circle
+      setKonvaLoaded(true)
+    }).catch((err) => {
+      console.warn('Failed to load Konva components:', err)
+      setError('Failed to load canvas components')
+    })
+  }, [])
 
   useEffect(() => {
     try {
@@ -194,12 +214,24 @@ export function RoomCanvas() {
     )
   }
 
+  // Wait for Konva components to load
+  if (!konvaLoaded) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-50">
+        <div className="text-center text-gray-400">
+          <div className="animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-violet-600 mx-auto mb-3"></div>
+          <p className="text-sm">Loading canvas components...</p>
+        </div>
+      </div>
+    )
+  }
+
   if (!mounted || dimensions.width === 0) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-gray-50">
         <div className="text-center text-gray-400">
           <div className="animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-violet-600 mx-auto mb-3"></div>
-          <p className="text-sm">Loading canvas...</p>
+          <p className="text-sm">Initializing canvas...</p>
         </div>
       </div>
     )
@@ -235,43 +267,56 @@ export function RoomCanvas() {
             </div>
           </div>
         }>
-          <Stage
-            width={dimensions.width}
-            height={dimensions.height}
-            onClick={handleStageClick}
-            className="border border-gray-200 rounded-lg shadow-sm bg-white"
-          >
-            <Layer>
-              {/* Grid */}
-              {gridLines}
+          {Stage && Layer && Line && Circle ? (
+            <Stage
+              width={dimensions.width}
+              height={dimensions.height}
+              onClick={handleStageClick}
+              className="border border-gray-200 rounded-lg shadow-sm bg-white"
+            >
+              <Layer>
+                {/* Grid */}
+                {gridLines}
 
-              {/* Rooms */}
-              {state.rooms.map((room) => (
-                <RoomShape
-                  key={room.id}
-                  room={room}
-                  canvasSize={dimensions}
-                  percentToPixels={percentToPixels}
-                  pixelsToPercent={pixelsToPercent}
-                  onSelect={() => dispatch({ type: 'SELECT_ROOM', id: room.id })}
-                  onUpdate={(updates) => dispatch({ type: 'UPDATE_ROOM', id: room.id, updates })}
-                  isSelected={state.selectedRoom === room.id}
-                />
-              ))}
+                {/* Rooms */}
+                {state.rooms.map((room) => (
+                  <RoomShape
+                    key={room.id}
+                    room={room}
+                    canvasSize={dimensions}
+                    percentToPixels={percentToPixels}
+                    pixelsToPercent={pixelsToPercent}
+                    onSelect={() => dispatch({ type: 'SELECT_ROOM', id: room.id })}
+                    onUpdate={(updates) => dispatch({ type: 'UPDATE_ROOM', id: room.id, updates })}
+                    isSelected={state.selectedRoom === room.id}
+                  />
+                ))}
 
-              {/* Snap indicators */}
-              {state.snapPoints.map((point, index) => (
-                <Circle
-                  key={`snap-${index}`}
-                  x={percentToPixels(point.x, 'width')}
-                  y={percentToPixels(point.y, 'height')}
-                  radius={3}
-                  fill="#3B82F6"
-                  opacity={0.6}
-                />
-              ))}
-            </Layer>
-          </Stage>
+                {/* Snap indicators */}
+                {state.snapPoints.map((point, index) => (
+                  <Circle
+                    key={`snap-${index}`}
+                    x={percentToPixels(point.x, 'width')}
+                    y={percentToPixels(point.y, 'height')}
+                    radius={3}
+                    fill="#3B82F6"
+                    opacity={0.6}
+                  />
+                ))}
+              </Layer>
+            </Stage>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-gray-50">
+              <div className="text-center text-gray-400">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="mx-auto mb-3 opacity-50">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                  <circle cx="9" cy="9" r="2"/>
+                  <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
+                </svg>
+                <p className="text-sm">Canvas components unavailable</p>
+              </div>
+            </div>
+          )}
         </ErrorBoundary>
       </ReactKonvaWrapper>
     </div>

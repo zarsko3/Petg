@@ -35,12 +35,21 @@ export default function MobileZonesPage() {
       console.log('📡 API Response status:', response.status, response.statusText)
 
       if (!response.ok) {
-        const errorText = await response.text().catch(() => 'Unknown error')
+        let errorText = 'Unknown error'
+        try {
+          errorText = await response.text()
+        } catch (textError) {
+          console.warn('Failed to read response text:', textError)
+        }
+
         console.error('❌ API Error details:', {
           status: response.status,
           statusText: response.statusText,
-          errorText
+          errorText,
+          url: '/api/zones',
+          method: 'GET'
         })
+
         throw new Error(`Failed to fetch zones: ${response.status} ${response.statusText}`)
       }
 
