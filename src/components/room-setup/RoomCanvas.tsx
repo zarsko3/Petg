@@ -171,7 +171,11 @@ function ClientSideCanvas() {
             const centerY = (bounds.minY + bounds.maxY) / 2
 
             return (
-              <Group key={room.id} draggable>
+              <Group
+                key={room.id}
+                draggable
+                rotation={room.rotation || 0}
+              >
                 {/* Room polygon */}
                 <Line
                   points={polygonPoints}
@@ -203,6 +207,24 @@ function ClientSideCanvas() {
                   offsetY={7}
                   listening={false}
                 />
+
+                {/* Rotation indicator */}
+                {(room.rotation || 0) !== 0 && (
+                  <Text
+                    x={centerX}
+                    y={centerY + 20}
+                    text={`${Math.round(room.rotation || 0)}°`}
+                    fontSize={10}
+                    fontFamily="system-ui, -apple-system, sans-serif"
+                    fontStyle="400"
+                    fill="#6B7280"
+                    align="center"
+                    verticalAlign="middle"
+                    offsetX={15}
+                    offsetY={5}
+                    listening={false}
+                  />
+                )}
 
                 {/* Selection outline */}
                 {state.selectedRoom === room.id && (

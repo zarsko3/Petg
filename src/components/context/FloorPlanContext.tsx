@@ -12,9 +12,10 @@ export interface Room {
   id: string
   name: string
   color: string
-  type: 'rectangle' | 'l-shape'
+  type: 'rectangle' | 'l-shape' | 't-shape' | 'u-shape'
   points: Point2D[]
   zIndex: number
+  rotation?: number // Rotation angle in degrees
 }
 
 export interface BeaconPlacement {
@@ -72,6 +73,8 @@ type FloorPlanAction =
   | { type: 'DELETE_ROOM_UNDO'; id: string }
   | { type: 'UNDO' }
   | { type: 'REDO' }
+  | { type: 'ROTATE_ROOM'; id: string; angle: number }
+  | { type: 'DUPLICATE_ROOM'; id: string }
 
 // Initial state
 const initialState: FloorPlanState = {
@@ -298,6 +301,41 @@ function floorPlanReducer(state: FloorPlanState, action: FloorPlanAction): Floor
       }
     }
 
+    case 'ROTATE_ROOM': {
+      return {
+        ...state,
+        rooms: state.rooms.map(room =>
+          room.id === action.id
+            ? { ...room, rotation: (room.rotation || 0) + action.angle }
+            : room
+        )
+      }
+    }
+
+    case 'DUPLICATE_ROOM': {
+      const roomToDuplicate = state.rooms.find(room => room.id === action.id)
+      if (!roomToDuplicate) return state
+
+      const roomCount = state.rooms.length
+      const newRoom: Room = {
+        ...roomToDuplicate,
+        id: `room-${Date.now()}`,
+        name: `${roomToDuplicate.name} Copy`,
+        zIndex: roomCount,
+        // Offset the duplicated room slightly
+        points: roomToDuplicate.points.map(point => ({
+          x: Math.max(0, Math.min(100, point.x + 5)),
+          y: Math.max(0, Math.min(100, point.y + 5))
+        }))
+      }
+
+      return {
+        ...state,
+        rooms: [...state.rooms, newRoom],
+        selectedRoom: newRoom.id
+      }
+    }
+
     default:
       return state
   }
@@ -448,6 +486,74 @@ export function createLShapePoints(
   }
 
   return points
+}
+
+export function createTShapePoints(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  stemWidth: number,
+  stemHeight: number
+): Point2D[] {
+  // Create T-shape: horizontal bar with vertical stem in center
+  const snappedX = snapToGrid(x)
+  const snappedY = snapToGrid(y)
+  const snappedWidth = snapToGrid(width)
+  const snappedHeight = snapToGrid(height)
+  const snappedStemWidth = snapToGrid(stemWidth)
+  const snappedStemHeight = snapToGrid(stemHeight)
+
+  const stemX = snappedX + (snappedWidth - snappedStemWidth) / 2
+
+  return [
+    // Top bar
+    { x: snappedX, y: snappedY },
+    { x: snappedX + snappedWidth, y: snappedY },
+    { x: snappedX + snappedWidth, y: snappedY + snappedStemHeight },
+    { x: snappedX + snappedWidth - (snappedWidth - snappedStemWidth) / 2, y: snappedY + snappedStemHeight },
+    // Stem
+    { x: stemX + snappedStemWidth, y: snappedY + snappedStemHeight },
+    { x: stemX + snappedStemWidth, y: snappedY + snappedHeight },
+    { x: stemX, y: snappedY + snappedHeight },
+    { x: stemX, y: snappedY + snappedStemHeight },
+    { x: snappedX + (snappedWidth - snappedStemWidth) / 2, y: snappedY + snappedStemHeight },
+    // Complete top bar
+    { x: snappedX, y: snappedY + snappedStemHeight },
+    { x: snappedX, y: snappedY }
+  ]
+}
+
+export function createUShapePoints(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  thickness: number
+): Point2D[] {
+  // Create U-shape: open at top
+  const snappedX = snapToGrid(x)
+  const snappedY = snapToGrid(y)
+  const snappedWidth = snapToGrid(width)
+  const snappedHeight = snapToGrid(height)
+  const snappedThickness = snapToGrid(thickness)
+
+  return [
+    // Left side
+    { x: snappedX, y: snappedY },
+    { x: snappedX + snappedThickness, y: snappedY },
+    { x: snappedX + snappedThickness, y: snappedY + snappedHeight - snappedThickness },
+    { x: snappedX, y: snappedY + snappedHeight - snappedThickness },
+    { x: snappedX, y: snappedY + snappedHeight },
+    { x: snappedX + snappedWidth, y: snappedY + snappedHeight },
+    { x: snappedX + snappedWidth, y: snappedY + snappedHeight - snappedThickness },
+    { x: snappedX + snappedWidth - snappedThickness, y: snappedY + snappedHeight - snappedThickness },
+    { x: snappedX + snappedWidth - snappedThickness, y: snappedY },
+    { x: snappedX + snappedWidth, y: snappedY },
+    { x: snappedX + snappedWidth, y: snappedY + snappedThickness },
+    { x: snappedX + snappedThickness, y: snappedY + snappedThickness },
+    { x: snappedX + snappedThickness, y: snappedY }
+  ]
 }
 
 // Room overlap detection utilities

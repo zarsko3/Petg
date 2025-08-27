@@ -144,7 +144,10 @@ export function RoomList() {
               )}
               <div className="flex items-center gap-1 mt-0.5">
                 <span className="text-xs text-gray-500">
-                  {room.type === 'rectangle' ? 'Rectangle' : 'L-Shape'}
+                  {room.type === 'rectangle' ? 'Rectangle' :
+                   room.type === 'l-shape' ? 'L-Shape' :
+                   room.type === 't-shape' ? 'T-Shape' :
+                   room.type === 'u-shape' ? 'U-Shape' : 'Shape'}
                 </span>
                 {room.type === 'l-shape' && (
                   <div className="flex gap-0.5">
@@ -152,11 +155,75 @@ export function RoomList() {
                     <div className="w-1 h-1 bg-green-500 rounded-full"></div>
                   </div>
                 )}
+                {room.type === 't-shape' && (
+                  <div className="flex gap-0.5">
+                    <div className="w-1 h-1 bg-purple-500 rounded-full"></div>
+                    <div className="w-1 h-1 bg-purple-500 rounded-full"></div>
+                    <div className="w-1 h-1 bg-purple-500 rounded-full"></div>
+                  </div>
+                )}
+                {room.type === 'u-shape' && (
+                  <div className="flex gap-0.5">
+                    <div className="w-1 h-1 bg-orange-500 rounded-full"></div>
+                    <div className="w-1 h-1 bg-orange-500 rounded-full"></div>
+                  </div>
+                )}
               </div>
             </div>
             
             {/* Actions */}
             <div className="flex items-center gap-1">
+              {/* Advanced editing actions - shown only for selected room */}
+              {state.selectedRoom === room.id && (
+                <div className="flex items-center gap-1 mr-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      dispatch({ type: 'ROTATE_ROOM', id: room.id, angle: 45 })
+                    }}
+                    className="p-1 text-xs text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded"
+                    title="Rotate room 45°"
+                  >
+                    ↻
+                  </button>
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      dispatch({ type: 'ROTATE_ROOM', id: room.id, angle: -45 })
+                    }}
+                    className="p-1 text-xs text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded"
+                    title="Rotate room -45°"
+                  >
+                    ↺
+                  </button>
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      dispatch({ type: 'DUPLICATE_ROOM', id: room.id })
+                    }}
+                    className="p-1 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded"
+                    title="Duplicate room"
+                  >
+                    📋
+                  </button>
+
+                  {(room.rotation || 0) !== 0 && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        dispatch({ type: 'ROTATE_ROOM', id: room.id, angle: -(room.rotation || 0) })
+                      }}
+                      className="p-1 text-xs text-orange-600 hover:text-orange-800 hover:bg-orange-50 rounded"
+                      title="Reset rotation"
+                    >
+                      ⟲
+                    </button>
+                  )}
+                </div>
+              )}
+
               <button
                 onClick={(e) => {
                   e.stopPropagation()
@@ -170,7 +237,7 @@ export function RoomList() {
                   <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
                 </svg>
               </button>
-              
+
               <button
                 onClick={(e) => {
                   e.stopPropagation()

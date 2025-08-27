@@ -1,10 +1,10 @@
 'use client'
 
 import { useEffect } from 'react'
-import { createRectanglePoints, createLShapePoints, Room } from '@/components/context/FloorPlanContext'
+import { createRectanglePoints, createLShapePoints, createTShapePoints, createUShapePoints, Room } from '@/components/context/FloorPlanContext'
 
 interface RoomTemplate {
-  type: 'rectangle' | 'l-shape'
+  type: 'rectangle' | 'l-shape' | 't-shape' | 'u-shape'
   name: string
   points: Array<{ x: number; y: number }>
   icon: string
@@ -39,6 +39,20 @@ export function RoomTemplates({ onSelect, onClose }: RoomTemplatesProps) {
       points: createLShapePoints(20, 20, 30, 25, 20, 15, 'bottom-right'),
       icon: '🔄',
       description: 'Great for kitchens and combined spaces'
+    },
+    {
+      type: 't-shape',
+      name: 'T-Shape',
+      points: createTShapePoints(20, 20, 30, 25, 10, 8),
+      icon: '⏸️',
+      description: 'Ideal for cross-shaped rooms and hallways'
+    },
+    {
+      type: 'u-shape',
+      name: 'U-Shape',
+      points: createUShapePoints(20, 20, 30, 25, 8),
+      icon: '🪜',
+      description: 'Perfect for courtyards and wrap-around layouts'
     }
   ]
 
