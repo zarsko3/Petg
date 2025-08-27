@@ -26,6 +26,7 @@ export default function MobileLocationPage() {
     type: 'beacon' | 'collar' | 'cluster',
     id: string
   } | undefined>()
+  const centerOnPetRef = useRef<() => void>()
   
   return (
     <div className="flex flex-col h-screen bg-gray-50">
@@ -38,7 +39,7 @@ export default function MobileLocationPage() {
       <div className="flex-1 relative bg-gray-50 p-4 overflow-visible">
         {/* Map container - Contained with rounded corners and shadow */}
         <div className="relative h-full bg-white rounded-2xl shadow-lg overflow-visible border border-gray-200/50">
-          <EnhancedKonvaMap 
+          <EnhancedKonvaMap
             floorplanImage="/floorplan.png"
             beacons={beacons.map(beacon => ({
               id: beacon.id.toString(),
@@ -57,11 +58,19 @@ export default function MobileLocationPage() {
             className="w-full h-full rounded-2xl"
             selectedMarker={selectedMarker}
             onMarkerTap={(type, id) => setSelectedMarker({ type, id })}
+            centerOnPetRef={centerOnPetRef}
           />
         </div>
         
         {/* Floating Action Buttons - Positioned outside map container with high z-index */}
-        <FloatingActionButtons position={position} mapRef={null} />
+        <FloatingActionButtons
+          position={position}
+          onCenterOnPet={() => {
+            if (centerOnPetRef.current) {
+              centerOnPetRef.current();
+            }
+          }}
+        />
         
 
       </div>

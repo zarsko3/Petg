@@ -1,9 +1,7 @@
   'use client'
 
   import { useRouter } from 'next/navigation'
-  import { Shield, Grid3X3, ZoomIn, ZoomOut, MapPin } from 'lucide-react'
-  import type L from 'leaflet'
-
+  import { Shield, Grid3X3, MapPin } from 'lucide-react'
   interface Position {
     x: number
     y: number
@@ -11,34 +9,20 @@
 
   interface FloatingActionButtonsProps {
     position: Position | null
-    mapRef: React.RefObject<L.Map> | null
+    onCenterOnPet?: () => void
   }
 
-  export function FloatingActionButtons({ position, mapRef }: FloatingActionButtonsProps) {
+  export function FloatingActionButtons({ position, onCenterOnPet }: FloatingActionButtonsProps) {
     const router = useRouter()
 
     const handleCenterOnPet = () => {
-      if (position && mapRef?.current && position.x !== undefined && position.y !== undefined && !isNaN(position.x) && !isNaN(position.y)) {
-        // Use setView with animate: false to prevent classList errors during DOM cleanup
-        mapRef.current.setView(
-          [position.y, position.x],
-          mapRef.current.getZoom(), // keep current zoom
-          { animate: false }        // disable animation
-        )
+      if (onCenterOnPet) {
+        onCenterOnPet()
+      } else if (position) {
+        console.log('Centering on pet position:', position)
+        // The parent component should handle the actual centering logic
       } else {
-        console.log('Cannot center: position not available or map not ready')
-      }
-    }
-
-    const handleZoomIn = () => {
-      if (mapRef?.current) {
-        mapRef.current.zoomIn(1, { animate: false })
-      }
-    }
-
-    const handleZoomOut = () => {
-      if (mapRef?.current) {
-        mapRef.current.zoomOut(1, { animate: false })
+        console.log('Cannot center: position not available')
       }
     }
 
@@ -78,25 +62,7 @@
               </div>
             </button>
 
-            {/* Zoom Controls */}
-            <div className="flex flex-col items-center gap-2 mt-2">
-              <button
-                onClick={handleZoomIn}
-                className="w-10 h-10 rounded-lg bg-white/95 backdrop-blur-sm shadow-md border border-gray-200 grid place-items-center transition-all duration-200 hover:scale-105 cursor-pointer"
-                style={{ pointerEvents: 'auto' }}
-                aria-label="Zoom in map"
-              >
-                <ZoomIn className="h-4 w-4 text-gray-700" />
-              </button>
-              <button
-                onClick={handleZoomOut}
-                className="w-10 h-10 rounded-lg bg-white/95 backdrop-blur-sm shadow-md border border-gray-200 grid place-items-center transition-all duration-200 hover:scale-105 cursor-pointer"
-                style={{ pointerEvents: 'auto' }}
-                aria-label="Zoom out map"
-              >
-                <ZoomOut className="h-4 w-4 text-gray-700" />
-              </button>
-            </div>
+
 
             {/* Center on Pet - Primary action */}
             <button
@@ -111,18 +77,7 @@
               </div>
             </button>
 
-            {/* Test Button - Remove this after testing */}
-            <button
-              onClick={() => {
-                console.log('Mobile test button clicked! Interactive elements are working.');
-                alert('Mobile map controls are working! You can now interact with all buttons.');
-              }}
-              className="w-10 h-10 rounded-lg bg-green-500 text-white shadow-md grid place-items-center transition-all duration-200 hover:scale-105 cursor-pointer mt-2"
-              style={{ pointerEvents: 'auto' }}
-              aria-label="Test mobile interactions"
-            >
-              <span className="text-xs">✓</span>
-            </button>
+
           </div>
         </div>
     </>

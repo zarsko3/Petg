@@ -81,6 +81,7 @@ interface EnhancedKonvaMapProps {
   onZoomChange?: (scale: number) => void
   onPanChange?: (x: number, y: number) => void
   selectedMarker?: { type: 'beacon' | 'collar' | 'cluster', id: string }
+  centerOnPetRef?: React.RefObject<() => void>
 }
 
 // Client-only Konva component
@@ -149,15 +150,15 @@ function KonvaMapComponent(props: EnhancedKonvaMapProps) {
       // Calculate position to center the pet in the viewport
       const containerWidth = mapContainerRef.current?.clientWidth || 0;
       const containerHeight = mapContainerRef.current?.clientHeight || 0;
-      
+
       // Convert percentage to pixels for the fixed size map
       const petXInPixels = (props.petData.position.x / 100) * 1000; // 1000px is the map width
       const petYInPixels = (props.petData.position.y / 100) * 700;  // 700px is the map height
-      
+
       // Calculate the position to center the pet
       const newX = (containerWidth / 2) - (petXInPixels * mapScale);
       const newY = (containerHeight / 2) - (petYInPixels * mapScale);
-      
+
       setMapPosition({ x: newX, y: newY });
     } else {
       // Reset to default view if no pet data available
@@ -165,6 +166,13 @@ function KonvaMapComponent(props: EnhancedKonvaMapProps) {
       setMapScale(1);
     }
   };
+
+  // Expose center function to parent component via ref
+  useEffect(() => {
+    if (props.centerOnPetRef) {
+      props.centerOnPetRef.current = handleCenterOnPet;
+    }
+  }, [props.centerOnPetRef, handleCenterOnPet]);
   
   // Adjust zoom level
   const handleZoom = (factor: number) => {
