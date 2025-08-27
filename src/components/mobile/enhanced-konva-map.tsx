@@ -615,7 +615,8 @@ function EnhancedKonvaMapInner({
         paddingTop: 'env(safe-area-inset-top)',
         paddingBottom: 'env(safe-area-inset-bottom)',
         paddingLeft: 'env(safe-area-inset-left)',
-        paddingRight: 'env(safe-area-inset-right)'
+        paddingRight: 'env(safe-area-inset-right)',
+        pointerEvents: 'auto'
       }}
     >
       <ReactKonvaWrapper>
@@ -633,6 +634,7 @@ function EnhancedKonvaMapInner({
           onDragEnd={handleDragEnd}
           onClick={handleStageClick}
           onTap={handleStageClick}
+          style={{ pointerEvents: 'auto' }}
         >
         {/* Floorplan Layer */}
         <Layer>

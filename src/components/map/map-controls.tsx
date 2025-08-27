@@ -22,18 +22,22 @@ export function MapControls() {
   return (
     <>
       {/* Main Controls */}
-      <div className="absolute top-4 right-4 flex flex-col gap-2">
+      <div 
+        className="absolute top-4 right-4 flex flex-col gap-2 z-50"
+        style={{ pointerEvents: 'auto' }}
+      >
         {/* Safe Zones Toggle - Hidden in tracking mode */}
         {!isTrackingMode && (
           <button
             onClick={() => setShowSafeZones(!showSafeZones)}
             className={cn(
-              "p-2 rounded-lg shadow-md transition-colors",
+              "p-2 rounded-lg shadow-md transition-colors cursor-pointer",
               showSafeZones 
-                ? "bg-purple-500 text-white" 
+                ? "bg-purple-500 text-white hover:bg-purple-600" 
                 : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
             )}
             title={showSafeZones ? "Hide Safe Zones" : "Show Safe Zones"}
+            style={{ pointerEvents: 'auto' }}
           >
             <Home className="h-4 w-4" />
           </button>
@@ -45,12 +49,13 @@ export function MapControls() {
             onClick={startCreatingSafeZone}
             disabled={isCreatingSafeZone}
             className={cn(
-              "p-2 rounded-lg shadow-md transition-colors",
+              "p-2 rounded-lg shadow-md transition-colors cursor-pointer",
               isCreatingSafeZone
-                ? "bg-purple-600 text-white"
+                ? "bg-purple-600 text-white cursor-not-allowed"
                 : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
             )}
             title="Create Safe Zone"
+            style={{ pointerEvents: 'auto' }}
           >
             <Plus className="h-4 w-4" />
           </button>
@@ -60,20 +65,37 @@ export function MapControls() {
         <button
           onClick={() => setShowBeaconInfo(!showBeaconInfo)}
           className={cn(
-            "p-2 rounded-lg shadow-md transition-colors",
+            "p-2 rounded-lg shadow-md transition-colors cursor-pointer",
             showBeaconInfo 
-              ? "bg-blue-500 text-white" 
+              ? "bg-blue-500 text-white hover:bg-blue-600" 
               : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
           )}
           title="Beacon Information"
+          style={{ pointerEvents: 'auto' }}
         >
           <Info className="h-4 w-4" />
+        </button>
+
+        {/* Test Button - Remove this after testing */}
+        <button
+          onClick={() => {
+            console.log('Test button clicked! Interactive elements are working.');
+            alert('Map controls are working! You can now interact with all buttons.');
+          }}
+          className="p-2 rounded-lg shadow-md transition-colors cursor-pointer bg-green-500 text-white hover:bg-green-600"
+          title="Test Interactive Elements"
+          style={{ pointerEvents: 'auto' }}
+        >
+          <span className="text-xs">✓</span>
         </button>
       </div>
 
       {/* Safe Zone Creation Instructions */}
       {isCreatingSafeZone && (
-        <div className="absolute top-4 left-4 bg-purple-100 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4 shadow-lg max-w-sm">
+        <div 
+          className="absolute top-4 left-4 bg-purple-100 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4 shadow-lg max-w-sm z-40"
+          style={{ pointerEvents: 'auto' }}
+        >
           <h3 className="font-semibold text-purple-900 dark:text-purple-100 mb-2">Creating Safe Zone</h3>
           <p className="text-sm text-purple-800 dark:text-purple-200">
             Click two points on the map to define the safe zone area. The first click sets the starting corner, 
@@ -84,7 +106,10 @@ export function MapControls() {
 
       {/* Beacon Information Panel */}
       {showBeaconInfo && (
-        <div className="absolute bottom-4 left-4 bg-white/95 dark:bg-gray-800/95 border border-gray-200 dark:border-gray-700 rounded-lg p-4 shadow-lg max-w-sm backdrop-blur-sm">
+        <div 
+          className="absolute bottom-4 left-4 bg-white/95 dark:bg-gray-800/95 border border-gray-200 dark:border-gray-700 rounded-lg p-4 shadow-lg max-w-sm backdrop-blur-sm z-40"
+          style={{ pointerEvents: 'auto' }}
+        >
           <h3 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
             <Info className="h-4 w-4 text-blue-500" />
             Beacon Legend

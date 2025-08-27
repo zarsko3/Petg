@@ -118,10 +118,14 @@ function HybridMapContainerInner({
         />
         
         {/* Canvas Mode Toggle */}
-        <div className="absolute top-4 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-2">
+        <div 
+          className="absolute top-4 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-2 z-50"
+          style={{ pointerEvents: 'auto' }}
+        >
           <button
             onClick={() => setCanvasMode(!canvasMode)}
-            className="flex items-center gap-2 px-3 py-1 text-sm font-medium text-gray-600 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+            className="flex items-center gap-2 px-3 py-1 text-sm font-medium text-gray-600 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 cursor-pointer"
+            style={{ pointerEvents: 'auto' }}
           >
             <span>🖼️</span>
             <span>Canvas Mode</span>
@@ -138,7 +142,8 @@ function HybridMapContainerInner({
         ref={mapRef}
         className="bg-white dark:bg-gray-800"
         style={{ 
-          cursor: isCreatingSafeZone ? 'crosshair' : 'default'
+          cursor: isCreatingSafeZone ? 'crosshair' : 'default',
+          pointerEvents: 'auto'
         }}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -164,10 +169,14 @@ function HybridMapContainerInner({
       <MapControls />
       
       {/* Canvas Mode Toggle */}
-      <div className="absolute top-4 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-2">
+      <div 
+        className="absolute top-4 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-2 z-50"
+        style={{ pointerEvents: 'auto' }}
+      >
         <button
           onClick={() => setCanvasMode(!canvasMode)}
-          className="flex items-center gap-2 px-3 py-1 text-sm font-medium text-gray-600 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+          className="flex items-center gap-2 px-3 py-1 text-sm font-medium text-gray-600 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 cursor-pointer"
+          style={{ pointerEvents: 'auto' }}
         >
           <span>🖼️</span>
           <span>DOM Mode</span>

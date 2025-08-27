@@ -620,6 +620,7 @@ export function CanvasMap({
     <div 
       ref={containerRef}
       className={cn("relative w-full h-full bg-gray-100 rounded-lg overflow-hidden", className)}
+      style={{ pointerEvents: 'auto' }}
     >
       <canvas
         ref={canvasRef}
@@ -630,13 +631,84 @@ export function CanvasMap({
           width: '100%', 
           height: '100%',
           imageRendering: 'pixelated',
-          cursor: getCursorStyle()
+          cursor: getCursorStyle(),
+          pointerEvents: 'auto'
         }}
         onMouseMove={handleMouseMove}
         onMouseDown={handleMouseDown}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
         onContextMenu={(e) => e.preventDefault()} // Prevent default right-click menu
+        onTouchStart={(e) => {
+          e.preventDefault();
+          const touch = e.touches[0];
+          if (touch && containerRef.current) {
+            const rect = containerRef.current.getBoundingClientRect();
+            const mousePixels = {
+              x: touch.clientX - rect.left,
+              y: touch.clientY - rect.top
+            };
+            const mousePercent = pixelsToPercent(mousePixels);
+            setMousePosition(mousePercent);
+            
+            // Handle touch as mouse down
+            const elementUnder = getElementUnderMouse(mousePercent);
+            if (elementUnder.type && elementUnder.id) {
+              const elementPos = elementUnder.type === 'pet' 
+                ? petMarker.currentPos 
+                : beacons.find(b => b.id === elementUnder.id)?.position;
+              
+              if (elementPos) {
+                setIsDragging(true);
+                setDragTarget({
+                  type: elementUnder.type as 'beacon' | 'pet',
+                  id: elementUnder.id,
+                  offset: {
+                    x: mousePercent.x - elementPos.x,
+                    y: mousePercent.y - elementPos.y
+                  }
+                });
+              }
+            } else if (!isLiveTracking && onPetPositionChange) {
+              onPetPositionChange(mousePercent);
+            }
+          }
+        }}
+        onTouchMove={(e) => {
+          e.preventDefault();
+          const touch = e.touches[0];
+          if (touch && containerRef.current) {
+            const rect = containerRef.current.getBoundingClientRect();
+            const mousePixels = {
+              x: touch.clientX - rect.left,
+              y: touch.clientY - rect.top
+            };
+            const mousePercent = pixelsToPercent(mousePixels);
+            setMousePosition(mousePercent);
+            
+            // Update hover state
+            const elementUnder = getElementUnderMouse(mousePercent);
+            setHoveredElement(elementUnder);
+            
+            // Handle dragging
+            if (isDragging && dragTarget) {
+              const newPosition = {
+                x: Math.max(0, Math.min(100, mousePercent.x - dragTarget.offset.x)),
+                y: Math.max(0, Math.min(100, mousePercent.y - dragTarget.offset.y))
+              };
+              
+              if (dragTarget.type === 'beacon' && onBeaconDrag) {
+                onBeaconDrag(dragTarget.id!, newPosition);
+              } else if (dragTarget.type === 'pet' && onPetPositionChange) {
+                onPetPositionChange(newPosition);
+              }
+            }
+          }
+        }}
+        onTouchEnd={(e) => {
+          e.preventDefault();
+          handleMouseUp();
+        }}
       />
     </div>
   );
