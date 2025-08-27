@@ -21,23 +21,74 @@ export default function MobileZonesPage() {
       setIsLoading(true)
       setError(null)
 
+      console.log('🔍 Fetching zones from API...')
+
       const response = await fetch('/api/zones', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
+        // Add timeout to prevent hanging
+        signal: AbortSignal.timeout(10000) // 10 second timeout
       })
 
+      console.log('📡 API Response status:', response.status, response.statusText)
+
       if (!response.ok) {
-        throw new Error(`Failed to fetch zones: ${response.status}`)
+        const errorText = await response.text().catch(() => 'Unknown error')
+        console.error('❌ API Error details:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorText
+        })
+        throw new Error(`Failed to fetch zones: ${response.status} ${response.statusText}`)
       }
 
       const zonesData: Zone[] = await response.json()
+      console.log('✅ Successfully fetched zones:', zonesData.length)
       setZones(zonesData)
 
     } catch (error: any) {
       console.error('❌ Failed to fetch zones:', error)
-      setError(error.message || 'Failed to fetch zones')
+
+      // Provide more specific error messages
+      if (error.name === 'AbortError') {
+        setError('Request timeout - please try again')
+      } else if (error.message.includes('Failed to fetch')) {
+        setError('Network error - please check your connection')
+      } else if (error.message.includes('500')) {
+        setError('Server error - please try again later')
+      } else {
+        setError(error.message || 'Failed to fetch zones')
+      }
+
+      // Provide fallback mock data for development
+      console.log('📝 Providing fallback mock data')
+      const mockZones: Zone[] = [
+        {
+          id: 'fallback-zone-1',
+          user_id: 'demo-user',
+          name: 'Demo Living Room',
+          type: 'SAFE' as const,
+          polygon_json: [
+            { x: 20, y: 20 },
+            { x: 80, y: 20 },
+            { x: 80, y: 60 },
+            { x: 20, y: 60 }
+          ],
+          color: '#10B981',
+          active: true,
+          alert_settings: {
+            entry_alert: false,
+            exit_alert: true,
+            sound_enabled: true,
+            notification_enabled: true,
+          },
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }
+      ]
+      setZones(mockZones)
     } finally {
       setIsLoading(false)
     }

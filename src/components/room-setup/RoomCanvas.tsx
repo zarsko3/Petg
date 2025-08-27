@@ -1,22 +1,79 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, Component, ReactNode } from 'react'
 import { Stage, Layer, Line, Circle } from 'react-konva'
 import { useFloorPlan, snapToGrid, GRID_SIZE } from '@/components/context/FloorPlanContext'
 import { RoomShape } from './RoomShape'
 
+// Error Boundary for Konva components
+interface ErrorBoundaryProps {
+  children: ReactNode
+  fallback: ReactNode
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean
+}
+
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props)
+    this.state = { hasError: false }
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    console.warn('Konva Error Boundary caught error:', error)
+    return { hasError: true }
+  }
+
+  componentDidCatch(error: Error, errorInfo: any) {
+    console.warn('Konva Error Boundary details:', error, errorInfo)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback
+    }
+
+    return this.props.children
+  }
+}
+
 const GRID_ALPHA = 0.1
 
-// React Konva compatibility fix
-const ReactKonvaWrapper = ({ children }: { children: React.ReactNode }) => {
+// React Konva compatibility fix - Enhanced client-side only wrapper
+const ReactKonvaWrapper = ({ children, fallback }: {
+  children: React.ReactNode
+  fallback?: React.ReactNode
+}) => {
   const [mounted, setMounted] = useState(false)
+  const [hasError, setHasError] = useState(false)
 
   useEffect(() => {
-    setMounted(true)
+    try {
+      setMounted(true)
+    } catch (error) {
+      console.warn('React Konva wrapper error:', error)
+      setHasError(true)
+    }
   }, [])
 
+  if (hasError) {
+    return fallback || <div className="w-full h-full flex items-center justify-center bg-gray-50">
+      <div className="text-center text-gray-400">
+        <div className="animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-violet-600 mx-auto mb-3"></div>
+        <p className="text-sm">Canvas temporarily unavailable</p>
+      </div>
+    </div>
+  }
+
   if (!mounted) {
-    return <div>Loading...</div>
+    return fallback || <div className="w-full h-full flex items-center justify-center bg-gray-50">
+      <div className="text-center text-gray-400">
+        <div className="animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-violet-600 mx-auto mb-3"></div>
+        <p className="text-sm">Loading canvas...</p>
+      </div>
+    </div>
   }
 
   return <>{children}</>
@@ -27,9 +84,16 @@ export function RoomCanvas() {
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 })
   const containerRef = useRef<HTMLDivElement>(null)
   const [mounted, setMounted] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    setMounted(true)
+    try {
+      setMounted(true)
+      setError(null)
+    } catch (err) {
+      console.warn('RoomCanvas mount error:', err)
+      setError('Failed to initialize canvas')
+    }
   }, [])
 
   // Responsive canvas sizing - always square, fitting within container
@@ -114,54 +178,101 @@ export function RoomCanvas() {
     }
   }
 
+  // Handle errors
+  if (error) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-50">
+        <div className="text-center text-red-400">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="mx-auto mb-3 opacity-50">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="m15 9-6 6"/>
+            <path d="m9 9 6 6"/>
+          </svg>
+          <p className="text-sm">{error}</p>
+        </div>
+      </div>
+    )
+  }
+
   if (!mounted || dimensions.width === 0) {
     return (
-      <div className="w-full h-full flex items-center justify-center">
-        <div className="text-gray-500">Loading canvas...</div>
+      <div className="w-full h-full flex items-center justify-center bg-gray-50">
+        <div className="text-center text-gray-400">
+          <div className="animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-violet-600 mx-auto mb-3"></div>
+          <p className="text-sm">Loading canvas...</p>
+        </div>
       </div>
     )
   }
 
   return (
     <div ref={containerRef} className="w-full h-full flex items-center justify-center p-4">
-      <ReactKonvaWrapper>
-        <Stage
-          width={dimensions.width}
-          height={dimensions.height}
-          onClick={handleStageClick}
-          className="border border-gray-200 rounded-lg shadow-sm bg-white"
-        >
-          <Layer>
-            {/* Grid */}
-            {gridLines}
-            
-            {/* Rooms */}
-            {state.rooms.map((room) => (
-              <RoomShape
-                key={room.id}
-                room={room}
-                canvasSize={dimensions}
-                percentToPixels={percentToPixels}
-                pixelsToPercent={pixelsToPercent}
-                onSelect={() => dispatch({ type: 'SELECT_ROOM', id: room.id })}
-                onUpdate={(updates) => dispatch({ type: 'UPDATE_ROOM', id: room.id, updates })}
-                isSelected={state.selectedRoom === room.id}
-              />
-            ))}
-            
-            {/* Snap indicators */}
-            {state.snapPoints.map((point, index) => (
-              <Circle
-                key={`snap-${index}`}
-                x={percentToPixels(point.x, 'width')}
-                y={percentToPixels(point.y, 'height')}
-                radius={3}
-                fill="#3B82F6"
-                opacity={0.6}
-              />
-            ))}
-          </Layer>
-        </Stage>
+      <ReactKonvaWrapper
+        fallback={
+          <div className="w-full h-full flex items-center justify-center bg-gray-50">
+            <div className="text-center text-gray-400">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="mx-auto mb-3 opacity-50">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <circle cx="9" cy="9" r="2"/>
+                <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
+              </svg>
+              <p className="text-sm">Canvas temporarily unavailable</p>
+              <p className="text-xs text-gray-500 mt-1">Please refresh the page</p>
+            </div>
+          </div>
+        }
+      >
+        <ErrorBoundary fallback={
+          <div className="w-full h-full flex items-center justify-center bg-gray-50">
+            <div className="text-center text-red-400">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="mx-auto mb-3 opacity-50">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="m15 9-6 6"/>
+                <path d="m9 9 6 6"/>
+              </svg>
+              <p className="text-sm">Canvas rendering error</p>
+              <p className="text-xs text-gray-500 mt-1">Try refreshing the page</p>
+            </div>
+          </div>
+        }>
+          <Stage
+            width={dimensions.width}
+            height={dimensions.height}
+            onClick={handleStageClick}
+            className="border border-gray-200 rounded-lg shadow-sm bg-white"
+          >
+            <Layer>
+              {/* Grid */}
+              {gridLines}
+
+              {/* Rooms */}
+              {state.rooms.map((room) => (
+                <RoomShape
+                  key={room.id}
+                  room={room}
+                  canvasSize={dimensions}
+                  percentToPixels={percentToPixels}
+                  pixelsToPercent={pixelsToPercent}
+                  onSelect={() => dispatch({ type: 'SELECT_ROOM', id: room.id })}
+                  onUpdate={(updates) => dispatch({ type: 'UPDATE_ROOM', id: room.id, updates })}
+                  isSelected={state.selectedRoom === room.id}
+                />
+              ))}
+
+              {/* Snap indicators */}
+              {state.snapPoints.map((point, index) => (
+                <Circle
+                  key={`snap-${index}`}
+                  x={percentToPixels(point.x, 'width')}
+                  y={percentToPixels(point.y, 'height')}
+                  radius={3}
+                  fill="#3B82F6"
+                  opacity={0.6}
+                />
+              ))}
+            </Layer>
+          </Stage>
+        </ErrorBoundary>
       </ReactKonvaWrapper>
     </div>
   )
