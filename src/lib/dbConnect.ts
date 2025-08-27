@@ -12,7 +12,11 @@ declare global {
 }
 
 // Get MongoDB URI from environment variables or use a fallback for development
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/petg-dev';
+const MONGODB_URI = process.env.MONGODB_URI;
+if (!MONGODB_URI) {
+  throw new Error('Missing required environment variable: MONGODB_URI');
+}
+const uri: string = MONGODB_URI as string;
 
 // Create the cached connection object if it doesn't exist
 // Ensuring that cached is always defined
@@ -40,7 +44,7 @@ async function dbConnect() {
     };
 
     try {
-      cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
+      cached.promise = mongoose.connect(uri, opts).then((mongoose) => {
         return mongoose;
       });
     } catch (err) {

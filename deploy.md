@@ -1,3 +1,8 @@
+# ==================== SECURITY WARNING ====================
+# DO NOT COMMIT REAL SECRETS (API KEYS, PASSWORDS) TO GIT
+# Replace all values below with your actual credentials before use
+# =========================================================
+
 # 🚀 Ready to Deploy! - Quick Start Guide
 
 ## ✅ Your app is production-ready! 
@@ -10,19 +15,19 @@ Copy these into your hosting platform (Vercel/Netlify):
 
 ```bash
 # Clerk Authentication (REPLACE WITH PRODUCTION KEYS!)
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_YOUR_PRODUCTION_KEY_HERE
-CLERK_SECRET_KEY=sk_live_YOUR_PRODUCTION_SECRET_HERE
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_<YOUR_PRODUCTION_KEY_HERE>
+CLERK_SECRET_KEY=sk_live_<YOUR_PRODUCTION_SECRET_HERE>
 NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
 NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
 NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/dashboard
 NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/dashboard
 
 # MongoDB (Use your existing connection)
-MONGODB_URI=mongodb+srv://zarsko:089430732zG$@Petg.dka36al.mongodb.net/?retryWrites=true&w=majority&appName=Petg
-MONGODB_DB_NAME=Petg
+MONGODB_URI=mongodb+srv://<username>:<password>@<cluster-url>/?retryWrites=true&w=majority&appName=<app-name>
+MONGODB_DB_NAME=<your-db-name>
 
 # Security Secret (Generated for you)
-NEXTAUTH_SECRET=205ff6b29b37a5d53d5a8e4c8c84ec24f6e12c41163b705d0e21843fc3ef8c2a
+NEXTAUTH_SECRET=<your-nextauth-secret>
 
 # Next.js Config
 NODE_ENV=production

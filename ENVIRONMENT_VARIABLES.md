@@ -1,3 +1,8 @@
+# ==================== SECURITY WARNING ====================
+# DO NOT COMMIT REAL SECRETS (API KEYS, PASSWORDS) TO GIT
+# Replace all values below with your actual credentials before use
+# =========================================================
+
 # Environment Variables Configuration
 
 This document lists all environment variables required for the Pet Collar application.
@@ -8,14 +13,14 @@ Set these variables in your Vercel dashboard:
 
 ```bash
 # HiveMQ Cloud MQTT Configuration
-NEXT_PUBLIC_MQTT_HOST=ab1d45df84884fd68d24d7d25cc78f2f.s1.eu.hivemq.cloud
-NEXT_PUBLIC_MQTT_PORT=8884
-NEXT_PUBLIC_MQTT_USER=zarsko
-NEXT_PUBLIC_MQTT_PASS=089430732zG
+NEXT_PUBLIC_MQTT_HOST=<your-mqtt-host>
+NEXT_PUBLIC_MQTT_PORT=<your-mqtt-port>
+NEXT_PUBLIC_MQTT_USER=<your-mqtt-user>
+NEXT_PUBLIC_MQTT_PASS=<your-mqtt-password>
 
 # MQTT Settings (server-side)
-MQTT_USERNAME=zarsko
-MQTT_PASSWORD=089430732zG
+MQTT_USERNAME=<your-mqtt-username>
+MQTT_PASSWORD=<your-mqtt-password>
 
 # Application Settings
 NEXT_PUBLIC_APP_ENV=production
@@ -27,6 +32,10 @@ NEXT_PUBLIC_COLLAR_DISCOVERY_TIMEOUT=30000
 
 # API Settings
 NEXT_PUBLIC_API_TIMEOUT=10000
+
+# MongoDB (Production Database)
+MONGODB_URI=mongodb+srv://<username>:<password>@<cluster-url>/?retryWrites=true&w=majority&appName=<app-name>
+MONGODB_DB_NAME=<your-db-name>
 ```
 
 ## Development Environment (.env.local)
@@ -35,14 +44,14 @@ Create a `.env.local` file in your project root:
 
 ```bash
 # HiveMQ Cloud MQTT Configuration
-NEXT_PUBLIC_MQTT_HOST=ab1d45df84884fd68d24d7d25cc78f2f.s1.eu.hivemq.cloud
-NEXT_PUBLIC_MQTT_PORT=8884
-NEXT_PUBLIC_MQTT_USER=zarsko
-NEXT_PUBLIC_MQTT_PASS=089430732zG
+NEXT_PUBLIC_MQTT_HOST=<your-mqtt-host>
+NEXT_PUBLIC_MQTT_PORT=<your-mqtt-port>
+NEXT_PUBLIC_MQTT_USER=<your-mqtt-user>
+NEXT_PUBLIC_MQTT_PASS=<your-mqtt-password>
 
 # MQTT Settings (server-side)
-MQTT_USERNAME=zarsko
-MQTT_PASSWORD=089430732zG
+MQTT_USERNAME=<your-mqtt-username>
+MQTT_PASSWORD=<your-mqtt-password>
 
 # Application Settings
 NEXT_PUBLIC_APP_ENV=development

@@ -1,4 +1,4 @@
-  /**
+/**
  * @file ESP32-S3_PetCollar.ino
  * @brief Advanced ESP32-S3 Pet Collar Firmware - Refactored Implementation
  * @version 4.0.0-Refactored
@@ -28,6 +28,11 @@
  * @author PETg Development Team
  * @license MIT
  */
+
+// ==================== WARNING ====================
+// DO NOT COMMIT REAL SECRETS (MQTT PASSWORDS, DEVICE IDS) TO GIT
+// Replace all values below with your actual credentials before uploading
+// ==================================================
 
 // ==================== CORE SYSTEM INCLUDES ====================
 #include <Arduino.h>
@@ -80,11 +85,11 @@
 // ==================== MQTT CLOUD CONFIGURATION ====================
 // Edit these settings for your HiveMQ Cloud instance
 #define ENABLE_MQTT_CLOUD true                    // Set to false to disable MQTT
-#define MQTT_SERVER "ab1d45df84884fd68d24d7d25cc78f2f.s1.eu.hivemq.cloud"
-#define MQTT_PORT 8883                           // TLS port
-#define MQTT_USER "PetCollar-001"
-#define MQTT_PASSWORD "089430732zG"
-#define DEVICE_ID "001"                          // Unique collar ID
+#define MQTT_SERVER "<YOUR_MQTT_SERVER>"
+#define MQTT_PORT <YOUR_MQTT_PORT>                           // TLS port
+#define MQTT_USER "<YOUR_MQTT_USER>"
+#define MQTT_PASSWORD "<YOUR_MQTT_PASSWORD>"
+#define DEVICE_ID "<YOUR_COLLAR_ID>"                          // Unique collar ID
 #define MQTT_TELEMETRY_INTERVAL 30000           // 30 seconds
 #define MQTT_HEARTBEAT_INTERVAL 60000           // 1 minute
 

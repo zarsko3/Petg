@@ -3,6 +3,11 @@
 
 #include <Arduino.h>
 
+// ==================== WARNING ====================
+// DO NOT COMMIT REAL SECRETS (WIFI PASSWORDS) TO GIT
+// Replace all values below with your actual credentials before uploading
+// ==================================================
+
 // ==========================================
 // MEMORY OPTIMIZATION SETTINGS
 // ==========================================
@@ -39,8 +44,8 @@
 #define DEVICE_ID "PETCOLLAR001"
 
 // WiFi settings
-#define DEFAULT_WIFI_SSID "TP-Link_C5B4"
-#define DEFAULT_WIFI_PASSWORD "24681357"
+#define DEFAULT_WIFI_SSID "<YOUR_WIFI_SSID>"
+#define DEFAULT_WIFI_PASSWORD "<YOUR_WIFI_PASSWORD>"
 
 // Macro for debug printing
 #if DEBUG_ENABLED

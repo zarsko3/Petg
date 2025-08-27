@@ -63,31 +63,31 @@ class EnhancedCollarConnection {
         return mdnsResult;
       }
     } catch (error) {
-      // Strategy 2: UDP Cache
-      try {
-        const udpResult = await this.tryUDPCacheConnection();
-        if (udpResult.success) {
-          this.notifyListeners(udpResult);
-          return udpResult;
-        }
-      } catch (error) {
-        // Strategy 3: Cloud Relay (future implementation)
-        try {
-          const cloudResult = await this.tryCloudConnection();
-          if (cloudResult.success) {
-            this.notifyListeners(cloudResult);
-            return cloudResult;
-          }
-        } catch (error) {
-          // All strategies failed
-          const failResult: CollarConnectionResult = {
-            success: false,
-            method: 'manual',
-            error: 'All connection strategies failed. Please check collar is powered on and connected to WiFi.'
-          };
-          
-          this.notifyListeners(failResult);
-          return failResult;
+    // Strategy 2: UDP Cache
+    try {
+      const udpResult = await this.tryUDPCacheConnection();
+      if (udpResult.success) {
+        this.notifyListeners(udpResult);
+        return udpResult;
+      }
+    } catch (error) {
+    // Strategy 3: Cloud Relay (future implementation)
+    try {
+      const cloudResult = await this.tryCloudConnection();
+      if (cloudResult.success) {
+        this.notifyListeners(cloudResult);
+        return cloudResult;
+      }
+    } catch (error) {
+    // All strategies failed
+    const failResult: CollarConnectionResult = {
+      success: false,
+      method: 'manual',
+      error: 'All connection strategies failed. Please check collar is powered on and connected to WiFi.'
+    };
+    
+    this.notifyListeners(failResult);
+    return failResult;
         }
       }
     }

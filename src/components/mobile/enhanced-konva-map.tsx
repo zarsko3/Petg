@@ -1,9 +1,32 @@
 'use client'
 
 import React, { useRef, useEffect, useState, useCallback } from 'react'
-import { Stage, Layer, Circle, Rect, Text, Label, Tag, Group } from 'react-konva'
+import { Stage, Layer, Circle, Rect, Text, Label, Tag, Group, Image } from 'react-konva'
 import Konva from 'konva'
 import { cn } from '@/lib/utils'
+
+// React Konva compatibility fix - ensure client-side only rendering
+const ReactKonvaWrapper = ({ children }: { children: React.ReactNode }) => {
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    // Simple client-side check
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-50">
+        <div className="text-center text-gray-400">
+          <div className="animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-violet-600 mx-auto mb-3"></div>
+          <p className="text-sm">Loading map...</p>
+        </div>
+      </div>
+    )
+  }
+
+  return <>{children}</>
+}
 
 // Style tokens as CSS variables
 const STYLE_TOKENS = {
@@ -64,6 +87,7 @@ interface ConnectionState {
 
 interface EnhancedKonvaMapProps {
   className?: string
+  floorplanImage?: string
   beacons?: Beacon[]
   petData?: PetData
   safeZones?: SafeZone[]
@@ -75,8 +99,9 @@ interface EnhancedKonvaMapProps {
   onPanChange?: (x: number, y: number) => void
 }
 
-export function EnhancedKonvaMap({
+function EnhancedKonvaMapInner({
   className,
+  floorplanImage = '/floorplan.png',
   beacons = [],
   petData,
   safeZones = [],
@@ -110,10 +135,22 @@ export function EnhancedKonvaMap({
   
   const [mounted, setMounted] = useState(false)
   const [lastTouchDistance, setLastTouchDistance] = useState(0)
+  const [floorplanImageRef, setFloorplanImageRef] = useState<HTMLImageElement | null>(null)
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  // Load floorplan image
+  useEffect(() => {
+    if (floorplanImage) {
+      const img = new Image()
+      img.onload = () => {
+        setFloorplanImageRef(img)
+      }
+      img.src = floorplanImage
+    }
+  }, [floorplanImage])
 
   // Responsive sizing with flex layout
   useEffect(() => {
@@ -581,21 +618,36 @@ export function EnhancedKonvaMap({
         paddingRight: 'env(safe-area-inset-right)'
       }}
     >
-      <Stage
-        ref={stageRef}
-        width={dimensions.width}
-        height={dimensions.height}
-        scaleX={stageConfig.scale}
-        scaleY={stageConfig.scale}
-        x={stageConfig.x}
-        y={stageConfig.y}
-        draggable
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onDragEnd={handleDragEnd}
-        onClick={handleStageClick}
-        onTap={handleStageClick}
-      >
+      <ReactKonvaWrapper>
+        <Stage
+          ref={stageRef}
+          width={dimensions.width}
+          height={dimensions.height}
+          scaleX={stageConfig.scale}
+          scaleY={stageConfig.scale}
+          x={stageConfig.x}
+          y={stageConfig.y}
+          draggable
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onDragEnd={handleDragEnd}
+          onClick={handleStageClick}
+          onTap={handleStageClick}
+        >
+        {/* Floorplan Layer */}
+        <Layer>
+          {floorplanImageRef && (
+            <Image
+              image={floorplanImageRef}
+              x={0}
+              y={0}
+              width={dimensions.width}
+              height={dimensions.height}
+              opacity={0.8}
+            />
+          )}
+        </Layer>
+        
         {/* Grid Layer */}
         <Layer>
           {renderGrid()}
@@ -617,6 +669,29 @@ export function EnhancedKonvaMap({
           {renderLiveChip()}
         </Layer>
       </Stage>
+      </ReactKonvaWrapper>
     </div>
   )
+}
+
+// Export a client-side only wrapper
+export function EnhancedKonvaMap(props: EnhancedKonvaMapProps) {
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-50">
+        <div className="text-center text-gray-400">
+          <div className="animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-violet-600 mx-auto mb-3"></div>
+          <p className="text-sm">Loading enhanced map...</p>
+        </div>
+      </div>
+    )
+  }
+
+  return <EnhancedKonvaMapInner {...props} />
 } 

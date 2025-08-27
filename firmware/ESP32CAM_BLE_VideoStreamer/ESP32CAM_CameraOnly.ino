@@ -59,12 +59,17 @@ int activeClients = 0;
 unsigned long lastButtonPress = 0;
 bool flashState = false;
 
+// ==================== WARNING ====================
+// DO NOT COMMIT REAL SECRETS (WIFI PASSWORDS) TO GIT
+// Replace all values below with your actual credentials before uploading
+// ==================================================
+
 // Default configuration
 void loadDefaultConfig() {
-  config.deviceName = "PetZone-Camera-CAM01";
-  config.location = "Living Room";
-  config.wifiSSID = "ESP32-CAM-VideoStream";
-  config.wifiPassword = "petzone123";
+  config.deviceName = "<YOUR_DEVICE_NAME>";
+  config.location = "<YOUR_LOCATION>";
+  config.wifiSSID = "<YOUR_WIFI_SSID>";
+  config.wifiPassword = "<YOUR_WIFI_PASSWORD>";
   config.streamPort = 80;
   config.flashEnabled = true;
 }

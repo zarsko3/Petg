@@ -7,6 +7,21 @@ import { RoomShape } from './RoomShape'
 
 const GRID_ALPHA = 0.1
 
+// React Konva compatibility fix
+const ReactKonvaWrapper = ({ children }: { children: React.ReactNode }) => {
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return <div>Loading...</div>
+  }
+
+  return <>{children}</>
+}
+
 export function RoomCanvas() {
   const { state, dispatch } = useFloorPlan()
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 })
@@ -101,99 +116,51 @@ export function RoomCanvas() {
 
   if (!mounted || dimensions.width === 0) {
     return (
-      <div className="w-full h-full flex items-center justify-center bg-gray-50">
-        <div className="text-center text-gray-400">
-          <div className="animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-violet-600 mx-auto mb-3"></div>
-          <p className="text-sm">Loading canvas...</p>
-        </div>
+      <div className="w-full h-full flex items-center justify-center">
+        <div className="text-gray-500">Loading canvas...</div>
       </div>
     )
   }
 
   return (
-    <div 
-      ref={containerRef}
-      className="w-full h-full flex items-center justify-center bg-gray-50 p-4"
-    >
-      <div className="relative flex-shrink-0">
+    <div ref={containerRef} className="w-full h-full flex items-center justify-center p-4">
+      <ReactKonvaWrapper>
         <Stage
           width={dimensions.width}
           height={dimensions.height}
-          onMouseDown={handleStageClick}
-          onTouchStart={handleStageClick}
+          onClick={handleStageClick}
           className="border border-gray-200 rounded-lg shadow-sm bg-white"
         >
-          {/* Grid Layer */}
           <Layer>
+            {/* Grid */}
             {gridLines}
-          </Layer>
-
-          {/* Rooms Layer */}
-          <Layer>
+            
+            {/* Rooms */}
             {state.rooms.map((room) => (
               <RoomShape
                 key={room.id}
                 room={room}
-                canvasSize={dimensions}
+                dimensions={dimensions}
                 percentToPixels={percentToPixels}
                 pixelsToPercent={pixelsToPercent}
-                onSelect={() => dispatch({ type: 'SELECT_ROOM', id: room.id })}
-                onUpdate={(updates) => dispatch({ type: 'UPDATE_ROOM', id: room.id, updates })}
-                isSelected={state.selectedRoom === room.id}
+                isSelected={state.selectedRoomId === room.id}
+              />
+            ))}
+            
+            {/* Snap indicators */}
+            {state.snapPoints.map((point, index) => (
+              <Circle
+                key={`snap-${index}`}
+                x={percentToPixels(point.x, 'width')}
+                y={percentToPixels(point.y, 'height')}
+                radius={3}
+                fill="#3B82F6"
+                opacity={0.6}
               />
             ))}
           </Layer>
-
-          {/* Guide dots for grid snapping when editing */}
-          {state.isEditing && (
-            <Layer>
-              {Array.from({ length: Math.floor(100 / GRID_SIZE) + 1 }, (_, i) =>
-                Array.from({ length: Math.floor(100 / GRID_SIZE) + 1 }, (_, j) => {
-                  const gridSpacing = (dimensions.width * GRID_SIZE) / 100
-                  return (
-                    <Circle
-                      key={`guide-${i}-${j}`}
-                      x={i * gridSpacing}
-                      y={j * gridSpacing}
-                      radius={1}
-                      fill="#94A3B8"
-                      opacity={0.3}
-                    />
-                  )
-                })
-              ).flat()}
-            </Layer>
-          )}
         </Stage>
-
-        {/* Canvas Instructions */}
-        {state.rooms.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="text-center text-gray-400">
-              <svg 
-                width="48" 
-                height="48" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="1" 
-                className="mx-auto mb-3 opacity-50"
-              >
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-                <polyline points="9,22 9,12 15,12 15,22"/>
-              </svg>
-              <p className="text-sm">
-                Canvas ready for your rooms
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Canvas size indicator */}
-        <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
-          {dimensions.width}×{dimensions.height}
-        </div>
-      </div>
+      </ReactKonvaWrapper>
     </div>
   )
 } 

@@ -1,3 +1,8 @@
+# ==================== SECURITY WARNING ====================
+# DO NOT COMMIT REAL SECRETS (API KEYS, PASSWORDS) TO GIT
+# Replace all values below with your actual credentials before use
+# =========================================================
+
 # 🚀 PETg Application - Production Deployment Guide
 
 ## 📋 Pre-Deployment Checklist
@@ -20,23 +25,23 @@ Create these environment variables in your hosting platform:
 
 ```bash
 # Clerk Authentication (PRODUCTION KEYS)
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_YOUR_PRODUCTION_KEY
-CLERK_SECRET_KEY=sk_live_YOUR_PRODUCTION_SECRET
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_<YOUR_PRODUCTION_KEY>
+CLERK_SECRET_KEY=sk_live_<YOUR_PRODUCTION_SECRET>
 NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
 NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
 NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/dashboard
 NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/dashboard
 
 # MongoDB (Production Database)
-MONGODB_URI=mongodb+srv://zarsko:089430732zG$@Petg.dka36al.mongodb.net/?retryWrites=true&w=majority&appName=Petg
-MONGODB_DB_NAME=Petg
+MONGODB_URI=mongodb+srv://<username>:<password>@<cluster-url>/?retryWrites=true&w=majority&appName=<app-name>
+MONGODB_DB_NAME=<your-db-name>
 
 # Next.js Configuration
 NODE_ENV=production
 NEXT_PUBLIC_APP_URL=https://your-domain.com
 
 # Security
-NEXTAUTH_SECRET=generate-strong-random-secret-32-chars-min
+NEXTAUTH_SECRET=<generate-strong-random-secret>
 ```
 
 #### 3. **Clerk Domain Configuration**

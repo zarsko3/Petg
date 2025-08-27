@@ -1,19 +1,24 @@
+// ==================== WARNING ====================
+// DO NOT COMMIT REAL SECRETS (WIFI/MQTT PASSWORDS) TO GIT
+// Replace all values below with your actual credentials before uploading
+// ==================================================
+
 // ==================== MQTT CLOUD CONFIGURATION ====================
 // Edit these values before uploading to your ESP32-S3
 
 // WiFi Configuration
-#define WIFI_SSID "JenoviceAP"
-#define WIFI_PASSWORD "DataSecNet"  // Replace with your actual password
+#define WIFI_SSID "<YOUR_WIFI_SSID>"
+#define WIFI_PASSWORD "<YOUR_WIFI_PASSWORD>"
 
 // MQTT Cloud Configuration (HiveMQ Cloud)
-#define MQTT_SERVER "ab1d45df84884fd68d24d7d25cc78f2f.s1.eu.hivemq.cloud"
-#define MQTT_PORT 8883  // TLS port for secure connection
-#define MQTT_USER "zarsko"
-#define MQTT_PASSWORD "089430732zG"
+#define MQTT_SERVER "<YOUR_MQTT_SERVER>"
+#define MQTT_PORT <YOUR_MQTT_PORT>
+#define MQTT_USER "<YOUR_MQTT_USER>"
+#define MQTT_PASSWORD "<YOUR_MQTT_PASSWORD>"
 
 // Device Configuration  
-#define COLLAR_ID "001"  // Change this for each collar
-#define DEVICE_NAME "COLLAR-001"
+#define COLLAR_ID "<YOUR_COLLAR_ID>"
+#define DEVICE_NAME "<YOUR_DEVICE_NAME>"
 
 // Hardware Configuration
 #define BUZZER_PIN 18

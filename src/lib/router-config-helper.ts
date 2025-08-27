@@ -106,7 +106,7 @@ class RouterConfigHelper {
     if (this.cachedRouter && (now - this.lastDetectionTime) < this.CACHE_DURATION) {
       return this.cachedRouter;
     }
-
+    
     // Determine likely gateway based on collar IP
     const commonGateways = this.getOrderedGateways();
     
@@ -195,12 +195,12 @@ class RouterConfigHelper {
         };
       }
     } catch (error) {
-      // Return basic info if network-info endpoint doesn't exist
-      return {
-        currentIP: collarIP,
-        hostname: 'PetCollar',
-        macAddress: undefined // Will be shown as "Check collar device"
-      };
+    // Return basic info if network-info endpoint doesn't exist
+    return {
+      currentIP: collarIP,
+      hostname: 'PetCollar',
+      macAddress: undefined // Will be shown as "Check collar device"
+    };
     }
   }
 

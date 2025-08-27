@@ -7,23 +7,41 @@
 
 import mqtt, { MqttClient, IClientOptions } from 'mqtt';
 
-// MQTT connection configuration
-const MQTT_CONFIG: IClientOptions = {
-      host: process.env.NEXT_PUBLIC_MQTT_HOST || 'ab1d45df84884fd68d24d7d25cc78f2f.s1.eu.hivemq.cloud',
-  port: parseInt(process.env.NEXT_PUBLIC_MQTT_PORT || '8884'),
-  protocol: 'wss', // WebSocket Secure for browser clients
-  username: process.env.NEXT_PUBLIC_MQTT_USER || 'zarsko',
-  password: process.env.NEXT_PUBLIC_MQTT_PASS || '089430732zG',
-  connectTimeout: 4000,
-  clean: true,
-  clientId: `web-client-${Math.random().toString(16).substr(2, 8)}`,
-  // Last Will & Testament for web client
-  will: {
-    topic: 'web/status',
-    payload: 'offline',
-    qos: 1,
-    retain: true
+// Check if MQTT environment variables are available
+const hasMqttConfig = () => {
+  const requiredMqttVars = [
+    'NEXT_PUBLIC_MQTT_HOST',
+    'NEXT_PUBLIC_MQTT_PORT',
+    'NEXT_PUBLIC_MQTT_USER',
+    'NEXT_PUBLIC_MQTT_PASS'
+  ];
+  
+  return requiredMqttVars.every(key => process.env[key]);
+};
+
+// MQTT connection configuration (only created if env vars are available)
+const getMqttConfig = (): IClientOptions => {
+  if (!hasMqttConfig()) {
+    throw new Error('Missing required MQTT environment variables. Please check your .env.local file.');
   }
+  
+  return {
+    host: process.env.NEXT_PUBLIC_MQTT_HOST as string,
+    port: parseInt(process.env.NEXT_PUBLIC_MQTT_PORT as string),
+    protocol: 'wss', // WebSocket Secure for browser clients
+    username: process.env.NEXT_PUBLIC_MQTT_USER as string,
+    password: process.env.NEXT_PUBLIC_MQTT_PASS as string,
+    connectTimeout: 4000,
+    clean: true,
+    clientId: `web-client-${Math.random().toString(16).substr(2, 8)}`,
+    // Last Will & Testament for web client
+    will: {
+      topic: 'web/status',
+      payload: 'offline',
+      qos: 1,
+      retain: true
+    }
+  };
 };
 
 // Topic scheme for collar communication (matches ESP32 firmware)
@@ -138,12 +156,16 @@ export class CollarMQTTClient {
   }) => void;
 
   constructor() {
-    this.connect();
+    // Only connect if MQTT configuration is available
+    if (hasMqttConfig()) {
+      this.connect();
+    }
   }
 
   private connect() {
     try {
-      this.client = mqtt.connect(MQTT_CONFIG.protocol + '://' + MQTT_CONFIG.host + ':' + MQTT_CONFIG.port + '/mqtt', MQTT_CONFIG);
+      const config = getMqttConfig();
+      this.client = mqtt.connect(config.protocol + '://' + config.host + ':' + config.port + '/mqtt', config);
       
       this.client.on('connect', () => {
         this.isConnected = true;
@@ -152,10 +174,11 @@ export class CollarMQTTClient {
         this.subscribeToCollarTopics();
         
         // Publish web client online status
+        const config = getMqttConfig();
         this.client?.publish(MQTT_TOPICS.WEB_STATUS, JSON.stringify({
           status: 'online',
           timestamp: Date.now(),
-          client_id: MQTT_CONFIG.clientId
+          client_id: config.clientId
         }), { qos: 1, retain: true });
         
         this.onConnect?.();
@@ -317,10 +340,18 @@ export class CollarMQTTClient {
   }
 
   public getConnectionStatus(): { connected: boolean; client_id?: string } {
-    return {
-      connected: this.isConnected,
-      client_id: MQTT_CONFIG.clientId
-    };
+    try {
+      const config = getMqttConfig();
+      return {
+        connected: this.isConnected,
+        client_id: config.clientId
+      };
+    } catch {
+      return {
+        connected: false,
+        client_id: undefined
+      };
+    }
   }
 
   public disconnect() {
@@ -331,11 +362,16 @@ export class CollarMQTTClient {
     
     if (this.client) {
       // Publish offline status before disconnecting
-      this.client.publish(MQTT_TOPICS.WEB_STATUS, JSON.stringify({
-        status: 'offline',
-        timestamp: Date.now(),
-        client_id: MQTT_CONFIG.clientId
-      }), { qos: 1, retain: true });
+      try {
+        const config = getMqttConfig();
+        this.client.publish(MQTT_TOPICS.WEB_STATUS, JSON.stringify({
+          status: 'offline',
+          timestamp: Date.now(),
+          client_id: config.clientId
+        }), { qos: 1, retain: true });
+      } catch {
+        // If MQTT config is not available, just disconnect without publishing
+      }
       
       this.client.end();
       this.client = null;

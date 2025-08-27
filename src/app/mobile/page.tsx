@@ -112,26 +112,32 @@ export default function MobileWelcomePage() {
         {/* Action Buttons */}
         <div className="px-6 pb-8 space-y-4">
           {/* Only show SignInButton if Clerk is available */}
-          {typeof window !== 'undefined' && (
-            <SignInButton mode="modal" redirectUrl="/mobile/dashboard">
-              <button className="w-full bg-white text-purple-700 dark:bg-purple-600 dark:text-white py-4 rounded-2xl font-semibold text-lg shadow-xl hover:shadow-2xl transition-all duration-300 mobile-button touch-target flex items-center justify-center">
-                <User className="h-5 w-5 mr-2" />
-                Sign In to Your Account
+          <div>
+            {typeof window !== 'undefined' && (
+              <SignInButton mode="modal" redirectUrl="/mobile/dashboard">
+                <button className="w-full bg-white text-purple-700 dark:bg-purple-600 dark:text-white py-4 rounded-2xl font-semibold text-lg shadow-xl hover:shadow-2xl transition-all duration-300 mobile-button touch-target flex items-center justify-center">
+                  <User className="h-5 w-5 mr-2" />
+                  Sign In to Your Account
+                  <ChevronRight className="h-5 w-5 ml-2" />
+                </button>
+              </SignInButton>
+            )}
+          </div>
+
+          <div>
+            <Link href="/mobile/dashboard">
+              <button className="w-full bg-white/30 dark:bg-white/10 backdrop-blur-sm border-2 border-white/30 dark:border-white/20 text-purple-700 dark:text-white py-4 rounded-2xl font-semibold text-lg transition-all duration-300 mobile-button touch-target flex items-center justify-center">
+                Continue as Guest
                 <ChevronRight className="h-5 w-5 ml-2" />
               </button>
-            </SignInButton>
-          )}
+            </Link>
+          </div>
 
-          <Link href="/mobile/dashboard">
-            <button className="w-full bg-white/30 dark:bg-white/10 backdrop-blur-sm border-2 border-white/30 dark:border-white/20 text-purple-700 dark:text-white py-4 rounded-2xl font-semibold text-lg transition-all duration-300 mobile-button touch-target flex items-center justify-center">
-              Continue as Guest
-              <ChevronRight className="h-5 w-5 ml-2" />
-            </button>
-          </Link>
-
-          <p className="text-center text-gray-600 dark:text-purple-200 text-sm mt-6">
-            Guest mode provides limited features. Sign in for full access to your pet's data.
-          </p>
+          <div className="pt-2">
+            <p className="text-center text-gray-600 dark:text-purple-200 text-sm">
+              Guest mode provides limited features. Sign in for full access to your pet's data.
+            </p>
+          </div>
         </div>
       </div>
     </div>

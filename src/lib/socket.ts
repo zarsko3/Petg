@@ -337,7 +337,7 @@ export async function discoverCollar(): Promise<string[]> {
     'ws://192.168.1.12:8080',
     'ws://172.16.0.100:8080'
   ];
-
+  
   const promises = possibleUrls.map(async (url) => {
     try {
       const httpUrl = url.replace('ws://', 'http://').replace(':8080', '');

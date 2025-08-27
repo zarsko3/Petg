@@ -11,6 +11,11 @@
  * @date 2024
  */
 
+// ==================== WARNING ====================
+// DO NOT COMMIT REAL SECRETS (WIFI/MQTT PASSWORDS) TO GIT
+// Replace all values below with your actual credentials before uploading
+// ==================================================
+
 // ==================== FIRMWARE VERSION ====================
 #define FIRMWARE_VERSION "4.1.0"
 #define HARDWARE_PLATFORM "ESP32-S3"
@@ -37,18 +42,18 @@
 // =========================
 
 // Wi-Fi Configuration
-const char* WIFI_SSID = "JenoviceAP";
-const char* WIFI_PASSWORD = "********"; // Replace with actual password
+const char* WIFI_SSID = "<YOUR_WIFI_SSID>";
+const char* WIFI_PASSWORD = "<YOUR_WIFI_PASSWORD>"; // Replace with actual password
 
 // MQTT Configuration - HiveMQ Cloud
-const char* MQTT_HOST = "ab1d45df84884fd68d24d7d25cc78f2f.s1.eu.hivemq.cloud";
-const uint16_t MQTT_PORT = 8883;  // TLS port
-const char* MQTT_USER = "zarsko";
-const char* MQTT_PASSWORD = "089430732zG";
+const char* MQTT_HOST = "<YOUR_MQTT_SERVER>";
+const uint16_t MQTT_PORT = <YOUR_MQTT_PORT>;  // TLS port
+const char* MQTT_USER = "<YOUR_MQTT_USER>";
+const char* MQTT_PASSWORD = "<YOUR_MQTT_PASSWORD>";
 
 // Device Configuration
-const char* DEVICE_ID = "001";  // Change this for each collar
-const char* DEVICE_NAME = "COLLAR-001";
+const char* DEVICE_ID = "<YOUR_COLLAR_ID>";  // Change this for each collar
+const char* DEVICE_NAME = "<YOUR_DEVICE_NAME>";
 
 // Hardware Pins
 const int BUZZER_PIN = 4;
