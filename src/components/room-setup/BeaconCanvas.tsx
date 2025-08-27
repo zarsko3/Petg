@@ -1,15 +1,32 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Stage, Layer, Circle } from 'react-konva'
 import { useFloorPlan, snapToGrid } from '@/components/context/FloorPlanContext'
 import { RoomShape } from './RoomShape'
+
+// Dynamically import Konva components to prevent SSR issues
+let Stage: any = null
+let Layer: any = null
+let Circle: any = null
 
 export function BeaconCanvas() {
   const { state, dispatch } = useFloorPlan()
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 })
   const containerRef = useRef<HTMLDivElement>(null)
   const [mounted, setMounted] = useState(false)
+  const [konvaLoaded, setKonvaLoaded] = useState(false)
+
+  // Dynamically load Konva components
+  useEffect(() => {
+    import('react-konva').then((konva) => {
+      Stage = konva.Stage
+      Layer = konva.Layer
+      Circle = konva.Circle
+      setKonvaLoaded(true)
+    }).catch((err) => {
+      console.warn('Failed to load Konva components for BeaconCanvas:', err)
+    })
+  }, [])
 
   useEffect(() => {
     setMounted(true)
@@ -139,12 +156,24 @@ export function BeaconCanvas() {
     setTouchStartPos(null)
   }
 
+  // Wait for Konva components to load
+  if (!konvaLoaded) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-50">
+        <div className="text-center text-gray-400">
+          <div className="animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-violet-600 mx-auto mb-3"></div>
+          <p className="text-sm">Loading canvas components...</p>
+        </div>
+      </div>
+    )
+  }
+
   if (!mounted || dimensions.width === 0) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-gray-50">
         <div className="text-center text-gray-400">
           <div className="animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-violet-600 mx-auto mb-3"></div>
-          <p className="text-sm">Loading beacon placement...</p>
+          <p className="text-sm">Initializing beacon placement...</p>
         </div>
       </div>
     )
@@ -156,68 +185,81 @@ export function BeaconCanvas() {
       className="w-full h-full flex items-center justify-center bg-gray-50 p-4"
     >
       <div className="relative flex-shrink-0">
-        <Stage
-          width={dimensions.width}
-          height={dimensions.height}
-          onMouseDown={handleStageClick}
-          onTouchStart={handleStageTouchStart}
-          onTouchEnd={handleStageTouchEnd}
-          onDrop={handleStageDrop}
-          onDragOver={(e: any) => e.preventDefault()}
-          className="border border-gray-200 rounded-lg shadow-sm bg-white"
-        >
-          {/* Rooms Layer (read-only) */}
-          <Layer>
-            {state.rooms.map((room) => (
-              <RoomShape
-                key={room.id}
-                room={room}
-                canvasSize={dimensions}
-                percentToPixels={percentToPixels}
-                pixelsToPercent={pixelsToPercent}
-                onSelect={() => dispatch({ type: 'SELECT_ROOM', id: room.id })}
-                onUpdate={(updates) => dispatch({ type: 'UPDATE_ROOM', id: room.id, updates })}
-                isSelected={state.selectedRoom === room.id}
-              />
-            ))}
-          </Layer>
-
-          {/* Beacons Layer */}
-          <Layer>
-            {state.beacons.map((beacon) => {
-              // Scale beacon size based on canvas size
-              const beaconRadius = Math.max(dimensions.width * 0.03, 8) // 3% of canvas width, minimum 8px
-              
-              return (
-                <Circle
-                  key={beacon.beacon_id}
-                  x={percentToPixels(beacon.x, 'width')}
-                  y={percentToPixels(beacon.y, 'height')}
-                  radius={beaconRadius}
-                  fill="#10B981"
-                  stroke="#FFFFFF"
-                  strokeWidth={3}
-                  shadowColor="#10B981"
-                  shadowOpacity={0.5}
-                  shadowOffsetX={2}
-                  shadowOffsetY={2}
-                  shadowBlur={6}
-                  draggable
-                  onDragEnd={(e) => {
-                    const newX = pixelsToPercent(e.target.x(), 'width')
-                    const newY = pixelsToPercent(e.target.y(), 'height')
-                    dispatch({
-                      type: 'PLACE_BEACON',
-                      beacon_id: beacon.beacon_id,
-                      x: snapToGrid(newX),
-                      y: snapToGrid(newY)
-                    })
-                  }}
+        {Stage && Layer && Circle ? (
+          <Stage
+            width={dimensions.width}
+            height={dimensions.height}
+            onMouseDown={handleStageClick}
+            onTouchStart={handleStageTouchStart}
+            onTouchEnd={handleStageTouchEnd}
+            onDrop={handleStageDrop}
+            onDragOver={(e: any) => e.preventDefault()}
+            className="border border-gray-200 rounded-lg shadow-sm bg-white"
+          >
+            {/* Rooms Layer (read-only) */}
+            <Layer>
+              {state.rooms.map((room) => (
+                <RoomShape
+                  key={room.id}
+                  room={room}
+                  canvasSize={dimensions}
+                  percentToPixels={percentToPixels}
+                  pixelsToPercent={pixelsToPercent}
+                  onSelect={() => dispatch({ type: 'SELECT_ROOM', id: room.id })}
+                  onUpdate={(updates) => dispatch({ type: 'UPDATE_ROOM', id: room.id, updates })}
+                  isSelected={state.selectedRoom === room.id}
                 />
-              )
-            })}
-          </Layer>
-        </Stage>
+              ))}
+            </Layer>
+
+            {/* Beacons Layer */}
+            <Layer>
+              {state.beacons.map((beacon) => {
+                // Scale beacon size based on canvas size
+                const beaconRadius = Math.max(dimensions.width * 0.03, 8) // 3% of canvas width, minimum 8px
+
+                return (
+                  <Circle
+                    key={beacon.beacon_id}
+                    x={percentToPixels(beacon.x, 'width')}
+                    y={percentToPixels(beacon.y, 'height')}
+                    radius={beaconRadius}
+                    fill="#10B981"
+                    stroke="#FFFFFF"
+                    strokeWidth={3}
+                    shadowColor="#10B981"
+                    shadowOpacity={0.5}
+                    shadowOffsetX={2}
+                    shadowOffsetY={2}
+                    shadowBlur={6}
+                    draggable
+                    onDragEnd={(e) => {
+                      const newX = pixelsToPercent(e.target.x(), 'width')
+                      const newY = pixelsToPercent(e.target.y(), 'height')
+                      dispatch({
+                        type: 'PLACE_BEACON',
+                        beacon_id: beacon.beacon_id,
+                        x: snapToGrid(newX),
+                        y: snapToGrid(newY)
+                      })
+                    }}
+                  />
+                )
+              })}
+            </Layer>
+          </Stage>
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gray-50 border border-gray-200 rounded-lg">
+            <div className="text-center text-gray-400">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="mx-auto mb-3 opacity-50">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="m15 9-6 6"/>
+                <path d="m9 9 6 6"/>
+              </svg>
+              <p className="text-sm">Canvas components unavailable</p>
+            </div>
+          </div>
+        )}
 
         {/* Instructions */}
         {state.rooms.length === 0 && (
