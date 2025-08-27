@@ -556,6 +556,128 @@ export function createUShapePoints(
   ]
 }
 
+// Beacon placement validation utilities
+export function isPointInRoom(point: Point2D, room: Room): boolean {
+  // Handle rotation by rotating the point in the opposite direction
+  const rotation = -(room.rotation || 0)
+  const rotatedPoint = rotatePoint(point, room, rotation)
+
+  // Use ray casting algorithm to determine if point is inside polygon
+  let inside = false
+  for (let i = 0, j = room.points.length - 1; i < room.points.length; j = i++) {
+    const xi = room.points[i].x, yi = room.points[i].y
+    const xj = room.points[j].x, yj = room.points[j].y
+
+    if (((yi > rotatedPoint.y) !== (yj > rotatedPoint.y)) &&
+        (rotatedPoint.x < (xj - xi) * (rotatedPoint.y - yi) / (yj - yi) + xi)) {
+      inside = !inside
+    }
+  }
+
+  return inside
+}
+
+export function rotatePoint(point: Point2D, room: Room, angleInDegrees: number): Point2D {
+  if (angleInDegrees === 0) return point
+
+  // Calculate room center
+  const center = room.points.reduce(
+    (acc, p) => ({
+      x: acc.x + p.x,
+      y: acc.y + p.y
+    }),
+    { x: 0, y: 0 }
+  )
+  center.x /= room.points.length
+  center.y /= room.points.length
+
+  // Convert to radians
+  const angle = (angleInDegrees * Math.PI) / 180
+
+  // Translate point to origin, rotate, translate back
+  const translatedX = point.x - center.x
+  const translatedY = point.y - center.y
+
+  const rotatedX = translatedX * Math.cos(angle) - translatedY * Math.sin(angle)
+  const rotatedY = translatedX * Math.sin(angle) + translatedY * Math.cos(angle)
+
+  return {
+    x: rotatedX + center.x,
+    y: rotatedY + center.y
+  }
+}
+
+export function getMinimumBeaconDistance(): number {
+  return 15 // Minimum 15% of canvas distance between beacons
+}
+
+export function validateBeaconPlacement(
+  beacon: BeaconPlacement,
+  allBeacons: BeaconPlacement[],
+  rooms: Room[]
+): { valid: boolean; errors: string[]; warnings: string[] } {
+  const errors: string[] = []
+  const warnings: string[] = []
+
+  // Check if beacon is placed in a room
+  const room = rooms.find(r => isPointInRoom({ x: beacon.x, y: beacon.y }, r))
+  if (!room) {
+    errors.push('Beacon must be placed inside a room')
+  }
+
+  // Check minimum distance from other beacons
+  const minDistance = getMinimumBeaconDistance()
+  for (const otherBeacon of allBeacons) {
+    if (otherBeacon.beacon_id === beacon.beacon_id) continue
+
+    const distance = Math.sqrt(
+      Math.pow(beacon.x - otherBeacon.x, 2) + Math.pow(beacon.y - otherBeacon.y, 2)
+    )
+
+    if (distance < minDistance) {
+      errors.push(`Beacon too close to another beacon (minimum ${minDistance}% distance required)`)
+      break
+    }
+  }
+
+  // Check if beacon is too close to room walls (warning)
+  if (room) {
+    const margin = 5 // 5% margin from walls
+    const bounds = getPolygonBounds(room.points)
+
+    if (
+      beacon.x < bounds.minX + margin ||
+      beacon.x > bounds.maxX - margin ||
+      beacon.y < bounds.minY + margin ||
+      beacon.y > bounds.maxY - margin
+    ) {
+      warnings.push('Beacon placed too close to room walls')
+    }
+  }
+
+  return { valid: errors.length === 0, errors, warnings }
+}
+
+export function getOptimalBeaconPositions(rooms: Room[]): Array<{ x: number; y: number; roomId: string }> {
+  const positions: Array<{ x: number; y: number; roomId: string }> = []
+
+  for (const room of rooms) {
+    const bounds = getPolygonBounds(room.points)
+    const centerX = (bounds.minX + bounds.maxX) / 2
+    const centerY = (bounds.minY + bounds.maxY) / 2
+
+    // For simple shapes, place beacon in center
+    // For complex shapes, you might want more sophisticated algorithms
+    positions.push({
+      x: centerX,
+      y: centerY,
+      roomId: room.id
+    })
+  }
+
+  return positions
+}
+
 // Room overlap detection utilities
 export function doPolygonsOverlap(polygon1: Point2D[], polygon2: Point2D[]): boolean {
   // Simple bounding box overlap check first

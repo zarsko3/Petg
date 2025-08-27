@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useFloorPlan, snapToGrid } from '@/components/context/FloorPlanContext'
+import { useFloorPlan, snapToGrid, validateBeaconPlacement, isPointInRoom } from '@/components/context/FloorPlanContext'
 import { RoomShape } from './RoomShape'
 
 // Dynamically import Konva components to prevent SSR issues
@@ -73,6 +73,29 @@ export function BeaconCanvas() {
     return (pixels / dimensions[dimension]) * 100
   }
 
+  const validateAllBeacons = () => {
+    const newErrors: { [beaconId: string]: string[] } = {}
+    const newWarnings: { [beaconId: string]: string[] } = {}
+
+    state.beacons.forEach(beacon => {
+      const validation = validateBeaconPlacement(beacon, state.beacons, state.rooms)
+      if (validation.errors.length > 0) {
+        newErrors[beacon.beacon_id] = validation.errors
+      }
+      if (validation.warnings.length > 0) {
+        newWarnings[beacon.beacon_id] = validation.warnings
+      }
+    })
+
+    setValidationErrors(newErrors)
+    setValidationWarnings(newWarnings)
+  }
+
+  // Validate beacons whenever they change
+  useEffect(() => {
+    validateAllBeacons()
+  }, [state.beacons, state.rooms])
+
   const handleStageClick = (e: any) => {
     // Don't place beacons when clicking rooms - only on empty space
     if (e.target === e.target.getStage()) {
@@ -95,12 +118,17 @@ export function BeaconCanvas() {
       // Get beacon ID from drag data
       const beaconId = e.dataTransfer?.getData('beacon-id')
       if (beaconId) {
-        dispatch({
-          type: 'PLACE_BEACON',
-          beacon_id: beaconId,
-          x: snapToGrid(x),
-          y: snapToGrid(y)
-        })
+        try {
+          dispatch({
+            type: 'PLACE_BEACON',
+            beacon_id: beaconId,
+            x: snapToGrid(x),
+            y: snapToGrid(y)
+          })
+        } catch (error: any) {
+          // Show error message to user
+          alert(error.message || 'Failed to place beacon')
+        }
       }
     }
   }
@@ -108,6 +136,8 @@ export function BeaconCanvas() {
   // Touch drag handling
   const [touchDraggingBeacon, setTouchDraggingBeacon] = useState<string | null>(null)
   const [touchStartPos, setTouchStartPos] = useState<{ x: number; y: number } | null>(null)
+  const [validationErrors, setValidationErrors] = useState<{ [beaconId: string]: string[] }>({})
+  const [validationWarnings, setValidationWarnings] = useState<{ [beaconId: string]: string[] }>({})
 
   const handleStageTouchStart = (e: any) => {
     // Check if we're touching a beacon in the sidebar
@@ -142,12 +172,17 @@ export function BeaconCanvas() {
           const x = pixelsToPercent(pointerPosition.x, 'width')
           const y = pixelsToPercent(pointerPosition.y, 'height')
 
-          dispatch({
-            type: 'PLACE_BEACON',
-            beacon_id: touchDraggingBeacon,
-            x: snapToGrid(x),
-            y: snapToGrid(y)
-          })
+          try {
+            dispatch({
+              type: 'PLACE_BEACON',
+              beacon_id: touchDraggingBeacon,
+              x: snapToGrid(x),
+              y: snapToGrid(y)
+            })
+          } catch (error: any) {
+            // Show error message to user
+            alert(error.message || 'Failed to place beacon')
+          }
         }
       }
     }
@@ -218,16 +253,34 @@ export function BeaconCanvas() {
                 // Scale beacon size based on canvas size
                 const beaconRadius = Math.max(dimensions.width * 0.03, 8) // 3% of canvas width, minimum 8px
 
+                // Determine beacon color based on validation status
+                const hasErrors = validationErrors[beacon.beacon_id]?.length > 0
+                const hasWarnings = validationWarnings[beacon.beacon_id]?.length > 0
+
+                let fillColor = "#10B981" // Default green
+                let strokeColor = "#FFFFFF"
+                let strokeWidth = 3
+
+                if (hasErrors) {
+                  fillColor = "#EF4444" // Red for errors
+                  strokeColor = "#FFFFFF"
+                  strokeWidth = 4
+                } else if (hasWarnings) {
+                  fillColor = "#F59E0B" // Orange for warnings
+                  strokeColor = "#FFFFFF"
+                  strokeWidth = 3
+                }
+
                 return (
                   <Circle
                     key={beacon.beacon_id}
                     x={percentToPixels(beacon.x, 'width')}
                     y={percentToPixels(beacon.y, 'height')}
                     radius={beaconRadius}
-                    fill="#10B981"
-                    stroke="#FFFFFF"
-                    strokeWidth={3}
-                    shadowColor="#10B981"
+                    fill={fillColor}
+                    stroke={strokeColor}
+                    strokeWidth={strokeWidth}
+                    shadowColor={fillColor}
                     shadowOpacity={0.5}
                     shadowOffsetX={2}
                     shadowOffsetY={2}
@@ -236,12 +289,22 @@ export function BeaconCanvas() {
                     onDragEnd={(e) => {
                       const newX = pixelsToPercent(e.target.x(), 'width')
                       const newY = pixelsToPercent(e.target.y(), 'height')
-                      dispatch({
-                        type: 'PLACE_BEACON',
-                        beacon_id: beacon.beacon_id,
-                        x: snapToGrid(newX),
-                        y: snapToGrid(newY)
-                      })
+
+                      try {
+                        dispatch({
+                          type: 'PLACE_BEACON',
+                          beacon_id: beacon.beacon_id,
+                          x: snapToGrid(newX),
+                          y: snapToGrid(newY)
+                        })
+                      } catch (error: any) {
+                        // Reset beacon position on validation error
+                        e.target.position({
+                          x: percentToPixels(beacon.x, 'width'),
+                          y: percentToPixels(beacon.y, 'height')
+                        })
+                        alert(error.message || 'Invalid beacon position')
+                      }
                     }}
                   />
                 )
@@ -257,6 +320,25 @@ export function BeaconCanvas() {
                 <path d="m9 9 6 6"/>
               </svg>
               <p className="text-sm">Canvas components unavailable</p>
+            </div>
+          </div>
+        )}
+
+        {/* Validation Summary */}
+        {(Object.keys(validationErrors).length > 0 || Object.keys(validationWarnings).length > 0) && (
+          <div className="absolute top-4 left-4 right-4 bg-white border border-gray-200 rounded-lg p-3 shadow-lg pointer-events-none max-h-32 overflow-y-auto">
+            <h4 className="font-semibold text-gray-900 text-sm mb-2">Beacon Issues:</h4>
+            <div className="space-y-1">
+              {Object.entries(validationErrors).map(([beaconId, errors]) => (
+                <div key={`error-${beaconId}`} className="text-red-700 text-xs">
+                  <span className="font-medium">Beacon {beaconId}:</span> {errors.join(', ')}
+                </div>
+              ))}
+              {Object.entries(validationWarnings).map(([beaconId, warnings]) => (
+                <div key={`warning-${beaconId}`} className="text-orange-700 text-xs">
+                  <span className="font-medium">Beacon {beaconId}:</span> {warnings.join(', ')}
+                </div>
+              ))}
             </div>
           </div>
         )}
