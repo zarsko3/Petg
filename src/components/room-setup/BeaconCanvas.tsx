@@ -67,25 +67,76 @@ export function BeaconCanvas() {
   const handleStageDrop = (e: any) => {
     // Handle beacon drop from external drag
     e.preventDefault()
-    
+
     const stage = e.target.getStage()
     const pointerPosition = stage.getPointerPosition()
-    
+
     if (pointerPosition) {
       const x = pixelsToPercent(pointerPosition.x, 'width')
       const y = pixelsToPercent(pointerPosition.y, 'height')
-      
-      // Get beacon ID from drag data (would be set during drag start)
+
+      // Get beacon ID from drag data
       const beaconId = e.dataTransfer?.getData('beacon-id')
       if (beaconId) {
-        dispatch({ 
-          type: 'PLACE_BEACON', 
-          beacon_id: beaconId, 
-          x: snapToGrid(x), 
-          y: snapToGrid(y) 
+        dispatch({
+          type: 'PLACE_BEACON',
+          beacon_id: beaconId,
+          x: snapToGrid(x),
+          y: snapToGrid(y)
         })
       }
     }
+  }
+
+  // Touch drag handling
+  const [touchDraggingBeacon, setTouchDraggingBeacon] = useState<string | null>(null)
+  const [touchStartPos, setTouchStartPos] = useState<{ x: number; y: number } | null>(null)
+
+  const handleStageTouchStart = (e: any) => {
+    // Check if we're touching a beacon in the sidebar
+    const touchedElement = document.elementFromPoint(e.evt.touches[0].clientX, e.evt.touches[0].clientY)
+    if (touchedElement && touchedElement.hasAttribute('data-beacon-id')) {
+      const beaconId = touchedElement.getAttribute('data-beacon-id')
+      if (beaconId) {
+        setTouchDraggingBeacon(beaconId)
+        setTouchStartPos({ x: e.evt.touches[0].clientX, y: e.evt.touches[0].clientY })
+        e.evt.preventDefault()
+      }
+    } else {
+      // Regular touch - deselect room
+      dispatch({ type: 'SELECT_ROOM', id: null })
+    }
+  }
+
+  const handleStageTouchEnd = (e: any) => {
+    if (touchDraggingBeacon && touchStartPos) {
+      // Calculate how far the touch moved
+      const touchEndPos = { x: e.evt.changedTouches[0].clientX, y: e.evt.changedTouches[0].clientY }
+      const deltaX = Math.abs(touchEndPos.x - touchStartPos.x)
+      const deltaY = Math.abs(touchEndPos.y - touchStartPos.y)
+      const minDragDistance = 20 // Minimum distance to consider it a drag
+
+      if (deltaX > minDragDistance || deltaY > minDragDistance) {
+        // This was a drag - place the beacon at the touch end position
+        const stage = e.target.getStage()
+        const pointerPosition = stage.getPointerPosition()
+
+        if (pointerPosition) {
+          const x = pixelsToPercent(pointerPosition.x, 'width')
+          const y = pixelsToPercent(pointerPosition.y, 'height')
+
+          dispatch({
+            type: 'PLACE_BEACON',
+            beacon_id: touchDraggingBeacon,
+            x: snapToGrid(x),
+            y: snapToGrid(y)
+          })
+        }
+      }
+    }
+
+    setTouchDraggingBeacon(null)
+    setTouchStartPos(null)
   }
 
   if (!mounted || dimensions.width === 0) {
@@ -109,7 +160,8 @@ export function BeaconCanvas() {
           width={dimensions.width}
           height={dimensions.height}
           onMouseDown={handleStageClick}
-          onTouchStart={handleStageClick}
+          onTouchStart={handleStageTouchStart}
+          onTouchEnd={handleStageTouchEnd}
           onDrop={handleStageDrop}
           onDragOver={(e: any) => e.preventDefault()}
           className="border border-gray-200 rounded-lg shadow-sm bg-white"
@@ -124,7 +176,7 @@ export function BeaconCanvas() {
                 percentToPixels={percentToPixels}
                 pixelsToPercent={pixelsToPercent}
                 onSelect={() => dispatch({ type: 'SELECT_ROOM', id: room.id })}
-                onUpdate={() => {}} // Read-only in beacon mode
+                onUpdate={(updates) => dispatch({ type: 'UPDATE_ROOM', id: room.id, updates })}
                 isSelected={state.selectedRoom === room.id}
               />
             ))}
@@ -171,13 +223,13 @@ export function BeaconCanvas() {
         {state.rooms.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="text-center text-gray-400">
-              <svg 
-                width="48" 
-                height="48" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="1" 
+              <svg
+                width="48"
+                height="48"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1"
                 className="mx-auto mb-3 opacity-50"
               >
                 <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
@@ -197,6 +249,26 @@ export function BeaconCanvas() {
             </p>
           </div>
         )}
+
+        {/* Touch drag indicator */}
+        {touchDraggingBeacon && (
+          <div className="absolute inset-0 bg-green-100 bg-opacity-20 border-2 border-dashed border-green-400 rounded-lg pointer-events-none flex items-center justify-center">
+            <div className="bg-green-100 border border-green-300 rounded-lg px-4 py-2 shadow-lg">
+              <p className="text-sm font-medium text-green-800">
+                Drop beacon here
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Drag over indicator */}
+        <div
+          className="absolute inset-0 border-2 border-dashed border-blue-400 bg-blue-50 bg-opacity-30 rounded-lg pointer-events-none opacity-0 transition-opacity"
+          style={{
+            opacity: 0 // This will be controlled by dragover events if needed
+          }}
+          id="drag-over-indicator"
+        />
 
         {/* Canvas size indicator */}
         <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded">

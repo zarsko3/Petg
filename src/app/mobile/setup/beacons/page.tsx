@@ -109,8 +109,32 @@ function BeaconSetupContent() {
           {unplacedBeacons.map((beacon) => (
             <div
               key={beacon.id}
-              className="w-16 h-16 bg-gradient-to-br from-green-400 to-emerald-500 rounded-lg flex items-center justify-center text-white font-bold shadow-lg cursor-grab active:cursor-grabbing"
+              className="w-16 h-16 bg-gradient-to-br from-green-400 to-emerald-500 rounded-lg flex items-center justify-center text-white font-bold shadow-lg cursor-grab active:cursor-grabbing transition-all duration-200 hover:scale-105 active:scale-95"
               title={beacon.name}
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData('beacon-id', beacon.id)
+                e.dataTransfer.effectAllowed = 'move'
+                e.currentTarget.classList.add('dragging')
+              }}
+              onDragEnd={(e) => {
+                e.currentTarget.classList.remove('dragging')
+              }}
+              onTouchStart={(e) => {
+                // Store beacon ID for touch drag
+                e.currentTarget.setAttribute('data-beacon-id', beacon.id)
+                e.currentTarget.classList.add('touch-dragging')
+                // Add visual feedback
+                e.currentTarget.style.transform = 'scale(1.1)'
+              }}
+              onTouchEnd={(e) => {
+                e.currentTarget.classList.remove('touch-dragging')
+                e.currentTarget.style.transform = 'scale(1)'
+              }}
+              onTouchMove={(e) => {
+                // Optional: Add some visual feedback during touch move
+                e.currentTarget.style.opacity = '0.8'
+              }}
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="m12 1 3 3-3 3-3-3z"/>

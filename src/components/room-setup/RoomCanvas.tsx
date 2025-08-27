@@ -140,10 +140,12 @@ export function RoomCanvas() {
               <RoomShape
                 key={room.id}
                 room={room}
-                dimensions={dimensions}
+                canvasSize={dimensions}
                 percentToPixels={percentToPixels}
                 pixelsToPercent={pixelsToPercent}
-                isSelected={state.selectedRoomId === room.id}
+                onSelect={() => dispatch({ type: 'SELECT_ROOM', id: room.id })}
+                onUpdate={(updates) => dispatch({ type: 'UPDATE_ROOM', id: room.id, updates })}
+                isSelected={state.selectedRoom === room.id}
               />
             ))}
             
