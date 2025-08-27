@@ -297,7 +297,10 @@ function KonvaMapComponent(props: EnhancedKonvaMapProps) {
       </div>
       
       {/* Info overlay - fixed to screen */}
-      <div className="absolute top-2 right-2 bg-white/90 rounded-lg p-3 text-xs shadow-lg max-w-[180px] z-50">
+      <div
+        className="absolute top-2 right-2 bg-white/90 rounded-lg p-3 text-xs shadow-lg max-w-[180px] z-50"
+        style={{ pointerEvents: 'auto' }}
+      >
         {/* Selected item details */}
         {props.selectedMarker ? (
           <>
@@ -342,8 +345,9 @@ function KonvaMapComponent(props: EnhancedKonvaMapProps) {
               </>
             )}
             
-            <button 
-              className="mt-2 bg-gray-200 hover:bg-gray-300 text-gray-700 px-2 py-1 rounded text-[10px] w-full transition-colors"
+            <button
+              className="mt-2 bg-gray-200 hover:bg-gray-300 text-gray-700 px-2 py-1 rounded text-[10px] w-full transition-colors cursor-pointer"
+              style={{ pointerEvents: 'auto' }}
               onClick={() => props.onMarkerTap?.(undefined as any, "")}
             >
               Clear Selection
@@ -1173,7 +1177,7 @@ function KonvaMapRenderer({
   }
 
   return (
-    <div 
+    <div
       ref={containerRef}
       className={cn("w-full h-full flex-1", className)}
       style={{
@@ -1181,7 +1185,8 @@ function KonvaMapRenderer({
         paddingTop: 'env(safe-area-inset-top)',
         paddingBottom: 'env(safe-area-inset-bottom)',
         paddingLeft: 'env(safe-area-inset-left)',
-        paddingRight: 'env(safe-area-inset-right)'
+        paddingRight: 'env(safe-area-inset-right)',
+        pointerEvents: 'auto'
       }}
     >
       <Stage
@@ -1198,6 +1203,7 @@ function KonvaMapRenderer({
         onDragEnd={handleDragEnd}
         onClick={handleStageClick}
         onTap={handleStageClick}
+        style={{ pointerEvents: 'auto' }}
       >
         {/* Floorplan Layer */}
         <Layer>
