@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import dynamic from 'next/dynamic'
-import { FloorPlanProvider, useFloorPlan } from '@/components/context/FloorPlanContext'
+import { FloorPlanProvider, useFloorPlan, exportFloorPlan, importFloorPlan, downloadFloorPlan } from '@/components/context/FloorPlanContext'
 import { RoomList } from '@/components/room-setup/RoomList'
 import { RoomTemplates } from '@/components/room-setup/RoomTemplates'
 
@@ -22,6 +22,7 @@ const RoomCanvas = dynamic(() => import('@/components/room-setup/RoomCanvas').th
 function RoomSetupContent() {
   const { state, dispatch } = useFloorPlan()
   const [showTemplates, setShowTemplates] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [error, setError] = useState<string | null>(null)
 
@@ -48,6 +49,50 @@ function RoomSetupContent() {
     }
   }, [])
 
+  const handleExport = useCallback(() => {
+    try {
+      const floorPlanData = exportFloorPlan(state.rooms, [])
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
+      const filename = `floor-plan-${timestamp}.json`
+      downloadFloorPlan(filename, floorPlanData)
+    } catch (error: any) {
+      setError('Failed to export floor plan')
+      setTimeout(() => setError(null), 3000)
+    }
+  }, [state.rooms])
+
+  const handleImport = useCallback(() => {
+    fileInputRef.current?.click()
+  }, [])
+
+  const handleFileImport = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const jsonData = e.target?.result as string
+        const importedData = importFloorPlan(jsonData)
+
+        dispatch({
+          type: 'IMPORT_FLOOR_PLAN',
+          data: importedData
+        })
+
+        setError('Floor plan imported successfully!')
+        setTimeout(() => setError(null), 3000)
+      } catch (error: any) {
+        setError(error.message || 'Failed to import floor plan')
+        setTimeout(() => setError(null), 5000)
+      }
+    }
+    reader.readAsText(file)
+
+    // Reset file input
+    event.target.value = ''
+  }, [])
+
   const canProceed = state.rooms.length > 0
 
   return (
@@ -70,17 +115,41 @@ function RoomSetupContent() {
             </div>
           </div>
           
-          <button
-            onClick={handleNext}
-            disabled={!canProceed}
-            className={`px-6 py-2 rounded-lg font-medium transition-all ${
-              canProceed
-                ? 'bg-violet-600 text-white hover:bg-violet-700 shadow-lg hover:shadow-xl'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-            }`}
-          >
-            Next
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Export/Import buttons */}
+            <button
+              onClick={handleExport}
+              disabled={state.rooms.length === 0}
+              className={`px-3 py-2 rounded-lg font-medium transition-all text-sm ${
+                state.rooms.length > 0
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              }`}
+              title="Export floor plan"
+            >
+              📤
+            </button>
+
+            <button
+              onClick={handleImport}
+              className="px-3 py-2 rounded-lg font-medium transition-all text-sm bg-green-600 text-white hover:bg-green-700"
+              title="Import floor plan"
+            >
+              📥
+            </button>
+
+            <button
+              onClick={handleNext}
+              disabled={!canProceed}
+              className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                canProceed
+                  ? 'bg-violet-600 text-white hover:bg-violet-700 shadow-lg hover:shadow-xl'
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              Next
+            </button>
+          </div>
         </div>
       </div>
 
@@ -149,6 +218,15 @@ function RoomSetupContent() {
           onClose={() => setShowTemplates(false)}
         />
       )}
+
+      {/* Hidden file input for import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json"
+        onChange={handleFileImport}
+        className="hidden"
+      />
     </div>
   )
 }

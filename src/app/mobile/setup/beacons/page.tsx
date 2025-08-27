@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import dynamic from 'next/dynamic'
-import { FloorPlanProvider, useFloorPlan } from '@/components/context/FloorPlanContext'
+import { FloorPlanProvider, useFloorPlan, exportFloorPlan, importFloorPlan, downloadFloorPlan } from '@/components/context/FloorPlanContext'
 
 // Dynamically import beacon canvas to avoid SSR issues
 const BeaconCanvas = dynamic(() => import('@/components/room-setup/BeaconCanvas').then(mod => ({ default: mod.BeaconCanvas })), {
@@ -19,6 +19,8 @@ const BeaconCanvas = dynamic(() => import('@/components/room-setup/BeaconCanvas'
 
 function BeaconSetupContent() {
   const { state, dispatch } = useFloorPlan()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [importStatus, setImportStatus] = useState<string | null>(null)
 
   // Mock available beacons - in real app, fetch from Supabase
   useEffect(() => {
@@ -44,6 +46,51 @@ function BeaconSetupContent() {
     alert('Floor plan saved! Redirecting to location page...')
     window.location.href = '/mobile/location'
   }, [state.availableBeacons, state.beacons])
+
+  const handleExport = useCallback(() => {
+    try {
+      const floorPlanData = exportFloorPlan(state.rooms, state.beacons)
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
+      const filename = `complete-floor-plan-${timestamp}.json`
+      downloadFloorPlan(filename, floorPlanData)
+    } catch (error: any) {
+      alert('Failed to export floor plan')
+    }
+  }, [state.rooms, state.beacons])
+
+  const handleImport = useCallback(() => {
+    fileInputRef.current?.click()
+  }, [])
+
+  const handleFileImport = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const jsonData = e.target?.result as string
+        const importedData = importFloorPlan(jsonData)
+
+        // Replace current floor plan with imported data
+        dispatch({
+          type: 'LOAD_FLOOR_PLAN',
+          rooms: importedData.rooms,
+          beacons: importedData.beacons
+        })
+
+        setImportStatus('Floor plan imported successfully!')
+        setTimeout(() => setImportStatus(null), 3000)
+      } catch (error: any) {
+        setImportStatus(error.message || 'Failed to import floor plan')
+        setTimeout(() => setImportStatus(null), 5000)
+      }
+    }
+    reader.readAsText(file)
+
+    // Reset file input
+    event.target.value = ''
+  }, [])
 
   const canFinish = state.availableBeacons.every(
     beacon => state.beacons.find(placed => placed.beacon_id === beacon.id)
@@ -73,17 +120,41 @@ function BeaconSetupContent() {
             </div>
           </div>
           
-          <button
-            onClick={handleFinish}
-            disabled={!canFinish}
-            className={`px-6 py-2 rounded-lg font-medium transition-all ${
-              canFinish
-                ? 'bg-green-600 text-white hover:bg-green-700 shadow-lg hover:shadow-xl'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-            }`}
-          >
-            Finish
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Export/Import buttons */}
+            <button
+              onClick={handleExport}
+              disabled={state.rooms.length === 0}
+              className={`px-3 py-2 rounded-lg font-medium transition-all text-sm ${
+                state.rooms.length > 0
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              }`}
+              title="Export complete floor plan"
+            >
+              📤
+            </button>
+
+            <button
+              onClick={handleImport}
+              className="px-3 py-2 rounded-lg font-medium transition-all text-sm bg-green-600 text-white hover:bg-green-700"
+              title="Import floor plan"
+            >
+              📥
+            </button>
+
+            <button
+              onClick={handleFinish}
+              disabled={!canFinish}
+              className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                canFinish
+                  ? 'bg-green-600 text-white hover:bg-green-700 shadow-lg hover:shadow-xl'
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              Finish
+            </button>
+          </div>
         </div>
       </div>
 
@@ -178,7 +249,27 @@ function BeaconSetupContent() {
             </div>
           )}
         </div>
+
+        {/* Import status message */}
+        {importStatus && (
+          <div className={`mt-2 px-3 py-2 rounded-lg text-sm font-medium ${
+            importStatus.includes('successfully')
+              ? 'bg-green-100 text-green-800'
+              : 'bg-red-100 text-red-800'
+          }`}>
+            {importStatus}
+          </div>
+        )}
       </div>
+
+      {/* Hidden file input for import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json"
+        onChange={handleFileImport}
+        className="hidden"
+      />
     </div>
   )
 }

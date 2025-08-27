@@ -75,6 +75,8 @@ type FloorPlanAction =
   | { type: 'REDO' }
   | { type: 'ROTATE_ROOM'; id: string; angle: number }
   | { type: 'DUPLICATE_ROOM'; id: string }
+  | { type: 'EXPORT_FLOOR_PLAN' }
+  | { type: 'IMPORT_FLOOR_PLAN'; data: { rooms: Room[]; beacons: BeaconPlacement[] } }
 
 // Initial state
 const initialState: FloorPlanState = {
@@ -333,6 +335,21 @@ function floorPlanReducer(state: FloorPlanState, action: FloorPlanAction): Floor
         ...state,
         rooms: [...state.rooms, newRoom],
         selectedRoom: newRoom.id
+      }
+    }
+
+    case 'EXPORT_FLOOR_PLAN': {
+      // Export is handled by the UI component directly
+      return state
+    }
+
+    case 'IMPORT_FLOOR_PLAN': {
+      return {
+        ...state,
+        rooms: action.data.rooms,
+        beacons: action.data.beacons,
+        undoStack: [],
+        redoStack: []
       }
     }
 
@@ -814,4 +831,73 @@ export function clearFloorPlanFromStorage(): void {
   } catch (error) {
     console.warn('Failed to clear floor plan from localStorage:', error)
   }
+}
+
+// Export/Import utilities
+export function exportFloorPlan(rooms: Room[], beacons: BeaconPlacement[]): string {
+  const floorPlanData = {
+    version: '1.0',
+    timestamp: new Date().toISOString(),
+    rooms,
+    beacons,
+    metadata: {
+      roomCount: rooms.length,
+      beaconCount: beacons.length,
+      roomTypes: [...new Set(rooms.map(r => r.type))]
+    }
+  }
+
+  return JSON.stringify(floorPlanData, null, 2)
+}
+
+export function importFloorPlan(jsonData: string): { rooms: Room[]; beacons: BeaconPlacement[] } {
+  try {
+    const data = JSON.parse(jsonData)
+
+    // Validate the imported data structure
+    if (!data.rooms || !Array.isArray(data.rooms)) {
+      throw new Error('Invalid floor plan: missing or invalid rooms data')
+    }
+
+    if (!data.beacons || !Array.isArray(data.beacons)) {
+      throw new Error('Invalid floor plan: missing or invalid beacons data')
+    }
+
+    // Basic validation of room and beacon data
+    data.rooms.forEach((room: any, index: number) => {
+      if (!room.id || !room.name || !room.type || !room.points) {
+        throw new Error(`Invalid room data at index ${index}`)
+      }
+    })
+
+    data.beacons.forEach((beacon: any, index: number) => {
+      if (!beacon.beacon_id || typeof beacon.x !== 'number' || typeof beacon.y !== 'number') {
+        throw new Error(`Invalid beacon data at index ${index}`)
+      }
+    })
+
+    return {
+      rooms: data.rooms,
+      beacons: data.beacons
+    }
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(`Failed to import floor plan: ${error.message}`)
+    }
+    throw new Error('Failed to import floor plan: Invalid JSON format')
+  }
+}
+
+export function downloadFloorPlan(filename: string, data: string): void {
+  if (typeof window === 'undefined') return
+
+  const blob = new Blob([data], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
 } 
