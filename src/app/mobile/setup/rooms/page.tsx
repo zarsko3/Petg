@@ -23,6 +23,8 @@ function RoomSetupContent() {
   const { state, dispatch } = useFloorPlan()
   const [showTemplates, setShowTemplates] = useState(false)
 
+  const [error, setError] = useState<string | null>(null)
+
   const handleNext = useCallback(() => {
     if (state.rooms.length === 0) {
       alert('Please add at least one room before continuing.')
@@ -31,6 +33,20 @@ function RoomSetupContent() {
     // Navigate to beacon placement
     window.location.href = '/mobile/setup/beacons'
   }, [state.rooms.length])
+
+  const handleAddRoom = useCallback((template: any) => {
+    try {
+      setError(null)
+      dispatch({
+        type: 'ADD_ROOM',
+        room: template,
+      })
+    } catch (error: any) {
+      setError(error.message || 'Failed to add room')
+      // Show error for 3 seconds
+      setTimeout(() => setError(null), 3000)
+    }
+  }, [])
 
   const canProceed = state.rooms.length > 0
 
@@ -111,14 +127,23 @@ function RoomSetupContent() {
         </div>
       </div>
 
+      {/* Error Message */}
+      {error && (
+        <div className="fixed top-4 left-4 right-4 z-50 bg-red-500 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="m15 9-6 6"/>
+            <path d="m9 9 6 6"/>
+          </svg>
+          <p className="text-sm font-medium">{error}</p>
+        </div>
+      )}
+
       {/* Room Templates Bottom Sheet */}
       {showTemplates && (
-        <RoomTemplates 
+        <RoomTemplates
           onSelect={(template) => {
-            dispatch({
-              type: 'ADD_ROOM',
-              room: template,
-            })
+            handleAddRoom(template)
             setShowTemplates(false)
           }}
           onClose={() => setShowTemplates(false)}

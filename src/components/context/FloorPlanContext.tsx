@@ -65,6 +65,8 @@ type FloorPlanAction =
   | { type: 'SET_EDITING'; editing: boolean }
   | { type: 'LOAD_FLOOR_PLAN'; rooms: Room[]; beacons: BeaconPlacement[] }
   | { type: 'RESET' }
+  | { type: 'SAVE_TO_STORAGE' }
+  | { type: 'LOAD_FROM_STORAGE' }
 
 // Initial state
 const initialState: FloorPlanState = {
@@ -87,6 +89,17 @@ function floorPlanReducer(state: FloorPlanState, action: FloorPlanAction): Floor
         zIndex: roomCount,
         ...action.room,
       }
+
+      // Check for overlaps with existing rooms
+      const hasOverlap = state.rooms.some(existingRoom =>
+        doPolygonsOverlap(newRoom.points, existingRoom.points)
+      )
+
+      if (hasOverlap) {
+        // Return state unchanged and throw error to be handled by UI
+        throw new Error('Room overlaps with existing room. Please adjust the position or size.')
+      }
+
       return {
         ...state,
         rooms: [...state.rooms, newRoom],
@@ -188,7 +201,25 @@ function floorPlanReducer(state: FloorPlanState, action: FloorPlanAction): Floor
     }
 
     case 'RESET': {
+      clearFloorPlanFromStorage()
       return initialState
+    }
+
+    case 'SAVE_TO_STORAGE': {
+      saveFloorPlanToStorage(state.rooms, state.beacons)
+      return state
+    }
+
+    case 'LOAD_FROM_STORAGE': {
+      const data = loadFloorPlanFromStorage()
+      if (data) {
+        return {
+          ...state,
+          rooms: data.rooms,
+          beacons: data.beacons
+        }
+      }
+      return state
     }
 
     default:
@@ -205,6 +236,29 @@ const FloorPlanContext = createContext<{
 // Provider component
 export function FloorPlanProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(floorPlanReducer, initialState)
+  const [isInitialized, setIsInitialized] = useState(false)
+
+  // Load data from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const data = loadFloorPlanFromStorage()
+      if (data && (data.rooms.length > 0 || data.beacons.length > 0)) {
+        dispatch({
+          type: 'LOAD_FLOOR_PLAN',
+          rooms: data.rooms,
+          beacons: data.beacons
+        })
+      }
+      setIsInitialized(true)
+    }
+  }, [])
+
+  // Auto-save to localStorage when state changes (after initialization)
+  useEffect(() => {
+    if (isInitialized && typeof window !== 'undefined') {
+      saveFloorPlanToStorage(state.rooms, state.beacons)
+    }
+  }, [state.rooms, state.beacons, isInitialized])
 
   return (
     <FloorPlanContext.Provider value={{ state, dispatch }}>
@@ -237,33 +291,223 @@ export function createRectanglePoints(x: number, y: number, width: number, heigh
 }
 
 export function createLShapePoints(
-  x: number, 
-  y: number, 
-  width1: number, 
+  x: number,
+  y: number,
+  width1: number,
   height1: number,
-  width2: number, 
+  width2: number,
   height2: number,
-  position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' = 'top-left'
+  position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' = 'bottom-right'
 ): Point2D[] {
-  // Create L-shape as two overlapping rectangles
-  const baseRect = createRectanglePoints(x, y, width1, height1)
-  
-  let extRect: Point2D[]
+  // Create proper L-shape polygon by tracing the outer perimeter
+  const snappedX = snapToGrid(x)
+  const snappedY = snapToGrid(y)
+  const snappedWidth1 = snapToGrid(width1)
+  const snappedHeight1 = snapToGrid(height1)
+  const snappedWidth2 = snapToGrid(width2)
+  const snappedHeight2 = snapToGrid(height2)
+
+  let points: Point2D[]
+
   switch (position) {
-    case 'top-right':
-      extRect = createRectanglePoints(x + width1, y, width2, height2)
-      break
-    case 'bottom-left':
-      extRect = createRectanglePoints(x, y + height1, width2, height2)
-      break
     case 'bottom-right':
-      extRect = createRectanglePoints(x + width1, y + height1, width2, height2)
+      // L-shape extending to bottom-right
+      points = [
+        { x: snappedX, y: snappedY },                                    // Top-left of main rectangle
+        { x: snappedX + snappedWidth1, y: snappedY },                   // Top-right of main rectangle
+        { x: snappedX + snappedWidth1, y: snappedY + snappedHeight1 },  // Bottom-right of main rectangle
+        { x: snappedX + snappedWidth1 + snappedWidth2, y: snappedY + snappedHeight1 }, // Bottom-right of extension
+        { x: snappedX + snappedWidth1 + snappedWidth2, y: snappedY + snappedHeight1 + snappedHeight2 }, // Bottom-right corner
+        { x: snappedX + snappedWidth1, y: snappedY + snappedHeight1 + snappedHeight2 }, // Bottom-left of extension
+        { x: snappedX + snappedWidth1, y: snappedY + snappedHeight1 },  // Top-right of extension
+        { x: snappedX, y: snappedY + snappedHeight1 },                  // Bottom-left of main rectangle
+        { x: snappedX, y: snappedY }                                    // Back to start
+      ]
       break
-    default: // top-left
-      extRect = createRectanglePoints(x - width2, y, width2, height2)
+
+    case 'top-right':
+      // L-shape extending to top-right
+      points = [
+        { x: snappedX, y: snappedY + snappedHeight1 },                  // Bottom-left of main rectangle
+        { x: snappedX + snappedWidth1, y: snappedY + snappedHeight1 },  // Bottom-right of main rectangle
+        { x: snappedX + snappedWidth1, y: snappedY },                   // Top-right of main rectangle
+        { x: snappedX + snappedWidth1 + snappedWidth2, y: snappedY },   // Top-right of extension
+        { x: snappedX + snappedWidth1 + snappedWidth2, y: snappedY - snappedHeight2 }, // Top-right corner
+        { x: snappedX + snappedWidth1, y: snappedY - snappedHeight2 },  // Top-left of extension
+        { x: snappedX + snappedWidth1, y: snappedY },                   // Bottom-right of extension
+        { x: snappedX, y: snappedY },                                   // Top-left of main rectangle
+        { x: snappedX, y: snappedY + snappedHeight1 }                   // Back to start
+      ]
+      break
+
+    case 'bottom-left':
+      // L-shape extending to bottom-left
+      points = [
+        { x: snappedX + snappedWidth1, y: snappedY },                   // Top-right of main rectangle
+        { x: snappedX, y: snappedY },                                   // Top-left of main rectangle
+        { x: snappedX, y: snappedY + snappedHeight1 },                  // Bottom-left of main rectangle
+        { x: snappedX - snappedWidth2, y: snappedY + snappedHeight1 },  // Bottom-left of extension
+        { x: snappedX - snappedWidth2, y: snappedY + snappedHeight1 + snappedHeight2 }, // Bottom-left corner
+        { x: snappedX, y: snappedY + snappedHeight1 + snappedHeight2 }, // Bottom-right of extension
+        { x: snappedX, y: snappedY + snappedHeight1 },                  // Top-right of extension
+        { x: snappedX + snappedWidth1, y: snappedY + snappedHeight1 },  // Bottom-right of main rectangle
+        { x: snappedX + snappedWidth1, y: snappedY }                    // Back to start
+      ]
+      break
+
+    case 'top-left':
+      // L-shape extending to top-left
+      points = [
+        { x: snappedX + snappedWidth1, y: snappedY + snappedHeight1 },  // Bottom-right of main rectangle
+        { x: snappedX, y: snappedY + snappedHeight1 },                  // Bottom-left of main rectangle
+        { x: snappedX, y: snappedY },                                   // Top-left of main rectangle
+        { x: snappedX - snappedWidth2, y: snappedY },                   // Top-left of extension
+        { x: snappedX - snappedWidth2, y: snappedY - snappedHeight2 },  // Top-left corner
+        { x: snappedX, y: snappedY - snappedHeight2 },                  // Top-right of extension
+        { x: snappedX, y: snappedY },                                   // Bottom-right of extension
+        { x: snappedX + snappedWidth1, y: snappedY },                   // Top-right of main rectangle
+        { x: snappedX + snappedWidth1, y: snappedY + snappedHeight1 }   // Back to start
+      ]
+      break
   }
-  
-  // For now, return the union as a simple concatenation
-  // TODO: Implement proper polygon union for complex L-shapes
-  return [...baseRect, ...extRect]
+
+  return points
+}
+
+// Room overlap detection utilities
+export function doPolygonsOverlap(polygon1: Point2D[], polygon2: Point2D[]): boolean {
+  // Simple bounding box overlap check first
+  if (!doBoundingBoxesOverlap(polygon1, polygon2)) {
+    return false
+  }
+
+  // Check if any edge of polygon1 intersects with any edge of polygon2
+  for (let i = 0; i < polygon1.length; i++) {
+    const edge1 = {
+      start: polygon1[i],
+      end: polygon1[(i + 1) % polygon1.length]
+    }
+
+    for (let j = 0; j < polygon2.length; j++) {
+      const edge2 = {
+        start: polygon2[j],
+        end: polygon2[(j + 1) % polygon2.length]
+      }
+
+      if (doEdgesIntersect(edge1, edge2)) {
+        return true
+      }
+    }
+  }
+
+  // Check if one polygon is completely inside the other
+  return isPointInsidePolygon(polygon1[0], polygon2) || isPointInsidePolygon(polygon2[0], polygon1)
+}
+
+export function doBoundingBoxesOverlap(polygon1: Point2D[], polygon2: Point2D[]): boolean {
+  const bounds1 = getPolygonBounds(polygon1)
+  const bounds2 = getPolygonBounds(polygon2)
+
+  return !(bounds1.maxX < bounds2.minX ||
+           bounds1.minX > bounds2.maxX ||
+           bounds1.maxY < bounds2.minY ||
+           bounds1.minY > bounds2.maxY)
+}
+
+function getPolygonBounds(polygon: Point2D[]): {
+  minX: number
+  maxX: number
+  minY: number
+  maxY: number
+} {
+  return polygon.reduce(
+    (bounds, point) => ({
+      minX: Math.min(bounds.minX, point.x),
+      maxX: Math.max(bounds.maxX, point.x),
+      minY: Math.min(bounds.minY, point.y),
+      maxY: Math.max(bounds.maxY, point.y)
+    }),
+    { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }
+  )
+}
+
+function doEdgesIntersect(
+  edge1: { start: Point2D; end: Point2D },
+  edge2: { start: Point2D; end: Point2D }
+): boolean {
+  const { start: p1, end: p2 } = edge1
+  const { start: p3, end: p4 } = edge2
+
+  const denom = (p1.x - p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x - p4.x)
+
+  if (Math.abs(denom) < 1e-10) {
+    return false // Lines are parallel
+  }
+
+  const t = ((p1.x - p3.x) * (p3.y - p4.y) - (p1.y - p3.y) * (p3.x - p4.x)) / denom
+  const u = -((p1.x - p2.x) * (p1.y - p3.y) - (p1.y - p2.y) * (p1.x - p3.x)) / denom
+
+  return t >= 0 && t <= 1 && u >= 0 && u <= 1
+}
+
+function isPointInsidePolygon(point: Point2D, polygon: Point2D[]): boolean {
+  let inside = false
+
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].x, yi = polygon[i].y
+    const xj = polygon[j].x, yj = polygon[j].y
+
+    if (((yi > point.y) !== (yj > point.y)) &&
+        (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi)) {
+      inside = !inside
+    }
+  }
+
+  return inside
+}
+
+// Local storage utilities for floor plan persistence
+const STORAGE_KEY = 'floor-plan-data'
+
+export function saveFloorPlanToStorage(rooms: Room[], beacons: BeaconPlacement[]): void {
+  if (typeof window === 'undefined') return
+
+  try {
+    const data = {
+      rooms,
+      beacons,
+      timestamp: Date.now()
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+  } catch (error) {
+    console.warn('Failed to save floor plan to localStorage:', error)
+  }
+}
+
+export function loadFloorPlanFromStorage(): { rooms: Room[]; beacons: BeaconPlacement[] } | null {
+  if (typeof window === 'undefined') return null
+
+  try {
+    const data = localStorage.getItem(STORAGE_KEY)
+    if (!data) return null
+
+    const parsed = JSON.parse(data)
+    return {
+      rooms: parsed.rooms || [],
+      beacons: parsed.beacons || []
+    }
+  } catch (error) {
+    console.warn('Failed to load floor plan from localStorage:', error)
+    return null
+  }
+}
+
+export function clearFloorPlanFromStorage(): void {
+  if (typeof window === 'undefined') return
+
+  try {
+    localStorage.removeItem(STORAGE_KEY)
+  } catch (error) {
+    console.warn('Failed to clear floor plan from localStorage:', error)
+  }
 } 
