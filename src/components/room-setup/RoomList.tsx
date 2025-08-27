@@ -31,9 +31,17 @@ export function RoomList() {
   }
 
   const handleDelete = (roomId: string) => {
-    if (confirm('Delete this room? This cannot be undone.')) {
-      dispatch({ type: 'DELETE_ROOM', id: roomId })
+    if (confirm('Delete this room? You can undo this action.')) {
+      dispatch({ type: 'DELETE_ROOM_UNDO', id: roomId })
     }
+  }
+
+  const handleUndo = () => {
+    dispatch({ type: 'UNDO' })
+  }
+
+  const handleRedo = () => {
+    dispatch({ type: 'REDO' })
   }
 
   if (state.rooms.length === 0) {
@@ -52,9 +60,44 @@ export function RoomList() {
     <div className="p-4">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-semibold text-gray-900">Rooms ({state.rooms.length})</h3>
-        {state.rooms.length > 0 && (
-          <span className="text-xs text-gray-500">Tap to select, double-tap to rename</span>
-        )}
+        <div className="flex items-center gap-2">
+          {/* Undo/Redo buttons */}
+          <button
+            onClick={handleUndo}
+            disabled={state.undoStack.length === 0}
+            className={`p-1.5 rounded transition-colors ${
+              state.undoStack.length === 0
+                ? 'text-gray-300 cursor-not-allowed'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+            }`}
+            title="Undo last action"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M9 19c-5 0-9-4-9-9s4-9 9-9"/>
+              <path d="M15 10l-3 3 3 3"/>
+            </svg>
+          </button>
+
+          <button
+            onClick={handleRedo}
+            disabled={state.redoStack.length === 0}
+            className={`p-1.5 rounded transition-colors ${
+              state.redoStack.length === 0
+                ? 'text-gray-300 cursor-not-allowed'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+            }`}
+            title="Redo last undone action"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M15 5c5 0 9 4 9 9s-4 9-9 9"/>
+              <path d="M9 14l3-3-3-3"/>
+            </svg>
+          </button>
+
+          {state.rooms.length > 0 && (
+            <span className="text-xs text-gray-500 hidden sm:inline">Tap to select, double-tap to rename</span>
+          )}
+        </div>
       </div>
       
       <div className="space-y-2 max-h-32 overflow-y-auto">

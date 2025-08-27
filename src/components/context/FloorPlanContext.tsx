@@ -32,6 +32,8 @@ export interface FloorPlanState {
   selectedRoom: string | null
   currentStep: 'rooms' | 'beacons' | 'complete'
   isEditing: boolean
+  undoStack: Array<{ rooms: Room[]; beacons: BeaconPlacement[] }>
+  redoStack: Array<{ rooms: Room[]; beacons: BeaconPlacement[] }>
 }
 
 // Color palette for rooms (10 colors as requested)
@@ -67,6 +69,9 @@ type FloorPlanAction =
   | { type: 'RESET' }
   | { type: 'SAVE_TO_STORAGE' }
   | { type: 'LOAD_FROM_STORAGE' }
+  | { type: 'DELETE_ROOM_UNDO'; id: string }
+  | { type: 'UNDO' }
+  | { type: 'REDO' }
 
 // Initial state
 const initialState: FloorPlanState = {
@@ -76,10 +81,40 @@ const initialState: FloorPlanState = {
   selectedRoom: null,
   currentStep: 'rooms',
   isEditing: false,
+  undoStack: [],
+  redoStack: [],
+}
+
+// Helper functions for undo/redo
+function saveToUndoStack(state: FloorPlanState): FloorPlanState {
+  const currentState = {
+    rooms: [...state.rooms],
+    beacons: [...state.beacons]
+  }
+
+  return {
+    ...state,
+    undoStack: [...state.undoStack, currentState].slice(-20), // Keep last 20 states
+    redoStack: [] // Clear redo stack when new action is performed
+  }
+}
+
+function createUndoAction(state: FloorPlanState, action: FloorPlanAction): FloorPlanState {
+  // Only save state for actions that modify data
+  const actionsToTrack = ['ADD_ROOM', 'UPDATE_ROOM', 'DELETE_ROOM', 'DELETE_ROOM_UNDO', 'PLACE_BEACON', 'REMOVE_BEACON', 'RESET']
+
+  if (actionsToTrack.includes(action.type)) {
+    return saveToUndoStack(state)
+  }
+
+  return state
 }
 
 // Reducer
 function floorPlanReducer(state: FloorPlanState, action: FloorPlanAction): FloorPlanState {
+  // Save current state to undo stack for reversible actions
+  state = createUndoAction(state, action)
+
   switch (action.type) {
     case 'ADD_ROOM': {
       const roomCount = state.rooms.length
@@ -220,6 +255,47 @@ function floorPlanReducer(state: FloorPlanState, action: FloorPlanAction): Floor
         }
       }
       return state
+    }
+
+    case 'DELETE_ROOM_UNDO': {
+      const roomToDelete = state.rooms.find(room => room.id === action.id)
+      if (!roomToDelete) return state
+
+      return {
+        ...state,
+        rooms: state.rooms.filter(room => room.id !== action.id),
+        selectedRoom: state.selectedRoom === action.id ? null : state.selectedRoom
+      }
+    }
+
+    case 'UNDO': {
+      if (state.undoStack.length === 0) return state
+
+      const previousState = state.undoStack[state.undoStack.length - 1]
+      const newUndoStack = state.undoStack.slice(0, -1)
+
+      return {
+        ...state,
+        rooms: previousState.rooms,
+        beacons: previousState.beacons,
+        undoStack: newUndoStack,
+        redoStack: [...state.redoStack, { rooms: state.rooms, beacons: state.beacons }]
+      }
+    }
+
+    case 'REDO': {
+      if (state.redoStack.length === 0) return state
+
+      const nextState = state.redoStack[state.redoStack.length - 1]
+      const newRedoStack = state.redoStack.slice(0, -1)
+
+      return {
+        ...state,
+        rooms: nextState.rooms,
+        beacons: nextState.beacons,
+        redoStack: newRedoStack,
+        undoStack: [...state.undoStack, { rooms: state.rooms, beacons: state.beacons }]
+      }
     }
 
     default:
