@@ -142,8 +142,16 @@ export function RoomList() {
                   {room.name}
                 </div>
               )}
-              <div className="text-xs text-gray-500 mt-0.5">
-                {room.type === 'rectangle' ? 'Rectangle' : 'L-Shape'}
+              <div className="flex items-center gap-1 mt-0.5">
+                <span className="text-xs text-gray-500">
+                  {room.type === 'rectangle' ? 'Rectangle' : 'L-Shape'}
+                </span>
+                {room.type === 'l-shape' && (
+                  <div className="flex gap-0.5">
+                    <div className="w-1 h-1 bg-green-500 rounded-full"></div>
+                    <div className="w-1 h-1 bg-green-500 rounded-full"></div>
+                  </div>
+                )}
               </div>
             </div>
             

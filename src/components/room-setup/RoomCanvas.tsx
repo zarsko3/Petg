@@ -215,6 +215,19 @@ function ClientSideCanvas() {
                     listening={false}
                   />
                 )}
+
+                {/* L-shape corner indicators */}
+                {room.type === 'l-shape' && room.points.map((point: any, index: number) => (
+                  <Circle
+                    key={`corner-${index}`}
+                    x={percentToPixels(point.x, 'width')}
+                    y={percentToPixels(point.y, 'height')}
+                    radius={3}
+                    fill="#10B981"
+                    opacity={0.7}
+                    listening={false}
+                  />
+                ))}
               </Group>
             )
           })}

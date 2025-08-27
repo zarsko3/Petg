@@ -110,39 +110,89 @@ export function RoomShape({
     }
   }, [room.points, room.type, pixelsToPercent, onUpdate])
 
-  // Generate resize handles for rectangle
+  const handleLShapeResize = useCallback((vertexIndex: number, deltaX: number, deltaY: number) => {
+    if (room.type !== 'l-shape' || room.points.length < 4) return
+
+    const deltaXPercent = pixelsToPercent(deltaX, 'width')
+    const deltaYPercent = pixelsToPercent(deltaY, 'height')
+
+    // For L-shapes, allow moving individual vertices with constraints
+    const newPoints = [...room.points]
+
+    // Apply movement with grid snapping
+    newPoints[vertexIndex] = {
+      x: snapToGrid(room.points[vertexIndex].x + deltaXPercent),
+      y: snapToGrid(room.points[vertexIndex].y + deltaYPercent)
+    }
+
+    // For L-shapes, we need to maintain connectivity and prevent self-intersection
+    // This is a simplified approach - in a production app, you'd want more sophisticated
+    // geometric validation and constraints
+
+    onUpdate({ points: newPoints })
+  }, [room.points, room.type, pixelsToPercent, onUpdate])
+
+  // Generate resize handles for rectangle and L-shape
   const handles: JSX.Element[] = []
-  if (isSelected && room.type === 'rectangle') {
-    const handlePositions = [
-      { x: bounds.minX, y: bounds.minY }, // Top-left
-      { x: bounds.maxX, y: bounds.minY }, // Top-right
-      { x: bounds.maxX, y: bounds.maxY }, // Bottom-right
-      { x: bounds.minX, y: bounds.maxY }, // Bottom-left
-    ]
-    
-    handlePositions.forEach((pos, index) => {
-      handles.push(
-        <Circle
-          key={`handle-${index}`}
-          x={pos.x}
-          y={pos.y}
-          radius={6}
-          fill="#3B82F6"
-          stroke="#FFFFFF"
-          strokeWidth={2}
-          draggable
-          onDragMove={(e) => {
-            const deltaX = e.target.x() - pos.x
-            const deltaY = e.target.y() - pos.y
-            handleResize(index, deltaX, deltaY)
-          }}
-          onDragEnd={(e) => {
-            // Reset handle position after resize
-            e.target.position(pos)
-          }}
-        />
-      )
-    })
+  if (isSelected) {
+    if (room.type === 'rectangle') {
+      // Rectangle handles - corners only
+      const handlePositions = [
+        { x: bounds.minX, y: bounds.minY }, // Top-left
+        { x: bounds.maxX, y: bounds.minY }, // Top-right
+        { x: bounds.maxX, y: bounds.maxY }, // Bottom-right
+        { x: bounds.minX, y: bounds.maxY }, // Bottom-left
+      ]
+
+      handlePositions.forEach((pos, index) => {
+        handles.push(
+          <Circle
+            key={`rect-handle-${index}`}
+            x={pos.x}
+            y={pos.y}
+            radius={6}
+            fill="#3B82F6"
+            stroke="#FFFFFF"
+            strokeWidth={2}
+            draggable
+            onDragMove={(e) => {
+              const deltaX = e.target.x() - pos.x
+              const deltaY = e.target.y() - pos.y
+              handleResize(index, deltaX, deltaY)
+            }}
+            onDragEnd={(e) => {
+              // Reset handle position after resize
+              e.target.position(pos)
+            }}
+          />
+        )
+      })
+    } else if (room.type === 'l-shape') {
+      // L-shape handles - all vertices for complex resizing
+      roomPoints.forEach((point, index) => {
+        handles.push(
+          <Circle
+            key={`l-handle-${index}`}
+            x={point.x}
+            y={point.y}
+            radius={5}
+            fill="#10B981" // Green for L-shape handles
+            stroke="#FFFFFF"
+            strokeWidth={2}
+            draggable
+            onDragMove={(e) => {
+              const deltaX = e.target.x() - point.x
+              const deltaY = e.target.y() - point.y
+              handleLShapeResize(index, deltaX, deltaY)
+            }}
+            onDragEnd={(e) => {
+              // Reset handle position after resize
+              e.target.position(point)
+            }}
+          />
+        )
+      })
+    }
   }
 
   return (
