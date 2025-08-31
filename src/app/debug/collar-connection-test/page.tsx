@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { getMQTTClient, MQTT_TOPICS } from '@/lib/mqtt-client';
+import { getMQTTClient } from '@/lib/mqtt-client';
+import { MQTT_TOPICS } from '@/lib/constants';
 import { toast } from 'sonner';
 import { 
   Wifi, 
@@ -27,9 +28,18 @@ export default function CollarConnectionTestPage() {
   const [isTesting, setIsTesting] = useState(false);
   const [collarId, setCollarId] = useState('001');
 
-  const mqttClient = getMQTTClient();
+  const [mqttClient, setMqttClient] = useState<any>(null);
 
   useEffect(() => {
+    // Initialize MQTT client only in browser
+    if (typeof window !== 'undefined') {
+      setMqttClient(getMQTTClient());
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!mqttClient) return;
+
     // Set up MQTT event handlers
     mqttClient.onConnect = () => {
       console.log('🔗 MQTT Connected to HiveMQ');
@@ -63,13 +73,18 @@ export default function CollarConnectionTestPage() {
     return () => {
       // Cleanup if needed
     };
-  }, []);
+  }, [mqttClient]);
 
   const addTestResult = (message: string) => {
     setTestResults(prev => [...prev.slice(-9), `${new Date().toLocaleTimeString()}: ${message}`]);
   };
 
   const testMQTTConnection = async () => {
+    if (!mqttClient) {
+      addTestResult('❌ MQTT client not initialized');
+      return;
+    }
+
     addTestResult('🔍 Testing MQTT connection...');
     const status = mqttClient.getConnectionStatus();
     
@@ -96,6 +111,11 @@ export default function CollarConnectionTestPage() {
   };
 
   const testCollarBuzz = async (mode: 'buzzer' | 'vibration' | 'both') => {
+    if (!mqttClient) {
+      addTestResult('❌ MQTT client not initialized');
+      return;
+    }
+
     setIsTesting(true);
     addTestResult(`🔔 Testing ${mode} alert...`);
     
