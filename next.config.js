@@ -31,6 +31,13 @@ const allowedDevOrigins = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Expose MQTT environment variables to the client
+  env: {
+    NEXT_PUBLIC_MQTT_HOST: process.env.NEXT_PUBLIC_MQTT_HOST,
+    NEXT_PUBLIC_MQTT_PORT: process.env.NEXT_PUBLIC_MQTT_PORT,
+    NEXT_PUBLIC_MQTT_USER: process.env.NEXT_PUBLIC_MQTT_USER,
+    NEXT_PUBLIC_MQTT_PASS: process.env.NEXT_PUBLIC_MQTT_PASS,
+  },
   images: {
     remotePatterns: [],
     domains: [],

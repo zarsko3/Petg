@@ -9,7 +9,7 @@ import mqtt, { MqttClient, IClientOptions } from 'mqtt';
 import { MQTT_TOPICS, GUEST_DEVICE_ID } from './constants';
 
 // Check if MQTT environment variables are available
-const hasMqttConfig = () => {
+export const hasMqttConfig = () => {
   const requiredMqttVars = [
     'NEXT_PUBLIC_MQTT_HOST',
     'NEXT_PUBLIC_MQTT_PORT',
@@ -17,7 +17,13 @@ const hasMqttConfig = () => {
     'NEXT_PUBLIC_MQTT_PASS'
   ];
   
-  return requiredMqttVars.every(key => process.env[key]);
+  const missingVars = requiredMqttVars.filter(key => !process.env[key]);
+  if (missingVars.length > 0) {
+    console.warn('⚠️ Missing MQTT environment variables:', missingVars.join(', '));
+    return false;
+  }
+  
+  return true;
 };
 
 // MQTT connection configuration (only created if env vars are available)
@@ -110,6 +116,8 @@ export class CollarMQTTClient {
   private isConnected = false;
   private isConnecting = false;
   private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+  private reconnectAttempts = 0;
+  private readonly maxReconnectAttempts = 10;
   
   // Event handlers
   public onCollarTelemetry?: (collarId: string, data: CollarTelemetryData) => void;
@@ -145,40 +153,67 @@ export class CollarMQTTClient {
       const config = getMqttConfig();
       
       // Use WebSocket protocol (wss://) for browser clients
-      const url = `wss://${config.host}:${config.port}/mqtt`;
+      // Construct WebSocket URL using environment variables directly
+      const url = `wss://${process.env.NEXT_PUBLIC_MQTT_HOST}:${process.env.NEXT_PUBLIC_MQTT_PORT}/mqtt`;
       console.log('🔌 Connecting to MQTT broker:', {
         url,
-        username: config.username,
+        username: process.env.NEXT_PUBLIC_MQTT_USER,
         clientId: config.clientId,
-        protocol: config.protocol,
-        port: config.port
+        protocol: 'wss',
+        port: process.env.NEXT_PUBLIC_MQTT_PORT
       });
 
-      // Add connection options for better reliability
-      const connectOptions = {
-        ...config,
+      // Connection options optimized for WebSocket Secure
+      const connectOptions: IClientOptions = {
+        username: process.env.NEXT_PUBLIC_MQTT_USER,
+        password: process.env.NEXT_PUBLIC_MQTT_PASS,
+        clientId: `web-client-${Math.random().toString(16).substr(2, 8)}`,
+        protocol: 'wss',
         keepalive: 30,            // Keepalive interval in seconds
         reconnectPeriod: 5000,    // Reconnect every 5 seconds
         connectTimeout: 10000,     // Wait 10 seconds before timing out
-        rejectUnauthorized: true  // Verify TLS certificate
+        rejectUnauthorized: true,  // Verify TLS certificate
+        clean: true,              // Start with a clean session
+        qos: 1,                   // Default QoS for better reliability
+        will: {                   // Last Will & Testament
+          topic: MQTT_TOPICS.WEB_STATUS,
+          payload: JSON.stringify({
+            status: 'offline',
+            timestamp: Date.now(),
+            client_id: `web-client-${Math.random().toString(16).substr(2, 8)}`
+          }),
+          qos: 1,
+          retain: true
+        }
       };
       
       this.client = mqtt.connect(url, connectOptions);
       
-      this.client.on('connect', () => {
+      this.client.on('connect', (connack) => {
         this.isConnected = true;
         this.isConnecting = false;
+        
+        console.log('✅ MQTT Connected:', {
+          sessionPresent: connack.sessionPresent,
+          returnCode: connack.returnCode,
+          clientId: this.client?.options.clientId
+        });
         
         // Subscribe to collar topics
         this.subscribeToCollarTopics();
         
         // Publish web client online status
-        const config = getMqttConfig();
         this.client?.publish(MQTT_TOPICS.WEB_STATUS, JSON.stringify({
           status: 'online',
           timestamp: Date.now(),
-          client_id: config.clientId
-        }), { qos: 1, retain: true });
+          client_id: this.client?.options.clientId
+        }), { qos: 1, retain: true }, (error) => {
+          if (error) {
+            console.error('❌ Failed to publish online status:', error);
+          } else {
+            console.log('✅ Published online status');
+          }
+        });
         
         this.onConnect?.();
       });
@@ -188,41 +223,55 @@ export class CollarMQTTClient {
       });
       
       this.client.on('error', (error: Error) => {
-        console.error('❌ MQTT client error:', error);
+        console.error('❌ MQTT client error:', {
+          message: error.message,
+          stack: error.stack,
+          clientId: this.client?.options.clientId,
+          connected: this.isConnected,
+          connecting: this.isConnecting
+        });
+        
         this.isConnected = false;
         this.isConnecting = false;
         this.onError?.(error);
-        this.scheduleReconnect();
+        
+        // Only reconnect if it's a recoverable error
+        if (!error.message.includes('client disconnecting')) {
+          this.scheduleReconnect();
+        }
       });
 
       // Add more event handlers for debugging
       this.client.on('close', () => {
-        console.log('🔌 MQTT connection closed');
+        console.log('🔌 MQTT connection closed:', {
+          clientId: this.client?.options.clientId,
+          wasConnected: this.isConnected,
+          wasConnecting: this.isConnecting
+        });
+        
         this.isConnected = false;
         this.isConnecting = false;
         this.onDisconnect?.();
+        
+        // Schedule reconnect with backoff
         this.scheduleReconnect();
       });
 
       this.client.on('reconnect', () => {
-        console.log('🔄 MQTT client reconnecting...');
+        console.log('🔄 MQTT client reconnecting...', {
+          clientId: this.client?.options.clientId,
+          attempt: this.reconnectAttempts
+        });
         this.isConnecting = true;
       });
 
       this.client.on('offline', () => {
-        console.log('📴 MQTT client offline');
+        console.log('📴 MQTT client offline:', {
+          clientId: this.client?.options.clientId,
+          wasConnected: this.isConnected
+        });
         this.isConnected = false;
         this.isConnecting = false;
-      });
-      
-      this.client.on('close', () => {
-        this.isConnected = false;
-        this.onDisconnect?.();
-        this.scheduleReconnect();
-      });
-      
-      this.client.on('offline', () => {
-        this.isConnected = false;
       });
       
     } catch (error) {
@@ -231,22 +280,29 @@ export class CollarMQTTClient {
   }
 
   private subscribeToCollarTopics() {
-    if (!this.client || !this.isConnected) return;
+    if (!this.client || !this.isConnected) {
+      console.warn('⚠️ Cannot subscribe to topics - client not ready');
+      return;
+    }
     
-    // Subscribe to all collar topics with wildcards
+    // Use constants for topic patterns
     const topics = [
-      'pet-collar/+/status',      // Any collar's status
-      'pet-collar/+/telemetry',   // Any collar's telemetry
-      'pet-collar/+/zones',       // Any collar's zones
-      'pet-collar/+/location',    // Any collar's location
-      'pet-collar/+/beacon-detection', // Any collar's beacon data
-      'pet-collar/+/alert'        // Any collar's alerts
+      MQTT_TOPICS.COLLAR_STATUS_WILDCARD,      // Any collar's status
+      MQTT_TOPICS.COLLAR_TELEMETRY_WILDCARD,   // Any collar's telemetry
+      MQTT_TOPICS.COLLAR_ZONES_WILDCARD,       // Any collar's zones
+      MQTT_TOPICS.COLLAR_LOCATION_WILDCARD,    // Any collar's location
+      MQTT_TOPICS.COLLAR_BEACONS_WILDCARD,     // Any collar's beacon data
+      MQTT_TOPICS.COLLAR_ALERTS_WILDCARD       // Any collar's alerts
     ];
     
+    console.log('📡 Subscribing to topics:', topics);
+    
     topics.forEach(topic => {
-      this.client?.subscribe(topic, { qos: 1 }, (error: Error | null) => {
+      this.client?.subscribe(topic, { qos: 1 }, (error: Error | null, granted) => {
         if (error) {
-          console.error('MQTT subscribe error:', error);
+          console.error('❌ Failed to subscribe to topic:', topic, error);
+        } else {
+          console.log('✅ Subscribed to topic:', topic, granted);
         }
       });
     });
@@ -320,10 +376,25 @@ export class CollarMQTTClient {
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
     }
+
+    // Implement exponential backoff with max attempts
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.error('❌ Max reconnection attempts reached. Please check your connection and reload the page.');
+      return;
+    }
+
+    const backoffDelay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000); // Max 30 seconds
+    this.reconnectAttempts++;
+
+    console.log('⏳ Scheduling reconnect:', {
+      attempt: this.reconnectAttempts,
+      delay: backoffDelay,
+      maxAttempts: this.maxReconnectAttempts
+    });
     
     this.reconnectTimeout = setTimeout(() => {
       this.connect();
-    }, 5000);
+    }, backoffDelay);
   }
 
   // Public methods for sending commands
