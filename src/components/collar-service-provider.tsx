@@ -129,15 +129,15 @@ export function CollarServiceProvider({ children }: CollarServiceProviderProps) 
             severity: data.status === 'online' ? 'success' : 'info'
           });
           
-          // Check for device_id "001" and status "online" to exit demo mode
-          if (data.device_id === "001" && data.status === 'online') {
-            console.log('🎯 CollarServiceProvider: Device 001 online - exiting demo mode');
+          // Handle both guest mode and PetCollar-001
+          if ((data.device_id === "001" || data.device_id === "PetCollar-001") && data.status === 'online') {
+            console.log('🎯 CollarServiceProvider: Device online - exiting demo mode');
             store.setDemoMode(false);
             
             // 🎉 ONLY show toast on real state transitions (no spam!)
             if (shouldShowToast && !shouldDebounce) {
               toast.success('Live Mode Activated', {
-                description: 'Collar 001 is now online'
+                description: `Collar ${data.device_id} is now online`
               });
             }
           }
@@ -204,9 +204,9 @@ export function CollarServiceProvider({ children }: CollarServiceProviderProps) 
           store.setLastCollarData(data);
           store.setLastDataReceived(Date.now());
           
-          // If this is from device_id "001", ensure demo mode is off
-          if (data.device_id === "001") {
-            console.log('📊 Telemetry from device 001 - ensuring demo mode is off');
+          // Handle both guest mode and PetCollar-001
+          if (data.device_id === "001" || data.device_id === "PetCollar-001") {
+            console.log(`📊 Telemetry from device ${data.device_id} - ensuring demo mode is off`);
             store.setDemoMode(false);
           }
           
@@ -233,9 +233,10 @@ export function CollarServiceProvider({ children }: CollarServiceProviderProps) 
           // 🔍 STEP 2: Enhanced logging for store/context verification
           console.log(`🔍 CollarServiceProvider: [STEP 2] Beacon detection from ${collarId}:`, beacon);
           
-          // Check for device_id "001" and exit demo mode if needed
-          if (beacon.device_id === "001" || collarId === "001") {
-            console.log('🔍 Beacon detection from device 001 - ensuring demo mode is off');
+          // Handle both guest mode and PetCollar-001
+          if (beacon.device_id === "001" || beacon.device_id === "PetCollar-001" || 
+              collarId === "001" || collarId === "PetCollar-001") {
+            console.log(`🔍 Beacon detection from device ${beacon.device_id || collarId} - ensuring demo mode is off`);
             store.setDemoMode(false);
             // TODO: Remove this toast once we confirm the list updates work correctly
             // toast.success('Live Beacon Data', {

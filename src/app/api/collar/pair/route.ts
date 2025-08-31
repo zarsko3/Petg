@@ -2,10 +2,39 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs'
 import { CollarPairRequestSchema, CollarSchema } from '@/lib/types'
 import { supabaseAdmin } from '@/lib/supabase'
+import { GUEST_DEVICE_ID } from '@/lib/constants'
 
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication
+    // Parse and validate request body
+    const body = await request.json()
+    const validatedData = CollarPairRequestSchema.parse(body)
+
+    // Check if this is a guest collar pairing request
+    if (validatedData.ble_mac === '00:00:00:00:00:01') {
+      return NextResponse.json({
+        id: GUEST_DEVICE_ID,
+        device_id: GUEST_DEVICE_ID,
+        name: 'Guest Collar',
+        mac_addr: '00:00:00:00:00:01',
+        owner_id: 'guest',
+        status: 'online',
+        battery_level: 100,
+        firmware_ver: '1.0.0',
+        last_seen: new Date().toISOString(),
+        settings: {
+          alert_mode: 'BUZZER',
+          sensitivity: 50,
+          battery_threshold: 20,
+          heartbeat_interval: 30,
+          location_accuracy: 'MEDIUM',
+        },
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+    }
+
+    // For non-guest collars, check authentication
     const { userId } = await auth()
     if (!userId) {
       return NextResponse.json(
@@ -21,12 +50,6 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       )
     }
-
-    // Parse and validate request body
-    const body = await request.json()
-    const validatedData = CollarPairRequestSchema.parse(body)
-
-    console.log('🔗 Pairing collar for user:', userId, 'MAC:', validatedData.ble_mac)
 
     // Check if collar is already paired to another user
     const macAddress = validatedData.ble_mac
@@ -140,4 +163,4 @@ export async function POST(request: NextRequest) {
       { status: statusCode }
     )
   }
-} 
+}

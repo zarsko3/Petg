@@ -85,13 +85,30 @@
 // ==================== MQTT CLOUD CONFIGURATION ====================
 // Edit these settings for your HiveMQ Cloud instance
 #define ENABLE_MQTT_CLOUD true                    // Set to false to disable MQTT
-#define MQTT_SERVER "<YOUR_MQTT_SERVER>"
-#define MQTT_PORT <YOUR_MQTT_PORT>                           // TLS port
-#define MQTT_USER "<YOUR_MQTT_USER>"
-#define MQTT_PASSWORD "<YOUR_MQTT_PASSWORD>"
-#define DEVICE_ID "<YOUR_COLLAR_ID>"                          // Unique collar ID
+
+// MQTT Configuration for HiveMQ Cloud
+#define MQTT_SERVER "ab1d45df84884fd68d24d7d25cc78f2f.s1.eu.hivemq.cloud"
+#define MQTT_PORT 8883                          // TLS port
+#define MQTT_USER "PetCollar-001"              // HiveMQ Cloud username
+#define MQTT_PASSWORD "246810Gal"              // HiveMQ Cloud password
+#define DEVICE_ID "PetCollar-001"              // Device ID for MQTT topics
+
+// MQTT Topics (pet-collar/001/...)
+#define MQTT_TOPIC_PREFIX "pet-collar"          // Topic prefix
+#define MQTT_TOPIC_STATUS "status"              // Online/offline status
+#define MQTT_TOPIC_TELEMETRY "telemetry"        // Sensor data
+#define MQTT_TOPIC_BEACON "beacon-detection"     // Beacon detection data
+
+// Topic Construction Macros
+#define MQTT_MAKE_TOPIC(type) MQTT_TOPIC_PREFIX "/" DEVICE_ID "/" type
+#define MQTT_STATUS_TOPIC MQTT_MAKE_TOPIC(MQTT_TOPIC_STATUS)
+#define MQTT_TELEMETRY_TOPIC MQTT_MAKE_TOPIC(MQTT_TOPIC_TELEMETRY)
+#define MQTT_BEACON_TOPIC MQTT_MAKE_TOPIC(MQTT_TOPIC_BEACON)
+
+// MQTT Timing
 #define MQTT_TELEMETRY_INTERVAL 30000           // 30 seconds
 #define MQTT_HEARTBEAT_INTERVAL 60000           // 1 minute
+#define MQTT_KEEPALIVE 30                       // 30 seconds keepalive
 
 // Display configuration
 #define SCREEN_WIDTH 128
@@ -1107,6 +1124,10 @@ bool validateFilterPerformance(const char* beaconMac, float targetRMSReduction) 
 }
 
 // ==================== MQTT CLOUD OBJECTS ====================
+// Include TLS certificate
+#include "include/cert.h"
+
+// Initialize secure MQTT client
 WiFiClientSecure mqttSecureClient;
 PubSubClient mqttClient(mqttSecureClient);
 
@@ -1162,8 +1183,8 @@ void initializeMQTTCloud() {
     
     Serial.println("🌐 Initializing MQTT Cloud connection...");
     
-    // Configure TLS (for production, add proper certificates)
-    mqttSecureClient.setInsecure(); // OK for pilot testing
+    // Configure TLS with HiveMQ Cloud root certificate
+    mqttSecureClient.setCACert(root_ca);
     
     // Set MQTT server
     mqttClient.setServer(MQTT_SERVER, MQTT_PORT);

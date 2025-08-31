@@ -2,34 +2,36 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { CollarSchema } from '@/lib/types'
 import { supabaseAdmin, supabaseConfig } from '@/lib/supabase'
+import { GUEST_DEVICE_ID } from '@/lib/constants'
 
-// Mock data for demo when Supabase not configured
-const DEMO_COLLARS = [
-  {
-    id: 'demo-collar-1',
-    user_id: 'demo-user',
-    name: 'Buddy\'s Collar',
-    mac_address: '00:1B:44:11:3A:B7',
-    paired_at: new Date().toISOString(),
-    last_seen: new Date(Date.now() - 300000).toISOString(), // 5 minutes ago
-    battery_level: 85,
-    is_active: true,
-    settings: {
-      alert_mode: 'BUZZER_VIBRATION',
-      sensitivity: 75,
-      auto_alerts: true
-    },
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  }
-]
+// Guest mode collar data
+const GUEST_COLLAR = {
+  id: GUEST_DEVICE_ID,
+  device_id: GUEST_DEVICE_ID,
+  name: 'Guest Collar',
+  mac_addr: '00:00:00:00:00:01',
+  owner_id: 'guest',
+  status: 'offline',
+  battery_level: 100,
+  firmware_ver: '1.0.0',
+  last_seen: new Date().toISOString(),
+  settings: {
+    alert_mode: 'BUZZER',
+    sensitivity: 50,
+    battery_threshold: 20,
+    heartbeat_interval: 30,
+    location_accuracy: 'MEDIUM',
+  },
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString()
+}
 
 export async function GET(request: NextRequest) {
   try {
     // Check if Supabase is configured
     if (!supabaseConfig.hasServiceKey || !supabaseAdmin) {
-      console.log('⚠️ Supabase admin not configured, using mock data')
-      return NextResponse.json(DEMO_COLLARS)
+      console.log('⚠️ Supabase admin not configured, using guest mode')
+      return NextResponse.json([GUEST_COLLAR])
     }
 
     // Check authentication with Next.js 15 compatible approach
@@ -38,13 +40,13 @@ export async function GET(request: NextRequest) {
       const authResult = await auth()
       userId = authResult?.userId || null
     } catch (error) {
-      console.log('⚠️ Auth not available, using demo data')
+      console.log('⚠️ Auth not available, using guest mode')
     }
 
-    // If no authenticated user, return demo data
+    // If no authenticated user, return guest collar
     if (!userId) {
-      console.log('📋 No authenticated user, returning demo collars')
-      return NextResponse.json(DEMO_COLLARS)
+      console.log('📋 No authenticated user, returning guest collar')
+      return NextResponse.json([GUEST_COLLAR])
     }
 
     console.log('📋 Fetching collars for user:', userId)
@@ -53,21 +55,21 @@ export async function GET(request: NextRequest) {
     const { data: collars, error: fetchError } = await supabaseAdmin
       .from('collars')
       .select('*')
-      .eq('owner_id', userId) // Updated to match new schema
+      .eq('owner_id', userId)
       .order('created_at', { ascending: false })
 
     if (fetchError) {
       console.error('❌ Collars fetch error:', fetchError)
-      // Fallback to demo data
-      return NextResponse.json(DEMO_COLLARS)
+      // Fallback to guest mode
+      return NextResponse.json([GUEST_COLLAR])
     }
 
     console.log(`✅ Found ${collars?.length || 0} collars for user`)
 
-    // If no collars found, return demo collars
+    // If no collars found, return guest collar
     if (!collars || collars.length === 0) {
-      console.log('📋 No collars found, returning demo collars')
-      return NextResponse.json(DEMO_COLLARS)
+      console.log('📋 No collars found, returning guest collar')
+      return NextResponse.json([GUEST_COLLAR])
     }
 
     // Validate and return collars
@@ -84,14 +86,8 @@ export async function GET(request: NextRequest) {
 
   } catch (error: any) {
     console.error('❌ Get collars API error:', error)
-
-    return NextResponse.json(
-      { 
-        error: 'CollarsFetchFailed', 
-        message: error.message || 'Failed to fetch collars' 
-      },
-      { status: 500 }
-    )
+    // Fallback to guest mode on error
+    return NextResponse.json([GUEST_COLLAR])
   }
 }
 
@@ -117,4 +113,4 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     )
   }
-} 
+}

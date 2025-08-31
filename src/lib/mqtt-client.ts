@@ -6,6 +6,7 @@
  */
 
 import mqtt, { MqttClient, IClientOptions } from 'mqtt';
+import { MQTT_TOPICS, GUEST_DEVICE_ID } from './constants';
 
 // Check if MQTT environment variables are available
 const hasMqttConfig = () => {
@@ -43,37 +44,6 @@ const getMqttConfig = (): IClientOptions => {
     }
   };
 };
-
-// Topic scheme for collar communication (matches ESP32 firmware)
-export const MQTT_TOPICS = {
-  // Collar status (online/offline)
-  COLLAR_STATUS: (collarId: string) => `pet-collar/${collarId}/status`,
-  COLLAR_STATUS_WILDCARD: 'pet-collar/+/status',
-  
-  // Collar telemetry data (position, battery, sensors)
-  COLLAR_TELEMETRY: (collarId: string) => `pet-collar/${collarId}/telemetry`, 
-  COLLAR_TELEMETRY_WILDCARD: 'pet-collar/+/telemetry',
-  
-  // Additional firmware topics
-  COLLAR_ZONES: (collarId: string) => `pet-collar/${collarId}/zones`,
-  COLLAR_ZONES_WILDCARD: 'pet-collar/+/zones',
-  COLLAR_LOCATION: (collarId: string) => `pet-collar/${collarId}/location`,
-  COLLAR_LOCATION_WILDCARD: 'pet-collar/+/location',
-  COLLAR_BEACONS: (collarId: string) => `pet-collar/${collarId}/beacon-detection`,
-  COLLAR_BEACONS_WILDCARD: 'pet-collar/+/beacon-detection',
-  COLLAR_ALERTS: (collarId: string) => `pet-collar/${collarId}/alert`,
-  COLLAR_ALERTS_WILDCARD: 'pet-collar/+/alert',
-  
-  // Commands to collar
-  COLLAR_COMMAND_BUZZ: (collarId: string) => `pet-collar/${collarId}/command/buzz`,
-  COLLAR_COMMAND_ZONE: (collarId: string) => `pet-collar/${collarId}/command/zone`,
-  COLLAR_COMMAND_LOCATE: (collarId: string) => `pet-collar/${collarId}/command/locate`,
-  COLLAR_COMMAND_LED: (collarId: string) => `pet-collar/${collarId}/command/led`,
-  COLLAR_COMMAND_SETTINGS: (collarId: string) => `pet-collar/${collarId}/command/settings`,
-  
-  // Web client status
-  WEB_STATUS: 'web/status'
-} as const;
 
 // Type definitions for MQTT messages
 export interface CollarTelemetryData {
@@ -212,18 +182,20 @@ export class CollarMQTTClient {
   private subscribeToCollarTopics() {
     if (!this.client || !this.isConnected) return;
     
+    // Subscribe to all collar topics with wildcards
     const topics = [
-      MQTT_TOPICS.COLLAR_STATUS_WILDCARD,
-      MQTT_TOPICS.COLLAR_TELEMETRY_WILDCARD,
-      MQTT_TOPICS.COLLAR_ZONES_WILDCARD,
-      MQTT_TOPICS.COLLAR_LOCATION_WILDCARD,
-      MQTT_TOPICS.COLLAR_BEACONS_WILDCARD,
-      MQTT_TOPICS.COLLAR_ALERTS_WILDCARD
+      'pet-collar/+/status',      // Any collar's status
+      'pet-collar/+/telemetry',   // Any collar's telemetry
+      'pet-collar/+/zones',       // Any collar's zones
+      'pet-collar/+/location',    // Any collar's location
+      'pet-collar/+/beacon-detection', // Any collar's beacon data
+      'pet-collar/+/alert'        // Any collar's alerts
     ];
     
     topics.forEach(topic => {
       this.client?.subscribe(topic, { qos: 1 }, (error: Error | null) => {
         if (error) {
+          console.error('MQTT subscribe error:', error);
         }
       });
     });
@@ -244,18 +216,32 @@ export class CollarMQTTClient {
       // Handle different message types
       if (topic.includes('/telemetry')) {
         const data: CollarTelemetryData = JSON.parse(messageStr);
-        this.onCollarTelemetry?.(collarId, data);
+        // Handle both guest mode and PetCollar-001
+        if (data.device_id === '001' || data.device_id === 'ESP32_PET_COLLAR' || data.device_id === 'PetCollar-001') {
+          console.log('📡 Received telemetry from collar:', data);
+          this.onCollarTelemetry?.(collarId, data);
+        }
       } else if (topic.includes('/status')) {
         const data: CollarStatusData = JSON.parse(messageStr);
-        this.onCollarStatus?.(collarId, data);
+        // Handle both guest mode and PetCollar-001
+        if (data.device_id === '001' || data.device_id === 'ESP32_PET_COLLAR' || data.device_id === 'PetCollar-001') {
+          console.log('📡 Received status from collar:', data);
+          this.onCollarStatus?.(collarId, data);
+        }
       } else if (topic.includes('/zones')) {
+        // Zone updates handled by separate component
       } else if (topic.includes('/location')) {
+        // Location updates handled by separate component
       } else if (topic.includes('/beacon-detection')) {
         // Parse beacon detection data
         const beaconData = JSON.parse(messageStr);
         
         // Validate required fields
         if (beaconData.beacon_name && beaconData.rssi !== undefined) {
+          // For guest mode, override device_id if it matches the pattern
+          if (beaconData.device_id === '001' || beaconData.device_id === 'ESP32_PET_COLLAR') {
+            beaconData.device_id = GUEST_DEVICE_ID;
+          }
           
           // Call the beacon detection handler
           const processedBeacon = {
@@ -269,12 +255,13 @@ export class CollarMQTTClient {
           };
           
           this.onCollarBeaconDetection?.(collarId, processedBeacon);
-          
         }
       } else if (topic.includes('/alert')) {
+        // Alert handling in separate component
       }
       
     } catch (error) {
+      console.error('MQTT message handling error:', error);
     }
   }
 
@@ -299,6 +286,7 @@ export class CollarMQTTClient {
     
     this.client.publish(topic, payload, { qos: 1 }, (error?: Error) => {
       if (error) {
+        console.error('MQTT publish error:', error);
       }
     });
     
@@ -315,6 +303,7 @@ export class CollarMQTTClient {
     
     this.client.publish(topic, payload, { qos: 1 }, (error) => {
       if (error) {
+        console.error('MQTT publish error:', error);
       }
     });
     
@@ -331,6 +320,7 @@ export class CollarMQTTClient {
       
       this.client.publish(topic, payload, { qos: 1, ...options }, (error) => {
         if (error) {
+          console.error('MQTT publish error:', error);
           resolve(false);
         } else {
           resolve(true);
@@ -400,4 +390,4 @@ export function destroyMQTTClient() {
     mqttClient.destroy();
     mqttClient = null;
   }
-} 
+}
