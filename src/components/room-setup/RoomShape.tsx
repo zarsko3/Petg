@@ -2,7 +2,23 @@
 
 import React, { useCallback, useRef } from 'react'
 import { Group, Line, Circle, Text } from 'react-konva'
-import { Room, snapToGrid } from '@/components/context/FloorPlanContext'
+// Temporarily not using context - using mock implementations
+// import { Room, snapToGrid } from '@/components/context/FloorPlanContext'
+
+// Mock implementations
+interface Point2D {
+  x: number
+  y: number
+}
+
+interface Room {
+  id: string
+  name: string
+  points: Point2D[]
+  color: string
+}
+
+const snapToGrid = (x: number, y: number) => ({ x: Math.round(x / 10) * 10, y: Math.round(y / 10) * 10 })
 
 interface RoomShapeProps {
   room: Room

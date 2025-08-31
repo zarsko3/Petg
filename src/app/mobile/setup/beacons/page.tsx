@@ -1,5 +1,17 @@
 'use client'
 
+// Disable static pre-rendering for this page
+export const dynamic = "force-dynamic";
+
+// Safety: All client-side logic is properly wrapped
+// - No MQTT client usage (would need: if (typeof window !== "undefined"))
+// - No Clerk authentication (would need: const isSignedIn = false; const user = null;)
+// - All hooks (useState, useEffect, useCallback) run safely on client
+
+// Placeholder Clerk logic (currently disabled)
+// const isSignedIn = false;
+// const user = null;
+
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import dynamic from 'next/dynamic'
 // Temporarily not using context - using mock data instead
@@ -326,5 +338,4 @@ export default function BeaconSetupPage() {
   )
 }
 
-// Disable static generation for this page to avoid SSR issues
-export const dynamic = 'force-dynamic' 
+// Dynamic export moved to top of file 

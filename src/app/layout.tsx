@@ -1,6 +1,7 @@
 import './globals.css'
 import type { Metadata, Viewport } from 'next'
-import { Inter } from 'next/font/google'
+// Temporarily disabled Google Fonts due to connectivity issues
+// import { Inter } from 'next/font/google'
 import { ThemeProvider } from '@/components/theme-provider'
 import { ToastProvider } from '@/components/toast-provider'
 import { ErrorBoundary } from '@/components/error-boundary'
@@ -11,7 +12,12 @@ import { ClerkProviderWrapper } from '@/components/clerk-provider-wrapper'
 import { RootLayoutClient } from '@/components/root-layout-client'
 
 
-const inter = Inter({ subsets: ['latin'] })
+// Temporarily using system font as fallback
+// const inter = Inter({ subsets: ['latin'] })
+const inter = {
+  className: 'font-sans', // Use system sans-serif font
+  style: {}
+}
 
 export const viewport: Viewport = {
   width: 'device-width',

@@ -1,7 +1,8 @@
 'use client'
 
 import './mobile-globals.css'
-import { Inter } from 'next/font/google'
+// Temporarily disabled Google Fonts due to connectivity issues
+// import { Inter } from 'next/font/google'
 import { ThemeProvider } from '@/components/theme-provider'
 import { CollarServiceProvider } from '@/components/collar-service-provider'
 import { Toaster } from 'sonner'
@@ -9,7 +10,12 @@ import BottomNavBar from '@/components/mobile/bottom-nav-bar'
 import HeaderBar from '@/components/mobile/header-bar'
 import { PWAInstallPrompt } from '@/components/pwa-install-prompt'
 
-const inter = Inter({ subsets: ['latin'] })
+// Temporarily using system font as fallback
+// const inter = Inter({ subsets: ['latin'] })
+const inter = {
+  className: 'font-sans', // Use system sans-serif font
+  style: {}
+}
 
 export default function MobileLayout({
   children,
