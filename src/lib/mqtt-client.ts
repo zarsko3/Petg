@@ -150,53 +150,41 @@ export class CollarMQTTClient {
   private connect() {
     try {
       this.isConnecting = true;
-      const config = getMqttConfig();
-      
-      // Use WebSocket protocol (wss://) for browser clients
-      // Construct WebSocket URL using environment variables directly
+      // Construct WebSocket URL with /mqtt suffix
       const url = `wss://${process.env.NEXT_PUBLIC_MQTT_HOST}:${process.env.NEXT_PUBLIC_MQTT_PORT}/mqtt`;
+      const clientId = `web-client-${Math.random().toString(16).substr(2, 8)}`;
+      
       console.log('🔌 Connecting to MQTT broker:', {
         url,
         username: process.env.NEXT_PUBLIC_MQTT_USER,
-        clientId: config.clientId,
-        protocol: 'wss',
-        port: process.env.NEXT_PUBLIC_MQTT_PORT
+        clientId,
+        protocol: 'wss'
       });
 
-      // Connection options optimized for WebSocket Secure
+      // Simple connection options as specified
       const connectOptions: IClientOptions = {
         username: process.env.NEXT_PUBLIC_MQTT_USER,
         password: process.env.NEXT_PUBLIC_MQTT_PASS,
-        clientId: `web-client-${Math.random().toString(16).substr(2, 8)}`,
         protocol: 'wss',
-        keepalive: 30,            // Keepalive interval in seconds
-        reconnectPeriod: 5000,    // Reconnect every 5 seconds
-        connectTimeout: 10000,     // Wait 10 seconds before timing out
-        rejectUnauthorized: true,  // Verify TLS certificate
-        clean: true,              // Start with a clean session
-        qos: 1,                   // Default QoS for better reliability
-        will: {                   // Last Will & Testament
-          topic: MQTT_TOPICS.WEB_STATUS,
-          payload: JSON.stringify({
-            status: 'offline',
-            timestamp: Date.now(),
-            client_id: `web-client-${Math.random().toString(16).substr(2, 8)}`
-          }),
-          qos: 1,
-          retain: true
-        }
+        clean: true,
+        connectTimeout: 4000,
+        clientId: `web-client-${Math.random().toString(16).substr(2, 8)}`
       };
       
       this.client = mqtt.connect(url, connectOptions);
       
-      this.client.on('connect', (connack) => {
+      this.client.on('connect', () => {
         this.isConnected = true;
         this.isConnecting = false;
         
-        console.log('✅ MQTT Connected:', {
-          sessionPresent: connack.sessionPresent,
-          returnCode: connack.returnCode,
-          clientId: this.client?.options.clientId
+        console.log('✅ MQTT Connected successfully:', {
+          url: url,
+          clientId: this.client?.options.clientId,
+          topics: [
+            'pet-collar/+/status',
+            'pet-collar/+/telemetry',
+            'pet-collar/+/command/+'
+          ]
         });
         
         // Subscribe to collar topics
@@ -223,12 +211,11 @@ export class CollarMQTTClient {
       });
       
       this.client.on('error', (error: Error) => {
-        console.error('❌ MQTT client error:', {
-          message: error.message,
-          stack: error.stack,
+        console.error('❌ MQTT Connection Error:', {
+          error: error.message,
+          url: url,
           clientId: this.client?.options.clientId,
-          connected: this.isConnected,
-          connecting: this.isConnecting
+          username: process.env.NEXT_PUBLIC_MQTT_USER
         });
         
         this.isConnected = false;
