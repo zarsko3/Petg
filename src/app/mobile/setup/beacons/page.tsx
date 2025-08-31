@@ -1,43 +1,46 @@
-'use client'
+'use client';
 
-// Disable static pre-rendering for this page
-export const dynamic = "force-dynamic";
-
-// Safety: All client-side logic is properly wrapped
-// - No MQTT client usage (would need: if (typeof window !== "undefined"))
-// - No Clerk authentication (would need: const isSignedIn = false; const user = null;)
-// - All hooks (useState, useEffect, useCallback) run safely on client
-
-// Placeholder Clerk logic (currently disabled)
-// const isSignedIn = false;
-// const user = null;
+// This is the simplest approach - a pure client component
+// with dynamic imports for any components that use browser APIs
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import dynamic from 'next/dynamic'
-// Temporarily not using context - using mock data instead
-// import { FloorPlanProvider, useFloorPlan, exportFloorPlan, importFloorPlan, downloadFloorPlan } from '@/components/context/FloorPlanContext'
 
-// Temporarily disable context usage to isolate the issue
-// function useFloorPlanSafe() {
-//   try {
-//     return useFloorPlan()
-//   } catch (error) {
-//     // Return safe defaults if context is not available
-//     return {
-//       state: {
-//         rooms: [],
-//         beacons: [],
-//         availableBeacons: []
-//       },
-//       dispatch: () => {}
-//     }
-//   }
-// }
+// Import BeaconCanvas with SSR disabled
+const BeaconCanvas = dynamic(() => import('@/components/room-setup/BeaconCanvas'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full flex items-center justify-center bg-gray-50">
+      <div className="text-center text-gray-400">
+        <div className="animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-violet-600 mx-auto mb-3"></div>
+        <p className="text-sm">Loading beacon placement...</p>
+      </div>
+    </div>
+  ),
+})
 
-// Import BeaconCanvas directly since we're using 'use client'
-import BeaconCanvas from '@/components/room-setup/BeaconCanvas'
+// Mock functions for floor plan operations
+const exportFloorPlan = (rooms: any, beacons: any) => {
+  return JSON.stringify({ rooms, beacons })
+}
 
-function BeaconSetupContent() {
+const importFloorPlan = (jsonData: string) => {
+  return JSON.parse(jsonData)
+}
+
+const downloadFloorPlan = (filename: string, data: any) => {
+  const blob = new Blob([data], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+export default function BeaconSetupPage() {
   // Temporarily use mock data instead of context
   const [mockState] = useState({
     rooms: [],
@@ -172,9 +175,9 @@ function BeaconSetupContent() {
             {/* Export/Import buttons */}
             <button
               onClick={handleExport}
-              disabled={state.rooms.length === 0}
+              disabled={mockState.rooms.length === 0}
               className={`px-3 py-2 rounded-lg font-medium transition-all text-sm ${
-                state.rooms.length > 0
+                mockState.rooms.length > 0
                   ? 'bg-blue-600 text-white hover:bg-blue-700'
                   : 'bg-gray-200 text-gray-400 cursor-not-allowed'
               }`}
@@ -321,11 +324,3 @@ function BeaconSetupContent() {
     </div>
   )
 }
-
-export default function BeaconSetupPage() {
-  return (
-    <BeaconSetupContent />
-  )
-}
-
-// Dynamic export moved to top of file 
