@@ -98,26 +98,18 @@ export default function HomePage() {
     
     try {
       const mqttClient = getMQTTClient();
-      const topic = 'pet-collar/001/command';
-      const payload = {
-        cmd: 'test-alert',
-        alertMode: 'both',  // Test both buzzer and vibration
-        durationMs: 1200,
-        intensity: 150
-      };
-
-      console.log(`📡 Sending test alert via MQTT to ${topic}:`, payload);
+      const collarId = 'PetCollar-001'; // Use the correct collar ID
       
-      const success = await mqttClient.publish(topic, JSON.stringify(payload));
+      // Send buzz command using the new Promise-based method
+      await mqttClient.sendBuzzCommand(collarId, {
+        duration_ms: 1200,
+        pattern: 'single'
+      });
       
-      if (success) {
-        toast.success('Test Alert Sent', {
-          description: 'Collar should buzz and vibrate for 1.2 seconds'
-        });
-        console.log('✅ Test alert sent successfully via MQTT');
-      } else {
-        throw new Error('Failed to publish MQTT message');
-      }
+      toast.success('Test Alert Sent', {
+        description: 'Collar should buzz for 1.2 seconds'
+      });
+      console.log('✅ Test alert sent successfully via MQTT');
       
     } catch (error) {
       console.error('Failed to send test alert:', error);

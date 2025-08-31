@@ -136,10 +136,27 @@ export class CollarMQTTClient {
   private connect() {
     try {
       const config = getMqttConfig();
+      
       // Use WebSocket protocol (wss://) for browser clients
       const url = `wss://${config.host}:${config.port}/mqtt`;
-      console.log('🔌 Connecting to MQTT broker:', url);
-      this.client = mqtt.connect(url, config);
+      console.log('🔌 Connecting to MQTT broker:', {
+        url,
+        username: config.username,
+        clientId: config.clientId,
+        protocol: config.protocol,
+        port: config.port
+      });
+
+      // Add connection options for better reliability
+      const connectOptions = {
+        ...config,
+        keepalive: 30,            // Keepalive interval in seconds
+        reconnectPeriod: 5000,    // Reconnect every 5 seconds
+        connectTimeout: 10000,     // Wait 10 seconds before timing out
+        rejectUnauthorized: true  // Verify TLS certificate
+      };
+      
+      this.client = mqtt.connect(url, connectOptions);
       
       this.client.on('connect', () => {
         this.isConnected = true;
@@ -163,9 +180,27 @@ export class CollarMQTTClient {
       });
       
       this.client.on('error', (error: Error) => {
+        console.error('❌ MQTT client error:', error);
         this.isConnected = false;
         this.onError?.(error);
         this.scheduleReconnect();
+      });
+
+      // Add more event handlers for debugging
+      this.client.on('close', () => {
+        console.log('🔌 MQTT connection closed');
+        this.isConnected = false;
+        this.onDisconnect?.();
+        this.scheduleReconnect();
+      });
+
+      this.client.on('reconnect', () => {
+        console.log('🔄 MQTT client reconnecting...');
+      });
+
+      this.client.on('offline', () => {
+        console.log('📴 MQTT client offline');
+        this.isConnected = false;
       });
       
       this.client.on('close', () => {
@@ -280,31 +315,46 @@ export class CollarMQTTClient {
   }
 
   // Public methods for sending commands
-  public sendBuzzCommand(collarId: string, command: CollarCommandBuzz): boolean {
-    if (!this.client || !this.isConnected) {
-      console.error('❌ Cannot send buzz command - MQTT client not connected');
-      return false;
-    }
-    
-    const topic = MQTT_TOPICS.COLLAR_COMMAND_BUZZ(collarId);
-    const payload = JSON.stringify(command);
-    
-    console.log('📡 Sending buzz command:', {
-      topic,
-      payload,
-      connected: this.isConnected,
-      clientId: this.client.options.clientId
-    });
-    
-    this.client.publish(topic, payload, { qos: 1 }, (error?: Error) => {
-      if (error) {
-        console.error('❌ MQTT publish error:', error);
-      } else {
-        console.log('✅ Buzz command sent successfully');
+  public sendBuzzCommand(collarId: string, command: CollarCommandBuzz): Promise<boolean> {
+    return new Promise((resolve, reject) => {
+      if (!this.client) {
+        console.error('❌ Cannot send buzz command - MQTT client not initialized');
+        reject(new Error('MQTT client not initialized'));
+        return;
+      }
+
+      if (!this.isConnected) {
+        console.error('❌ Cannot send buzz command - MQTT client not connected');
+        reject(new Error('MQTT client not connected'));
+        return;
+      }
+      
+      const topic = MQTT_TOPICS.COLLAR_COMMAND_BUZZ(collarId);
+      const payload = JSON.stringify(command);
+      
+      console.log('📡 Sending buzz command:', {
+        topic,
+        payload,
+        connected: this.isConnected,
+        clientId: this.client.options.clientId,
+        qos: 1
+      });
+      
+      try {
+        this.client.publish(topic, payload, { qos: 1 }, (error?: Error) => {
+          if (error) {
+            console.error('❌ MQTT publish error:', error);
+            reject(error);
+          } else {
+            console.log('✅ Buzz command sent successfully');
+            resolve(true);
+          }
+        });
+      } catch (error) {
+        console.error('❌ MQTT publish exception:', error);
+        reject(error);
       }
     });
-    
-    return true;
   }
 
   public sendLEDCommand(collarId: string, command: CollarCommandLED): boolean {
