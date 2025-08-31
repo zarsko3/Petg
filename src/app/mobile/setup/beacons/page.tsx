@@ -2,24 +2,25 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import dynamic from 'next/dynamic'
-import { FloorPlanProvider, useFloorPlan, exportFloorPlan, importFloorPlan, downloadFloorPlan } from '@/components/context/FloorPlanContext'
+// Temporarily not using context - using mock data instead
+// import { FloorPlanProvider, useFloorPlan, exportFloorPlan, importFloorPlan, downloadFloorPlan } from '@/components/context/FloorPlanContext'
 
-// Safe context hook wrapper for SSR compatibility
-function useFloorPlanSafe() {
-  try {
-    return useFloorPlan()
-  } catch (error) {
-    // Return safe defaults if context is not available
-    return {
-      state: {
-        rooms: [],
-        beacons: [],
-        availableBeacons: []
-      },
-      dispatch: () => {}
-    }
-  }
-}
+// Temporarily disable context usage to isolate the issue
+// function useFloorPlanSafe() {
+//   try {
+//     return useFloorPlan()
+//   } catch (error) {
+//     // Return safe defaults if context is not available
+//     return {
+//       state: {
+//         rooms: [],
+//         beacons: [],
+//         availableBeacons: []
+//       },
+//       dispatch: () => {}
+//     }
+//   }
+// }
 
 // Dynamically import BeaconCanvas to avoid SSR issues with Konva
 const BeaconCanvas = dynamic(() => import('@/components/room-setup/BeaconCanvas'), {
@@ -35,7 +36,17 @@ const BeaconCanvas = dynamic(() => import('@/components/room-setup/BeaconCanvas'
 })
 
 function BeaconSetupContent() {
-  const { state, dispatch } = useFloorPlanSafe()
+  // Temporarily use mock data instead of context
+  const [mockState] = useState({
+    rooms: [],
+    beacons: [],
+    availableBeacons: [
+      { id: 'beacon-1', name: 'Living Room Beacon', paired: true },
+      { id: 'beacon-2', name: 'Kitchen Beacon', paired: true },
+      { id: 'beacon-3', name: 'Bedroom Beacon', paired: true },
+    ]
+  })
+
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [importStatus, setImportStatus] = useState<string | null>(null)
   const [isClient, setIsClient] = useState(false)
@@ -45,25 +56,9 @@ function BeaconSetupContent() {
     setIsClient(true)
   }, [])
 
-  // Mock available beacons - in real app, fetch from Supabase
-  useEffect(() => {
-    const mockBeacons = [
-      { id: 'beacon-1', name: 'Living Room Beacon', paired: true },
-      { id: 'beacon-2', name: 'Kitchen Beacon', paired: true },
-      { id: 'beacon-3', name: 'Bedroom Beacon', paired: true },
-    ]
-    dispatch({ type: 'SET_AVAILABLE_BEACONS', beacons: mockBeacons })
-  }, [dispatch])
-
   const handleFinish = useCallback(() => {
-    // Safe check for state availability
-    if (!state || !state.availableBeacons || !state.beacons) {
-      alert('Floor plan state is not available. Please try again.')
-      return
-    }
-
-    const unplacedBeacons = state.availableBeacons.filter(
-      beacon => !state.beacons.find(placed => placed.beacon_id === beacon.id)
+    const unplacedBeacons = mockState.availableBeacons.filter(
+      beacon => !mockState.beacons.find(placed => placed.beacon_id === beacon.id)
     )
 
     if (unplacedBeacons.length > 0) {
@@ -78,19 +73,11 @@ function BeaconSetupContent() {
       alert('Floor plan saved! Redirecting to location page...')
       window.location.href = '/mobile/location'
     }
-  }, [state])
+  }, [mockState])
 
   const handleExport = useCallback(() => {
     try {
-      // Safe check for state availability
-      if (!state || !state.rooms || !state.beacons) {
-        if (typeof window !== 'undefined') {
-          alert('Floor plan state is not available. Please try again.')
-        }
-        return
-      }
-
-      const floorPlanData = exportFloorPlan(state.rooms, state.beacons)
+      const floorPlanData = exportFloorPlan(mockState.rooms, mockState.beacons)
       const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
       const filename = `complete-floor-plan-${timestamp}.json`
       downloadFloorPlan(filename, floorPlanData)
@@ -99,7 +86,7 @@ function BeaconSetupContent() {
         alert('Failed to export floor plan')
       }
     }
-  }, [state])
+  }, [mockState])
 
   const handleImport = useCallback(() => {
     fileInputRef.current?.click()
@@ -115,14 +102,8 @@ function BeaconSetupContent() {
         const jsonData = e.target?.result as string
         const importedData = importFloorPlan(jsonData)
 
-        // Safe dispatch with error handling
-        if (dispatch && typeof dispatch === 'function') {
-          dispatch({
-            type: 'LOAD_FLOOR_PLAN',
-            rooms: importedData.rooms || [],
-            beacons: importedData.beacons || []
-          })
-        }
+        // For now, just show success message since we're not using context
+        console.log('Floor plan imported:', importedData)
 
         setImportStatus('Floor plan imported successfully!')
         setTimeout(() => setImportStatus(null), 3000)
@@ -136,15 +117,15 @@ function BeaconSetupContent() {
 
     // Reset file input
     event.target.value = ''
-  }, [dispatch])
+  }, [])
 
-  // Safe state access with fallbacks
-  const canFinish = state?.availableBeacons?.every(
-    beacon => state?.beacons?.find(placed => placed.beacon_id === beacon.id)
+  // Use mock state data
+  const canFinish = mockState.availableBeacons.every(
+    beacon => mockState.beacons.find(placed => placed.beacon_id === beacon.id)
   ) || false
 
-  const unplacedBeacons = state?.availableBeacons?.filter(
-    beacon => !state?.beacons?.find(placed => placed.beacon_id === beacon.id)
+  const unplacedBeacons = mockState.availableBeacons.filter(
+    beacon => !mockState.beacons.find(placed => placed.beacon_id === beacon.id)
   ) || []
 
   // Only render on client side to prevent SSR issues
@@ -301,11 +282,11 @@ function BeaconSetupContent() {
       <div className="flex-shrink-0 bg-white border-t border-gray-200 px-4 py-3">
         <div className="flex items-center justify-between text-sm">
           <div className="text-gray-600">
-            {state?.beacons?.length || 0} of {state?.availableBeacons?.length || 0} beacons placed
+            {mockState.beacons.length} of {mockState.availableBeacons.length} beacons placed
           </div>
           {!canFinish && (
             <div className="text-amber-600 font-medium">
-              Place remaining {unplacedBeacons?.length || 0} beacon(s)
+              Place remaining {unplacedBeacons.length} beacon(s)
             </div>
           )}
           {canFinish && (
@@ -341,9 +322,7 @@ function BeaconSetupContent() {
 
 export default function BeaconSetupPage() {
   return (
-    <FloorPlanProvider>
-      <BeaconSetupContent />
-    </FloorPlanProvider>
+    <BeaconSetupContent />
   )
 }
 
