@@ -4,13 +4,29 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import { FloorPlanProvider, useFloorPlan, exportFloorPlan, importFloorPlan, downloadFloorPlan } from '@/components/context/FloorPlanContext'
 
-// Temporarily import BeaconCanvas directly to debug SSR issues
-import { BeaconCanvas } from '@/components/room-setup/BeaconCanvas'
+// Dynamically import BeaconCanvas to avoid SSR issues with Konva
+const BeaconCanvas = dynamic(() => import('@/components/room-setup/BeaconCanvas').then(mod => ({ default: mod.BeaconCanvas })), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full flex items-center justify-center bg-gray-50">
+      <div className="text-center text-gray-400">
+        <div className="animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-violet-600 mx-auto mb-3"></div>
+        <p className="text-sm">Loading beacon placement...</p>
+      </div>
+    </div>
+  ),
+})
 
 function BeaconSetupContent() {
   const { state, dispatch } = useFloorPlan()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [importStatus, setImportStatus] = useState<string | null>(null)
+  const [isClient, setIsClient] = useState(false)
+
+  // Ensure component only renders on client side
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
 
   // Mock available beacons - in real app, fetch from Supabase
   useEffect(() => {
@@ -34,7 +50,9 @@ function BeaconSetupContent() {
 
     // Save floor plan and navigate to location page
     alert('Floor plan saved! Redirecting to location page...')
-    window.location.href = '/mobile/location'
+    if (typeof window !== 'undefined') {
+      window.location.href = '/mobile/location'
+    }
   }, [state.availableBeacons, state.beacons])
 
   const handleExport = useCallback(() => {
@@ -90,6 +108,20 @@ function BeaconSetupContent() {
     beacon => !state.beacons.find(placed => placed.beacon_id === beacon.id)
   )
 
+  // Only render on client side to prevent SSR issues
+  if (!isClient) {
+    return (
+      <div className="flex flex-col h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center text-gray-400">
+            <div className="animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-violet-600 mx-auto mb-3"></div>
+            <p className="text-sm">Loading beacon setup...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col h-screen bg-gradient-to-br from-slate-50 to-blue-50">
       {/* Header */}
@@ -97,7 +129,7 @@ function BeaconSetupContent() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => window.history.back()}
+              onClick={() => typeof window !== 'undefined' && window.history.back()}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
