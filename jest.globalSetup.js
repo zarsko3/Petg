@@ -15,9 +15,9 @@ module.exports = async () => {
   process.env.NEXTAUTH_SECRET = 'test-secret';
   
   // Mock database URLs
-  process.env.MONGODB_URI = 'mongodb://localhost:27017/test-db';
   process.env.SUPABASE_URL = 'https://test.supabase.co';
   process.env.SUPABASE_ANON_KEY = 'test-anon-key';
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-key';
   
   // Mock Clerk keys
   process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = 'pk_test_mock';

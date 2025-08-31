@@ -2,7 +2,9 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // Environment variables needed for this application:
-// - MONGODB_URI: MongoDB connection string (e.g., mongodb://localhost:27017/petg-dev)
+// - NEXT_PUBLIC_SUPABASE_URL: Supabase project URL
+// - NEXT_PUBLIC_SUPABASE_ANON_KEY: Supabase anonymous key
+// - SUPABASE_SERVICE_ROLE_KEY: Supabase service role key (server-side only)
 // - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: Clerk public key for authentication
 // - CLERK_SECRET_KEY: Clerk secret key for authentication
 // - NEXT_PUBLIC_WEBSOCKET_URL: WebSocket server URL

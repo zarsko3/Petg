@@ -1,33 +1,93 @@
 import { NextRequest, NextResponse } from 'next/server';
-import dbConnect from '@/lib/dbConnect';
-import Pet from '@/models/Pet';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export async function GET(request: NextRequest) {
   try {
-    // Connect to the database
-    await dbConnect();
-    
     // Get the deviceId from query parameters
     const searchParams = request.nextUrl.searchParams;
     const deviceId = searchParams.get('deviceId');
-    
-    // If no deviceId is provided, return all pets
+
+    // If no deviceId is provided, return all collars with their latest location
     if (!deviceId) {
-      const pets = await Pet.find({}, 'name deviceId lastLocation batteryLevel');
-      return NextResponse.json({ success: true, data: pets });
+      const { data: collars, error } = await supabaseAdmin!
+        .from('collars')
+        .select(`
+          id,
+          name,
+          device_id,
+          battery_level,
+          collar_locations (
+            x,
+            y,
+            recorded_at
+          )
+        `)
+        .order('recorded_at', { foreignTable: 'collar_locations', ascending: false })
+        .limit(1, { foreignTable: 'collar_locations' });
+
+      if (error) {
+        console.error('Error fetching collars:', error);
+        return NextResponse.json(
+          { success: false, message: 'Failed to fetch collar data', error: error.message },
+          { status: 500 }
+        );
+      }
+
+      // Transform the data to match the expected format
+      const transformedData = collars?.map(collar => ({
+        name: collar.name,
+        deviceId: collar.device_id,
+        batteryLevel: collar.battery_level,
+        lastLocation: collar.collar_locations?.[0] ? {
+          x: collar.collar_locations[0].x,
+          y: collar.collar_locations[0].y,
+          timestamp: collar.collar_locations[0].recorded_at
+        } : undefined
+      })) || [];
+
+      return NextResponse.json({ success: true, data: transformedData });
     }
-    
-    // Find the pet with the matching deviceId
-    const pet = await Pet.findOne({ deviceId }, 'name lastLocation batteryLevel');
-    
-    if (!pet) {
+
+    // Find the collar with the matching deviceId and its latest location
+    const { data: collar, error: collarError } = await supabaseAdmin!
+      .from('collars')
+      .select(`
+        id,
+        name,
+        device_id,
+        battery_level,
+        collar_locations (
+          x,
+          y,
+          recorded_at
+        )
+      `)
+      .eq('device_id', deviceId)
+      .order('recorded_at', { foreignTable: 'collar_locations', ascending: false })
+      .limit(1, { foreignTable: 'collar_locations' })
+      .single();
+
+    if (collarError || !collar) {
+      console.error('Error fetching collar:', collarError);
       return NextResponse.json(
-        { success: false, message: 'Pet not found' },
+        { success: false, message: 'Collar not found' },
         { status: 404 }
       );
     }
-    
-    return NextResponse.json({ success: true, data: pet });
+
+    // Transform the data to match the expected format
+    const transformedCollar = {
+      name: collar.name,
+      deviceId: collar.device_id,
+      batteryLevel: collar.battery_level,
+      lastLocation: collar.collar_locations?.[0] ? {
+        x: collar.collar_locations[0].x,
+        y: collar.collar_locations[0].y,
+        timestamp: collar.collar_locations[0].recorded_at
+      } : undefined
+    };
+
+    return NextResponse.json({ success: true, data: transformedCollar });
   } catch (error) {
     console.error('Error fetching location:', error);
     return NextResponse.json(
@@ -39,41 +99,97 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // Connect to the database
-    await dbConnect();
-    
     // Parse the request body
     const body = await request.json();
     const { deviceId, x, y } = body;
-    
+
     if (!deviceId || typeof x !== 'number' || typeof y !== 'number') {
       return NextResponse.json(
         { success: false, message: 'Invalid request data' },
         { status: 400 }
       );
     }
-    
-    // Update the pet's location
-    const pet = await Pet.findOneAndUpdate(
-      { deviceId },
-      { 
-        lastLocation: {
-          x,
-          y,
-          timestamp: new Date()
-        }
-      },
-      { new: true }
-    );
-    
-    if (!pet) {
+
+    // First, find the collar by device_id
+    const { data: collar, error: findError } = await supabaseAdmin!
+      .from('collars')
+      .select('id, owner_id')
+      .eq('device_id', deviceId)
+      .single();
+
+    if (findError || !collar) {
+      console.error('Error finding collar:', findError);
       return NextResponse.json(
-        { success: false, message: 'Pet not found' },
+        { success: false, message: 'Collar not found' },
         { status: 404 }
       );
     }
-    
-    return NextResponse.json({ success: true, data: pet });
+
+    // Insert the new location
+    const { data: location, error: insertError } = await supabaseAdmin!
+      .from('collar_locations')
+      .insert({
+        collar_id: collar.id,
+        owner_id: collar.owner_id,
+        x: x,
+        y: y,
+        recorded_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error('Error inserting location:', insertError);
+      return NextResponse.json(
+        { success: false, message: 'Failed to update location data', error: insertError.message },
+        { status: 500 }
+      );
+    }
+
+    // Get the updated collar data
+    const { data: updatedCollar, error: fetchError } = await supabaseAdmin!
+      .from('collars')
+      .select(`
+        id,
+        name,
+        device_id,
+        battery_level,
+        collar_locations (
+          x,
+          y,
+          recorded_at
+        )
+      `)
+      .eq('device_id', deviceId)
+      .order('recorded_at', { foreignTable: 'collar_locations', ascending: false })
+      .limit(1, { foreignTable: 'collar_locations' })
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching updated collar:', fetchError);
+      return NextResponse.json(
+        { success: false, message: 'Location updated but failed to fetch updated data', error: fetchError.message },
+        { status: 500 }
+      );
+    }
+
+    // Transform the data to match the expected format
+    const transformedCollar = {
+      name: updatedCollar.name,
+      deviceId: updatedCollar.device_id,
+      batteryLevel: updatedCollar.battery_level,
+      lastLocation: updatedCollar.collar_locations?.[0] ? {
+        x: updatedCollar.collar_locations[0].x,
+        y: updatedCollar.collar_locations[0].y,
+        timestamp: updatedCollar.collar_locations[0].recorded_at
+      } : {
+        x: x,
+        y: y,
+        timestamp: new Date().toISOString()
+      }
+    };
+
+    return NextResponse.json({ success: true, data: transformedCollar });
   } catch (error) {
     console.error('Error updating location:', error);
     return NextResponse.json(
