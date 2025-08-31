@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import React, { useState, useCallback, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import { FloorPlanProvider, useFloorPlan, exportFloorPlan, importFloorPlan, downloadFloorPlan } from '@/components/context/FloorPlanContext'
 import { RoomList } from '@/components/room-setup/RoomList'

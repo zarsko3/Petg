@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useFloorPlan, snapToGrid, validateBeaconPlacement, isPointInRoom } from '@/components/context/FloorPlanContext'
 import { RoomShape } from './RoomShape'
 

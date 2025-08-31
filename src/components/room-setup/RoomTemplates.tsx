@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import React, { useEffect } from 'react'
 import { createRectanglePoints, createLShapePoints, createTShapePoints, createUShapePoints, Room } from '@/components/context/FloorPlanContext'
 
 interface RoomTemplate {

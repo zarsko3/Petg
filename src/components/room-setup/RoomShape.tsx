@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useRef } from 'react'
+import React, { useCallback, useRef } from 'react'
 import { Group, Line, Circle, Text } from 'react-konva'
 import { Room, snapToGrid } from '@/components/context/FloorPlanContext'
 

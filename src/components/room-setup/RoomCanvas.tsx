@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useFloorPlan, GRID_SIZE } from '@/components/context/FloorPlanContext'
 
 // Simple loading component that doesn't use any Konva
