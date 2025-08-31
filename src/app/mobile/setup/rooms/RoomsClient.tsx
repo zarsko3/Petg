@@ -56,7 +56,7 @@ function RoomSetupContent() {
       // Show error for 3 seconds
       setTimeout(() => setError(null), 3000)
     }
-  }, [])
+  }, [dispatch])
 
   const handleExport = useCallback(() => {
     try {
@@ -100,7 +100,7 @@ function RoomSetupContent() {
 
     // Reset file input
     event.target.value = ''
-  }, [])
+  }, [dispatch])
 
   const canProceed = state.rooms.length > 0
 
@@ -225,11 +225,23 @@ function RoomSetupContent() {
 
       {/* Error Message */}
       {error && (
-        <div className="fixed top-4 left-4 right-4 z-50 bg-red-500 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3">
+        <div className={`fixed top-4 left-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 ${
+          error.includes('successfully')
+            ? 'bg-green-500 text-white'
+            : 'bg-red-500 text-white'
+        }`}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="m15 9-6 6"/>
-            <path d="m9 9 6 6"/>
+            {error.includes('successfully') ? (
+              <>
+                <path d="M20 6L9 17l-5-5"/>
+              </>
+            ) : (
+              <>
+                <circle cx="12" cy="12" r="10"/>
+                <path d="m15 9-6 6"/>
+                <path d="m9 9 6 6"/>
+              </>
+            )}
           </svg>
           <p className="text-sm font-medium">{error}</p>
         </div>

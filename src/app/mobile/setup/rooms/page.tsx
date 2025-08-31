@@ -1,14 +1,9 @@
-// Server component that only does dynamic import with SSR disabled
-// This ensures no client code runs during build
+'use client';
 
-// Force dynamic rendering
-export const dynamic = "force-dynamic";
-
-import dynamic from 'next/dynamic'
+import dynamic from "next/dynamic";
 
 // Dynamically import the client component with SSR disabled
-// This ensures all React hooks, Clerk auth, and browser APIs only run on client
-const RoomsClient = dynamic(() => import('./RoomsClient'), {
+const RoomsClient = dynamic(() => import("./RoomsClient"), {
   ssr: false,
   loading: () => (
     <div className="flex items-center justify-center min-h-screen bg-gray-50">
@@ -18,9 +13,9 @@ const RoomsClient = dynamic(() => import('./RoomsClient'), {
       </div>
     </div>
   ),
-})
+});
 
-// Simple server component that just renders the client component
-export default function RoomSetupPage() {
-  return <RoomsClient />
+// Simple client component that renders the dynamic import
+export default function Page() {
+  return <RoomsClient />;
 }
