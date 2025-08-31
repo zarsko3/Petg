@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { hasMqttConfig } from '@/lib/mqtt-client';
 import { getMQTTClient } from '@/lib/mqtt-client';
+import { MQTTTestButton } from '@/components/mqtt-test-button';
 
 export default function MQTTEnvDebugPage() {
   const [mqttConfigStatus, setMqttConfigStatus] = useState<boolean | null>(null);
@@ -86,14 +87,27 @@ export default function MQTTEnvDebugPage() {
           <h2 className="text-lg font-semibold mb-4">MQTT Connection Status</h2>
           {mqttConnectionStatus && (
             <div className={`p-4 rounded-lg ${
-              mqttConnectionStatus.connected ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'
+              mqttConnectionStatus.connected
+                ? 'bg-green-50 dark:bg-green-900/20'
+                : mqttConnectionStatus.connecting
+                ? 'bg-yellow-50 dark:bg-yellow-900/20'
+                : 'bg-red-50 dark:bg-red-900/20'
             }`}>
               <div className="flex items-center gap-2 mb-2">
                 <div className={`h-3 w-3 rounded-full ${
-                  mqttConnectionStatus.connected ? 'bg-green-500' : 'bg-red-500'
+                  mqttConnectionStatus.connected
+                    ? 'bg-green-500'
+                    : mqttConnectionStatus.connecting
+                    ? 'bg-yellow-500 animate-pulse'
+                    : 'bg-red-500'
                 }`} />
                 <span className="font-medium">
-                  {mqttConnectionStatus.connected ? '✅ Connected' : '❌ Not Connected'}
+                  {mqttConnectionStatus.connected
+                    ? '✅ Connected'
+                    : mqttConnectionStatus.connecting
+                    ? '🔄 Connecting...'
+                    : '❌ Not Connected'
+                  }
                 </span>
               </div>
               {mqttConnectionStatus.client_id && (
@@ -108,6 +122,15 @@ export default function MQTTEnvDebugPage() {
               )}
             </div>
           )}
+        </div>
+
+        {/* Test Button */}
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold mb-4">MQTT Connection Test</h2>
+          <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+            <p className="text-sm mb-4">Click the button below to test MQTT connection and send a command:</p>
+            <MQTTTestButton />
+          </div>
         </div>
 
         {/* Instructions */}

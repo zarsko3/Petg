@@ -108,6 +108,7 @@ export interface CollarCommandLED {
 export class CollarMQTTClient {
   private client: MqttClient | null = null;
   private isConnected = false;
+  private isConnecting = false;
   private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   
   // Event handlers
@@ -140,6 +141,7 @@ export class CollarMQTTClient {
 
   private connect() {
     try {
+      this.isConnecting = true;
       const config = getMqttConfig();
       
       // Use WebSocket protocol (wss://) for browser clients
@@ -165,6 +167,7 @@ export class CollarMQTTClient {
       
       this.client.on('connect', () => {
         this.isConnected = true;
+        this.isConnecting = false;
         
         // Subscribe to collar topics
         this.subscribeToCollarTopics();
@@ -187,6 +190,7 @@ export class CollarMQTTClient {
       this.client.on('error', (error: Error) => {
         console.error('❌ MQTT client error:', error);
         this.isConnected = false;
+        this.isConnecting = false;
         this.onError?.(error);
         this.scheduleReconnect();
       });
@@ -195,17 +199,20 @@ export class CollarMQTTClient {
       this.client.on('close', () => {
         console.log('🔌 MQTT connection closed');
         this.isConnected = false;
+        this.isConnecting = false;
         this.onDisconnect?.();
         this.scheduleReconnect();
       });
 
       this.client.on('reconnect', () => {
         console.log('🔄 MQTT client reconnecting...');
+        this.isConnecting = true;
       });
 
       this.client.on('offline', () => {
         console.log('📴 MQTT client offline');
         this.isConnected = false;
+        this.isConnecting = false;
       });
       
       this.client.on('close', () => {
@@ -408,17 +415,20 @@ export class CollarMQTTClient {
     });
   }
 
-  public getConnectionStatus(): { connected: boolean; client_id?: string } {
+  public getConnectionStatus(): { connected: boolean; connecting: boolean; client_id?: string; error?: string } {
     try {
       const config = getMqttConfig();
       return {
         connected: this.isConnected,
+        connecting: this.isConnecting,
         client_id: config.clientId
       };
-    } catch {
+    } catch (error: any) {
       return {
         connected: false,
-        client_id: undefined
+        connecting: false,
+        client_id: undefined,
+        error: error.message
       };
     }
   }
