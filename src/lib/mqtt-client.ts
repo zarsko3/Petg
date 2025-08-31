@@ -5,7 +5,7 @@
  * the need for WebSocket tunneling from private networks.
  */
 
-import mqtt, { MqttClient, IClientOptions } from 'mqtt/dist/mqtt.min.js';
+import mqtt, { MqttClient, IClientOptions } from 'mqtt';
 import { MQTT_TOPICS, GUEST_DEVICE_ID } from './constants';
 
 // Freeze environment variables at module load
@@ -141,20 +141,25 @@ export class CollarMQTTClient {
   }) => void;
 
   constructor() {
-    // Only connect in browser environment
+    // Only connect in browser environment with dynamic import
     if (typeof window !== 'undefined') {
-      // Check if MQTT configuration is available
-      if (!hasMqttConfig()) {
-        console.warn('⚠️ MQTT configuration not available. Check environment variables.');
-        return;
-      }
+      // Ensure mqtt module is loaded in browser
+      import('mqtt').then(() => {
+        // Check if MQTT configuration is available
+        if (!hasMqttConfig()) {
+          console.warn('⚠️ MQTT configuration not available. Check environment variables.');
+          return;
+        }
 
-      // Connect if configuration is available
-      this.connect();
+        // Connect if configuration is available
+        this.connect();
+      }).catch(error => {
+        console.error('❌ Failed to load MQTT client:', error);
+      });
     }
   }
 
-  private connect() {
+  private async connect() {
     // Do not run on the server
     if (typeof window === 'undefined') return;
 
@@ -171,7 +176,8 @@ export class CollarMQTTClient {
         protocol: 'wss'
       });
 
-      // Use config from getMqttConfig()
+      // Dynamically import MQTT client
+      const { default: mqtt } = await import('mqtt');
       this.client = mqtt.connect(url, cfg);
       
       this.client.on('connect', () => {
