@@ -6,18 +6,8 @@ import { FloorPlanProvider, useFloorPlan, exportFloorPlan, importFloorPlan, down
 import { RoomList } from '@/components/room-setup/RoomList'
 import { RoomTemplates } from '@/components/room-setup/RoomTemplates'
 
-// Dynamically import RoomCanvas to avoid SSR issues with Konva
-const RoomCanvas = dynamic(() => import('@/components/room-setup/RoomCanvas').then(mod => ({ default: mod.RoomCanvas })), {
-  ssr: false,
-  loading: () => (
-    <div className="w-full h-full flex items-center justify-center bg-gray-50">
-      <div className="text-center text-gray-400">
-        <div className="animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-violet-600 mx-auto mb-3"></div>
-        <p className="text-sm">Loading canvas...</p>
-      </div>
-    </div>
-  ),
-})
+// Temporarily import RoomCanvas directly to debug SSR issues
+import { RoomCanvas } from '@/components/room-setup/RoomCanvas'
 
 function RoomSetupContent() {
   const { state, dispatch } = useFloorPlan()
@@ -237,4 +227,7 @@ export default function RoomSetupPage() {
       <RoomSetupContent />
     </FloorPlanProvider>
   )
-} 
+}
+
+// Disable static generation for this page to avoid SSR issues
+export const dynamic = 'force-dynamic' 

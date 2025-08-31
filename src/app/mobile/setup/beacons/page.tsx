@@ -4,18 +4,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import { FloorPlanProvider, useFloorPlan, exportFloorPlan, importFloorPlan, downloadFloorPlan } from '@/components/context/FloorPlanContext'
 
-// Dynamically import beacon canvas to avoid SSR issues
-const BeaconCanvas = dynamic(() => import('@/components/room-setup/BeaconCanvas').then(mod => ({ default: mod.BeaconCanvas })), {
-  ssr: false,
-  loading: () => (
-    <div className="w-full h-full flex items-center justify-center bg-gray-50">
-      <div className="text-center text-gray-400">
-        <div className="animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-violet-600 mx-auto mb-3"></div>
-        <p className="text-sm">Loading beacon placement...</p>
-      </div>
-    </div>
-  ),
-})
+// Temporarily import BeaconCanvas directly to debug SSR issues
+import { BeaconCanvas } from '@/components/room-setup/BeaconCanvas'
 
 function BeaconSetupContent() {
   const { state, dispatch } = useFloorPlan()
@@ -280,4 +270,7 @@ export default function BeaconSetupPage() {
       <BeaconSetupContent />
     </FloorPlanProvider>
   )
-} 
+}
+
+// Disable static generation for this page to avoid SSR issues
+export const dynamic = 'force-dynamic' 
