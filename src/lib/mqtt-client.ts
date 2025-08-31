@@ -26,9 +26,10 @@ const getMqttConfig = (): IClientOptions => {
     throw new Error('Missing required MQTT environment variables. Please check your .env.local file.');
   }
   
+  // Use WebSocket port 8884 for browser clients
   return {
     host: process.env.NEXT_PUBLIC_MQTT_HOST as string,
-    port: parseInt(process.env.NEXT_PUBLIC_MQTT_PORT as string),
+    port: 8884, // WebSocket port for HiveMQ Cloud
     protocol: 'wss', // WebSocket Secure for browser clients
     username: process.env.NEXT_PUBLIC_MQTT_USER as string,
     password: process.env.NEXT_PUBLIC_MQTT_PASS as string,
@@ -135,7 +136,10 @@ export class CollarMQTTClient {
   private connect() {
     try {
       const config = getMqttConfig();
-      this.client = mqtt.connect(config.protocol + '://' + config.host + ':' + config.port + '/mqtt', config);
+      // Use WebSocket protocol (wss://) for browser clients
+      const url = `wss://${config.host}:${config.port}/mqtt`;
+      console.log('🔌 Connecting to MQTT broker:', url);
+      this.client = mqtt.connect(url, config);
       
       this.client.on('connect', () => {
         this.isConnected = true;
@@ -278,15 +282,25 @@ export class CollarMQTTClient {
   // Public methods for sending commands
   public sendBuzzCommand(collarId: string, command: CollarCommandBuzz): boolean {
     if (!this.client || !this.isConnected) {
+      console.error('❌ Cannot send buzz command - MQTT client not connected');
       return false;
     }
     
     const topic = MQTT_TOPICS.COLLAR_COMMAND_BUZZ(collarId);
     const payload = JSON.stringify(command);
     
+    console.log('📡 Sending buzz command:', {
+      topic,
+      payload,
+      connected: this.isConnected,
+      clientId: this.client.options.clientId
+    });
+    
     this.client.publish(topic, payload, { qos: 1 }, (error?: Error) => {
       if (error) {
-        console.error('MQTT publish error:', error);
+        console.error('❌ MQTT publish error:', error);
+      } else {
+        console.log('✅ Buzz command sent successfully');
       }
     });
     
