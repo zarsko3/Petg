@@ -127,10 +127,15 @@ export class CollarMQTTClient {
   }) => void;
 
   constructor() {
-    // Only connect if MQTT configuration is available
-    if (hasMqttConfig()) {
-      this.connect();
+    // Check if MQTT configuration is available
+    if (!hasMqttConfig()) {
+      console.warn('⚠️ MQTT configuration not available. Please check environment variables.');
+      console.warn('Required variables: NEXT_PUBLIC_MQTT_HOST, NEXT_PUBLIC_MQTT_PORT, NEXT_PUBLIC_MQTT_USER, NEXT_PUBLIC_MQTT_PASS');
+      return;
     }
+
+    // Connect if configuration is available
+    this.connect();
   }
 
   private connect() {
@@ -317,15 +322,25 @@ export class CollarMQTTClient {
   // Public methods for sending commands
   public sendBuzzCommand(collarId: string, command: CollarCommandBuzz): Promise<boolean> {
     return new Promise((resolve, reject) => {
+      // Check if MQTT configuration is available
+      if (!hasMqttConfig()) {
+        const error = new Error('MQTT configuration missing. Please check environment variables.');
+        console.error('❌ Cannot send buzz command:', error.message);
+        reject(error);
+        return;
+      }
+
       if (!this.client) {
-        console.error('❌ Cannot send buzz command - MQTT client not initialized');
-        reject(new Error('MQTT client not initialized'));
+        const error = new Error('MQTT client not initialized. Configuration may be missing.');
+        console.error('❌ Cannot send buzz command:', error.message);
+        reject(error);
         return;
       }
 
       if (!this.isConnected) {
-        console.error('❌ Cannot send buzz command - MQTT client not connected');
-        reject(new Error('MQTT client not connected'));
+        const error = new Error('MQTT client not connected. Please check connection status.');
+        console.error('❌ Cannot send buzz command:', error.message);
+        reject(error);
         return;
       }
       
