@@ -97,22 +97,38 @@ export default function MobileDashboard() {
     try {
       const mqttClient = getMQTTClient()
       const collarId = 'PetCollar-001' // Use the correct collar ID
-      
+
       // Send buzz command using the new Promise-based method
       await mqttClient.sendBuzzCommand(collarId, {
         duration_ms: 1200,
         pattern: 'single'
       })
-      
+
       toast.success('Test Alert Sent', {
         description: 'Collar should buzz for 1.2 seconds'
       })
       console.log('✅ Test alert sent successfully via MQTT')
-      
-    } catch (error) {
+
+    } catch (error: any) {
       console.error('Failed to send test alert:', error)
-      toast.error('Failed to Send Test Alert', {
-        description: 'Please check collar connection and try again'
+
+      // Provide more specific error messages
+      let errorMessage = 'Please check collar connection and try again'
+      let errorDescription = error.message || 'Unknown error occurred'
+
+      if (error.message?.includes('configuration missing')) {
+        errorMessage = 'MQTT Configuration Missing'
+        errorDescription = 'Please check your environment variables'
+      } else if (error.message?.includes('not initialized')) {
+        errorMessage = 'MQTT Client Not Ready'
+        errorDescription = 'MQTT client is not properly initialized'
+      } else if (error.message?.includes('not connected')) {
+        errorMessage = 'MQTT Not Connected'
+        errorDescription = 'Please check your internet connection'
+      }
+
+      toast.error(errorMessage, {
+        description: errorDescription
       })
     } finally {
       setTimeout(() => setIsTesting(false), 2000)
