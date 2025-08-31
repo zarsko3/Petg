@@ -5,50 +5,55 @@
  * the need for WebSocket tunneling from private networks.
  */
 
-import mqtt, { MqttClient, IClientOptions } from 'mqtt';
+import mqtt, { MqttClient, IClientOptions } from 'mqtt/dist/mqtt.min.js';
 import { MQTT_TOPICS, GUEST_DEVICE_ID } from './constants';
 
+// Freeze environment variables at module load
+const ENV = {
+  HOST: process.env.NEXT_PUBLIC_MQTT_HOST,
+  PORT: process.env.NEXT_PUBLIC_MQTT_PORT,
+  USER: process.env.NEXT_PUBLIC_MQTT_USER,
+  PASS: process.env.NEXT_PUBLIC_MQTT_PASS,
+} as const;
+
 // Check if MQTT environment variables are available
-export const hasMqttConfig = () => {
-  const requiredMqttVars = [
-    'NEXT_PUBLIC_MQTT_HOST',
-    'NEXT_PUBLIC_MQTT_PORT',
-    'NEXT_PUBLIC_MQTT_USER',
-    'NEXT_PUBLIC_MQTT_PASS'
-  ];
+export const hasMqttConfig = (): boolean => {
+  const configStatus = {
+    host: !!ENV.HOST,
+    port: !!ENV.PORT,
+    user: !!ENV.USER,
+    pass: ENV.PASS ? true : false,
+  };
+
+  const hasAllConfig = Object.values(configStatus).every(Boolean);
   
-  const missingVars = requiredMqttVars.filter(key => !process.env[key]);
-  if (missingVars.length > 0) {
-    console.warn('⚠️ Missing MQTT environment variables:', missingVars.join(', '));
-    return false;
+  if (!hasAllConfig) {
+    console.warn('⚠️ MQTT config missing:', configStatus);
   }
   
-  return true;
+  return hasAllConfig;
 };
 
 // MQTT connection configuration (only created if env vars are available)
 const getMqttConfig = (): IClientOptions => {
   if (!hasMqttConfig()) {
-    throw new Error('Missing required MQTT environment variables. Please check your .env.local file.');
+    throw new Error('Missing required MQTT environment variables.');
   }
-  
-  // Use WebSocket port 8884 for browser clients
+
   return {
-    host: process.env.NEXT_PUBLIC_MQTT_HOST as string,
-    port: 8884, // WebSocket port for HiveMQ Cloud
-    protocol: 'wss', // WebSocket Secure for browser clients
-    username: process.env.NEXT_PUBLIC_MQTT_USER as string,
-    password: process.env.NEXT_PUBLIC_MQTT_PASS as string,
+    protocol: 'wss',
+    username: ENV.USER!,
+    password: ENV.PASS!,
     connectTimeout: 4000,
     clean: true,
-    clientId: `web-client-${Math.random().toString(16).substr(2, 8)}`,
-    // Last Will & Testament for web client
+    clientId: `web-client-${Math.random().toString(16).slice(2, 10)}`,
+    // LWT for the web client:
     will: {
       topic: 'web/status',
       payload: 'offline',
       qos: 1,
-      retain: true
-    }
+      retain: true,
+    },
   };
 };
 
@@ -136,42 +141,38 @@ export class CollarMQTTClient {
   }) => void;
 
   constructor() {
-    // Check if MQTT configuration is available
-    if (!hasMqttConfig()) {
-      console.warn('⚠️ MQTT configuration not available. Please check environment variables.');
-      console.warn('Required variables: NEXT_PUBLIC_MQTT_HOST, NEXT_PUBLIC_MQTT_PORT, NEXT_PUBLIC_MQTT_USER, NEXT_PUBLIC_MQTT_PASS');
-      return;
-    }
+    // Only connect in browser environment
+    if (typeof window !== 'undefined') {
+      // Check if MQTT configuration is available
+      if (!hasMqttConfig()) {
+        console.warn('⚠️ MQTT configuration not available. Check environment variables.');
+        return;
+      }
 
-    // Connect if configuration is available
-    this.connect();
+      // Connect if configuration is available
+      this.connect();
+    }
   }
 
   private connect() {
+    // Do not run on the server
+    if (typeof window === 'undefined') return;
+
     try {
       this.isConnecting = true;
-      // Construct WebSocket URL with /mqtt suffix
-      const url = `wss://${process.env.NEXT_PUBLIC_MQTT_HOST}:${process.env.NEXT_PUBLIC_MQTT_PORT}/mqtt`;
-      const clientId = `web-client-${Math.random().toString(16).substr(2, 8)}`;
+      const cfg = getMqttConfig();
+      // Important: include /mqtt for HiveMQ WS
+      const url = `wss://${ENV.HOST}:${ENV.PORT}/mqtt`;
       
       console.log('🔌 Connecting to MQTT broker:', {
         url,
-        username: process.env.NEXT_PUBLIC_MQTT_USER,
-        clientId,
+        username: ENV.USER,
+        clientId: cfg.clientId,
         protocol: 'wss'
       });
 
-      // Simple connection options as specified
-      const connectOptions: IClientOptions = {
-        username: process.env.NEXT_PUBLIC_MQTT_USER,
-        password: process.env.NEXT_PUBLIC_MQTT_PASS,
-        protocol: 'wss',
-        clean: true,
-        connectTimeout: 4000,
-        clientId: `web-client-${Math.random().toString(16).substr(2, 8)}`
-      };
-      
-      this.client = mqtt.connect(url, connectOptions);
+      // Use config from getMqttConfig()
+      this.client = mqtt.connect(url, cfg);
       
       this.client.on('connect', () => {
         this.isConnected = true;
@@ -385,56 +386,32 @@ export class CollarMQTTClient {
   }
 
   // Public methods for sending commands
-  public sendBuzzCommand(collarId: string, command: CollarCommandBuzz): Promise<boolean> {
-    return new Promise((resolve, reject) => {
-      // Check if MQTT configuration is available
-      if (!hasMqttConfig()) {
-        const error = new Error('MQTT configuration missing. Please check environment variables.');
-        console.error('❌ Cannot send buzz command:', error.message);
-        reject(error);
-        return;
-      }
+  public sendBuzzCommand(collarId: string, command: CollarCommandBuzz): boolean {
+    if (!hasMqttConfig()) {
+      console.error('❌ Cannot send buzz command: MQTT configuration missing.');
+      return false;
+    }
+    if (!this.client || !this.isConnected) {
+      console.error('❌ Cannot send buzz command: MQTT client not connected.');
+      return false;
+    }
 
-      if (!this.client) {
-        const error = new Error('MQTT client not initialized. Configuration may be missing.');
-        console.error('❌ Cannot send buzz command:', error.message);
-        reject(error);
-        return;
-      }
+    const topic = MQTT_TOPICS.COLLAR_COMMAND_BUZZ(collarId);
+    console.log('📡 Sending buzz command:', {
+      topic,
+      command,
+      clientId: this.client.options.clientId
+    });
 
-      if (!this.isConnected) {
-        const error = new Error('MQTT client not connected. Please check connection status.');
-        console.error('❌ Cannot send buzz command:', error.message);
-        reject(error);
-        return;
-      }
-      
-      const topic = MQTT_TOPICS.COLLAR_COMMAND_BUZZ(collarId);
-      const payload = JSON.stringify(command);
-      
-      console.log('📡 Sending buzz command:', {
-        topic,
-        payload,
-        connected: this.isConnected,
-        clientId: this.client.options.clientId,
-        qos: 1
-      });
-      
-      try {
-        this.client.publish(topic, payload, { qos: 1 }, (error?: Error) => {
-          if (error) {
-            console.error('❌ MQTT publish error:', error);
-            reject(error);
-          } else {
-            console.log('✅ Buzz command sent successfully');
-            resolve(true);
-          }
-        });
-      } catch (error) {
-        console.error('❌ MQTT publish exception:', error);
-        reject(error);
+    this.client.publish(topic, JSON.stringify(command), { qos: 1 }, (error?: Error) => {
+      if (error) {
+        console.error('❌ Failed to publish buzz command:', error);
+      } else {
+        console.log('✅ Buzz command sent successfully');
       }
     });
+
+    return true;
   }
 
   public sendLEDCommand(collarId: string, command: CollarCommandLED): boolean {
@@ -526,6 +503,10 @@ export class CollarMQTTClient {
 let mqttClient: CollarMQTTClient | null = null;
 
 export function getMQTTClient(): CollarMQTTClient {
+  // Prevent SSR instantiation
+  if (typeof window === 'undefined') {
+    throw new Error('MQTT client can only be used in the browser');
+  }
   if (!mqttClient) {
     mqttClient = new CollarMQTTClient();
   }
