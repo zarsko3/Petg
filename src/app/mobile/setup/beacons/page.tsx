@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic'
 import { FloorPlanProvider, useFloorPlan, exportFloorPlan, importFloorPlan, downloadFloorPlan } from '@/components/context/FloorPlanContext'
 
 // Dynamically import BeaconCanvas to avoid SSR issues with Konva
-const BeaconCanvas = dynamic(() => import('@/components/room-setup/BeaconCanvas').then(mod => ({ default: mod.BeaconCanvas })), {
+const BeaconCanvas = dynamic(() => import('@/components/room-setup/BeaconCanvas'), {
   ssr: false,
   loading: () => (
     <div className="w-full h-full flex items-center justify-center bg-gray-50">

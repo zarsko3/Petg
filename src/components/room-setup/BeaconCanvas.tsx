@@ -9,7 +9,7 @@ let Stage: any = null
 let Layer: any = null
 let Circle: any = null
 
-export function BeaconCanvas() {
+export default function BeaconCanvas() {
   const { state, dispatch } = useFloorPlan()
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 })
   const containerRef = useRef<HTMLDivElement>(null)
