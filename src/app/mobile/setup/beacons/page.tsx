@@ -4,6 +4,23 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import { FloorPlanProvider, useFloorPlan, exportFloorPlan, importFloorPlan, downloadFloorPlan } from '@/components/context/FloorPlanContext'
 
+// Safe context hook wrapper for SSR compatibility
+function useFloorPlanSafe() {
+  try {
+    return useFloorPlan()
+  } catch (error) {
+    // Return safe defaults if context is not available
+    return {
+      state: {
+        rooms: [],
+        beacons: [],
+        availableBeacons: []
+      },
+      dispatch: () => {}
+    }
+  }
+}
+
 // Dynamically import BeaconCanvas to avoid SSR issues with Konva
 const BeaconCanvas = dynamic(() => import('@/components/room-setup/BeaconCanvas'), {
   ssr: false,
@@ -18,7 +35,7 @@ const BeaconCanvas = dynamic(() => import('@/components/room-setup/BeaconCanvas'
 })
 
 function BeaconSetupContent() {
-  const { state, dispatch } = useFloorPlan()
+  const { state, dispatch } = useFloorPlanSafe()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [importStatus, setImportStatus] = useState<string | null>(null)
   const [isClient, setIsClient] = useState(false)
@@ -39,32 +56,50 @@ function BeaconSetupContent() {
   }, [dispatch])
 
   const handleFinish = useCallback(() => {
+    // Safe check for state availability
+    if (!state || !state.availableBeacons || !state.beacons) {
+      alert('Floor plan state is not available. Please try again.')
+      return
+    }
+
     const unplacedBeacons = state.availableBeacons.filter(
       beacon => !state.beacons.find(placed => placed.beacon_id === beacon.id)
     )
 
     if (unplacedBeacons.length > 0) {
-      alert(`Please place all beacons before finishing. Missing: ${unplacedBeacons.map(b => b.name).join(', ')}`)
+      if (typeof window !== 'undefined') {
+        alert(`Please place all beacons before finishing. Missing: ${unplacedBeacons.map(b => b.name).join(', ')}`)
+      }
       return
     }
 
     // Save floor plan and navigate to location page
-    alert('Floor plan saved! Redirecting to location page...')
     if (typeof window !== 'undefined') {
+      alert('Floor plan saved! Redirecting to location page...')
       window.location.href = '/mobile/location'
     }
-  }, [state.availableBeacons, state.beacons])
+  }, [state])
 
   const handleExport = useCallback(() => {
     try {
+      // Safe check for state availability
+      if (!state || !state.rooms || !state.beacons) {
+        if (typeof window !== 'undefined') {
+          alert('Floor plan state is not available. Please try again.')
+        }
+        return
+      }
+
       const floorPlanData = exportFloorPlan(state.rooms, state.beacons)
       const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
       const filename = `complete-floor-plan-${timestamp}.json`
       downloadFloorPlan(filename, floorPlanData)
     } catch (error: any) {
-      alert('Failed to export floor plan')
+      if (typeof window !== 'undefined') {
+        alert('Failed to export floor plan')
+      }
     }
-  }, [state.rooms, state.beacons])
+  }, [state])
 
   const handleImport = useCallback(() => {
     fileInputRef.current?.click()
@@ -80,17 +115,20 @@ function BeaconSetupContent() {
         const jsonData = e.target?.result as string
         const importedData = importFloorPlan(jsonData)
 
-        // Replace current floor plan with imported data
-        dispatch({
-          type: 'LOAD_FLOOR_PLAN',
-          rooms: importedData.rooms,
-          beacons: importedData.beacons
-        })
+        // Safe dispatch with error handling
+        if (dispatch && typeof dispatch === 'function') {
+          dispatch({
+            type: 'LOAD_FLOOR_PLAN',
+            rooms: importedData.rooms || [],
+            beacons: importedData.beacons || []
+          })
+        }
 
         setImportStatus('Floor plan imported successfully!')
         setTimeout(() => setImportStatus(null), 3000)
       } catch (error: any) {
-        setImportStatus(error.message || 'Failed to import floor plan')
+        const errorMessage = error?.message || 'Failed to import floor plan'
+        setImportStatus(errorMessage)
         setTimeout(() => setImportStatus(null), 5000)
       }
     }
@@ -98,15 +136,16 @@ function BeaconSetupContent() {
 
     // Reset file input
     event.target.value = ''
-  }, [])
+  }, [dispatch])
 
-  const canFinish = state.availableBeacons.every(
-    beacon => state.beacons.find(placed => placed.beacon_id === beacon.id)
-  )
+  // Safe state access with fallbacks
+  const canFinish = state?.availableBeacons?.every(
+    beacon => state?.beacons?.find(placed => placed.beacon_id === beacon.id)
+  ) || false
 
-  const unplacedBeacons = state.availableBeacons.filter(
-    beacon => !state.beacons.find(placed => placed.beacon_id === beacon.id)
-  )
+  const unplacedBeacons = state?.availableBeacons?.filter(
+    beacon => !state?.beacons?.find(placed => placed.beacon_id === beacon.id)
+  ) || []
 
   // Only render on client side to prevent SSR issues
   if (!isClient) {
@@ -129,7 +168,11 @@ function BeaconSetupContent() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => typeof window !== 'undefined' && window.history.back()}
+              onClick={() => {
+                if (typeof window !== 'undefined' && window.history) {
+                  window.history.back()
+                }
+              }}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -199,14 +242,14 @@ function BeaconSetupContent() {
           <div className="text-xs font-medium text-gray-600 text-center mb-2">
             Beacons
           </div>
-          {unplacedBeacons.map((beacon) => (
+          {unplacedBeacons?.map((beacon) => (
             <div
-              key={beacon.id}
+              key={beacon?.id || Math.random()}
               className="w-16 h-16 bg-gradient-to-br from-green-400 to-emerald-500 rounded-lg flex items-center justify-center text-white font-bold shadow-lg cursor-grab active:cursor-grabbing transition-all duration-200 hover:scale-105 active:scale-95"
-              title={beacon.name}
+              title={beacon?.name || 'Beacon'}
               draggable
               onDragStart={(e) => {
-                e.dataTransfer.setData('beacon-id', beacon.id)
+                e.dataTransfer.setData('beacon-id', beacon?.id || '')
                 e.dataTransfer.effectAllowed = 'move'
                 e.currentTarget.classList.add('dragging')
               }}
@@ -215,7 +258,7 @@ function BeaconSetupContent() {
               }}
               onTouchStart={(e) => {
                 // Store beacon ID for touch drag
-                e.currentTarget.setAttribute('data-beacon-id', beacon.id)
+                e.currentTarget.setAttribute('data-beacon-id', beacon?.id || '')
                 e.currentTarget.classList.add('touch-dragging')
                 // Add visual feedback
                 e.currentTarget.style.transform = 'scale(1.1)'
@@ -238,8 +281,8 @@ function BeaconSetupContent() {
               </svg>
             </div>
           ))}
-          
-          {unplacedBeacons.length === 0 && (
+
+          {(unplacedBeacons?.length === 0) && (
             <div className="text-xs text-gray-400 text-center">
               All placed!
             </div>
@@ -258,11 +301,11 @@ function BeaconSetupContent() {
       <div className="flex-shrink-0 bg-white border-t border-gray-200 px-4 py-3">
         <div className="flex items-center justify-between text-sm">
           <div className="text-gray-600">
-            {state.beacons.length} of {state.availableBeacons.length} beacons placed
+            {state?.beacons?.length || 0} of {state?.availableBeacons?.length || 0} beacons placed
           </div>
           {!canFinish && (
             <div className="text-amber-600 font-medium">
-              Place remaining {unplacedBeacons.length} beacon(s)
+              Place remaining {unplacedBeacons?.length || 0} beacon(s)
             </div>
           )}
           {canFinish && (

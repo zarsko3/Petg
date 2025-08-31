@@ -10,7 +10,23 @@ let Layer: any = null
 let Circle: any = null
 
 export default function BeaconCanvas() {
-  const { state, dispatch } = useFloorPlan()
+  // Safe context usage with error handling
+  let state: any = null
+  let dispatch: any = () => {}
+
+  try {
+    const context = useFloorPlan()
+    state = context.state
+    dispatch = context.dispatch
+  } catch (error) {
+    // Context not available, use default values
+    state = {
+      rooms: [],
+      beacons: [],
+      availableBeacons: []
+    }
+    dispatch = () => {}
+  }
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 })
   const containerRef = useRef<HTMLDivElement>(null)
   const [mounted, setMounted] = useState(false)
@@ -214,8 +230,20 @@ export default function BeaconCanvas() {
     )
   }
 
+  // Don't render if context is not available
+  if (!state) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-50 p-4">
+        <div className="text-center text-gray-400">
+          <div className="animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-violet-600 mx-auto mb-3"></div>
+          <p className="text-sm">Loading canvas...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div 
+    <div
       ref={containerRef}
       className="w-full h-full flex items-center justify-center bg-gray-50 p-4"
     >
