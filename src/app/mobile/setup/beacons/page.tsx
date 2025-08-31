@@ -34,18 +34,8 @@ import dynamic from 'next/dynamic'
 //   }
 // }
 
-// Dynamically import BeaconCanvas to avoid SSR issues with Konva
-const BeaconCanvas = dynamic(() => import('@/components/room-setup/BeaconCanvas'), {
-  ssr: false,
-  loading: () => (
-    <div className="w-full h-full flex items-center justify-center bg-gray-50">
-      <div className="text-center text-gray-400">
-        <div className="animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-violet-600 mx-auto mb-3"></div>
-        <p className="text-sm">Loading beacon placement...</p>
-      </div>
-    </div>
-  ),
-})
+// Import BeaconCanvas directly since we're using 'use client'
+import BeaconCanvas from '@/components/room-setup/BeaconCanvas'
 
 function BeaconSetupContent() {
   // Temporarily use mock data instead of context
