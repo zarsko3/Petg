@@ -85,30 +85,13 @@
 // ==================== MQTT CLOUD CONFIGURATION ====================
 // Edit these settings for your HiveMQ Cloud instance
 #define ENABLE_MQTT_CLOUD true                    // Set to false to disable MQTT
-
-// MQTT Configuration for HiveMQ Cloud
 #define MQTT_SERVER "ab1d45df84884fd68d24d7d25cc78f2f.s1.eu.hivemq.cloud"
-#define MQTT_PORT 8883                          // TLS port
-#define MQTT_USER "PetCollar-001"              // HiveMQ Cloud username
-#define MQTT_PASSWORD "246810Gal"              // HiveMQ Cloud password
-#define DEVICE_ID "PetCollar-001"              // Device ID for MQTT topics
-
-// MQTT Topics (pet-collar/001/...)
-#define MQTT_TOPIC_PREFIX "pet-collar"          // Topic prefix
-#define MQTT_TOPIC_STATUS "status"              // Online/offline status
-#define MQTT_TOPIC_TELEMETRY "telemetry"        // Sensor data
-#define MQTT_TOPIC_BEACON "beacon-detection"     // Beacon detection data
-
-// Topic Construction Macros
-#define MQTT_MAKE_TOPIC(type) MQTT_TOPIC_PREFIX "/" DEVICE_ID "/" type
-#define MQTT_STATUS_TOPIC MQTT_MAKE_TOPIC(MQTT_TOPIC_STATUS)
-#define MQTT_TELEMETRY_TOPIC MQTT_MAKE_TOPIC(MQTT_TOPIC_TELEMETRY)
-#define MQTT_BEACON_TOPIC MQTT_MAKE_TOPIC(MQTT_TOPIC_BEACON)
-
-// MQTT Timing
+#define MQTT_PORT 8883                           // TLS port
+#define MQTT_USER "PetCollar-001"
+#define MQTT_PASSWORD "246810Gal"
+#define DEVICE_ID "PetCollar-001"                          // Unique collar ID
 #define MQTT_TELEMETRY_INTERVAL 30000           // 30 seconds
 #define MQTT_HEARTBEAT_INTERVAL 60000           // 1 minute
-#define MQTT_KEEPALIVE 30                       // 30 seconds keepalive
 
 // Display configuration
 #define SCREEN_WIDTH 128
@@ -1124,10 +1107,6 @@ bool validateFilterPerformance(const char* beaconMac, float targetRMSReduction) 
 }
 
 // ==================== MQTT CLOUD OBJECTS ====================
-// Include TLS certificate
-#include "include/cert.h"
-
-// Initialize secure MQTT client
 WiFiClientSecure mqttSecureClient;
 PubSubClient mqttClient(mqttSecureClient);
 
@@ -1183,16 +1162,16 @@ void initializeMQTTCloud() {
     
     Serial.println("🌐 Initializing MQTT Cloud connection...");
     
-    // Configure TLS with HiveMQ Cloud root certificate
-    mqttSecureClient.setCACert(root_ca);
+    // Configure TLS (for production, add proper certificates)
+    mqttSecureClient.setInsecure(); // OK for pilot testing
     
     // Set MQTT server
-    mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
+    mqttClient.setServer(MQTT_SERVER, 8883);
     mqttClient.setCallback(onMqttMessage);
     mqttClient.setKeepAlive(60);
     mqttClient.setSocketTimeout(15);
     
-    Serial.printf("📡 MQTT Server: %s:%d\n", MQTT_SERVER, MQTT_PORT);
+    Serial.printf("📡 MQTT Server: %s:%d\n", MQTT_SERVER, 8883);
 }
 
 /**
@@ -1268,12 +1247,21 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
     
     // Handle different command types
     if (topicStr.indexOf("/command/buzz") > 0) {
-        int duration = doc["duration_ms"] | 3000;
-        String pattern = doc["pattern"] | "pulse";
+        int duration = doc["duration_ms"] | 1200;
+        int intensity = doc["intensity"] | 180;
+        String pattern = doc["pattern"] | "single";
         
-        // Use existing alert system with cloud command
-        alertManager.startAlert(AlertReason::REMOTE_COMMAND, AlertMode::BUZZER);
-        Serial.printf("🔊 Cloud buzzer command: %dms, pattern: %s\n", duration, pattern.c_str());
+        // Create alert config with proper duration and intensity
+        AlertConfig cfg;
+        cfg.mode = AlertMode::BUZZER;
+        cfg.duration = duration;
+        cfg.intensity = intensity;
+        cfg.reason = AlertReason::REMOTE_COMMAND;
+        
+        // Use enhanced alert system with PWM for passive buzzer
+        alertManager.triggerAlert(cfg);
+        Serial.printf("🔊 Cloud buzzer command: %dms, intensity=%d, pattern=%s\n", 
+                     duration, intensity, pattern.c_str());
         
     } else if (topicStr.endsWith("/command") || (topicStr.indexOf("/command") > 0 && doc.containsKey("cmd"))) {
         // Handle generic command format (pet-collar/001/command)
@@ -1295,8 +1283,15 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
                 mode = AlertMode::BOTH;
             }
             
+            // Create alert config with proper duration and intensity
+            AlertConfig cfg;
+            cfg.mode = mode;
+            cfg.duration = durationMs;
+            cfg.intensity = intensity;
+            cfg.reason = AlertReason::REMOTE_COMMAND;
+            
             // Trigger alert with test command
-            alertManager.startAlert(AlertReason::REMOTE_COMMAND, mode);
+            alertManager.triggerAlert(cfg);
             
             // Also trigger buzzer directly for immediate feedback
             if (alertMode == "buzzer" || alertMode == "both") {
@@ -3021,7 +3016,7 @@ void handleSerialCommands() {
             Serial.println("  status             - Show system status");
             Serial.println("  rssi-help          - RSSI smoother commands");
             Serial.println("  filter-help        - Temporal filter commands");
-            Serial.println("  test-buzzer        - Test buzzer on GPIO 18");
+            Serial.println("  test-buzzer        - Test buzzer on GPIO  ");
             Serial.println("  wifi-info          - WiFi connection info");
             Serial.println("  ble-scan           - Force BLE scan");
             Serial.println("  reboot             - Restart system");

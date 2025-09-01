@@ -540,7 +540,7 @@ void SystemStateManager::updateBatteryStatus() {
     // Read battery voltage and update percentage
     // Stub implementation for now
     systemStateImpl.lastBatteryUpdate = millis();
-}
+} 
 
 void SystemStateManager::updateProximityAlerts(int count) {
     systemStateImpl.proximityAlertCount += count;

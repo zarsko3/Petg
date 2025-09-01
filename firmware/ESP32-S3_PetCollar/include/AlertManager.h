@@ -20,6 +20,9 @@
 #include "MicroConfig.h"
 #include "BeaconTypes.h"
 
+// Forward declarations
+class AlertManager_Enhanced;
+
 // ==========================================
 // ALERT PATTERNS & DEFINITIONS
 // ==========================================
@@ -449,6 +452,19 @@ private:
     uint8_t vibrationPin;
     bool alertActive;
     
+    // LEDC / timing members
+    uint8_t  buzzerChannel   = 0;     // pick a free LEDC channel (0..7)
+    uint16_t defaultFreq     = 2000;  // 2 kHz is good for piezo
+    uint8_t  pwmResolution   = 8;     // 8-bit resolution
+    uint8_t  defaultDuty     = 180;   // 0..255 (~70%)
+    unsigned long alertEndTime   = 0;
+    uint32_t      currentDuration = 0;
+    AlertMode activeMode;       // Current alert mode
+    
+    // Helpers
+    void buzzOn(uint16_t freq, uint8_t duty);
+    void buzzOff();
+    
 public:
     AlertManager_Enhanced(uint8_t buzzerPin, uint8_t vibrationPin);
     
@@ -458,7 +474,13 @@ public:
     bool isAlertActive() const;
     bool initialize();
     bool triggerAlert(const AlertConfig& config);
-    bool startAlert(AlertReason reason, AlertMode mode = AlertMode::BOTH, int pattern = 1, int priority = 1, const String& customReason = "");
+    bool startAlert(
+        AlertReason reason,
+        AlertMode mode = AlertMode::BOTH,
+        int pattern = 1,
+        int priority = 1,
+        const String& customReason = ""
+    );
     
     // Utility functions
     AlertMode stringToAlertMode(const String& modeStr);

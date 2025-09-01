@@ -103,7 +103,8 @@ export default function HomePage() {
       // Send buzz command using the new Promise-based method
       await mqttClient.sendBuzzCommand(collarId, {
         duration_ms: 1200,
-        pattern: 'single'
+        pattern: 'single',
+        intensity: 180 // 0-255 for PWM duty cycle (70%)
       });
 
       toast.success('Test Alert Sent', {

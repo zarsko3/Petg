@@ -7,6 +7,7 @@
 
 import mqtt, { MqttClient, IClientOptions } from 'mqtt';
 import { MQTT_TOPICS, GUEST_DEVICE_ID } from './constants';
+import { getPersistentClientId } from './mqtt-persistence';
 
 // Freeze environment variables at module load
 const ENV = {
@@ -46,7 +47,7 @@ const getMqttConfig = (): IClientOptions => {
     password: ENV.PASS!,
     connectTimeout: 4000,
     clean: true,
-    clientId: `web-client-${Math.random().toString(16).slice(2, 10)}`,
+    clientId: getPersistentClientId(),
     // LWT for the web client:
     will: {
       topic: 'web/status',
@@ -107,6 +108,7 @@ export interface CollarStatusData {
 export interface CollarCommandBuzz {
   duration_ms: number;
   pattern?: 'single' | 'double' | 'triple';
+  intensity?: number; // 0-255 for PWM duty cycle
 }
 
 export interface CollarCommandLED {
@@ -392,32 +394,59 @@ export class CollarMQTTClient {
   }
 
   // Public methods for sending commands
-  public sendBuzzCommand(collarId: string, command: CollarCommandBuzz): boolean {
-    if (!hasMqttConfig()) {
-      console.error('❌ Cannot send buzz command: MQTT configuration missing.');
-      return false;
-    }
-    if (!this.client || !this.isConnected) {
-      console.error('❌ Cannot send buzz command: MQTT client not connected.');
-      return false;
-    }
+  public sendBuzzCommand(collarId: string, command: CollarCommandBuzz): Promise<boolean> {
+    return new Promise((resolve, reject) => {
+      if (!hasMqttConfig()) {
+        const error = new Error('MQTT configuration missing. Please check environment variables.');
+        console.error('❌ Cannot send buzz command:', error.message);
+        reject(error);
+        return;
+      }
 
-    const topic = MQTT_TOPICS.COLLAR_COMMAND_BUZZ(collarId);
-    console.log('📡 Sending buzz command:', {
-      topic,
-      command,
-      clientId: this.client.options.clientId
-    });
+      if (!this.client) {
+        const error = new Error('MQTT client not initialized. Configuration may be missing.');
+        console.error('❌ Cannot send buzz command:', error.message);
+        reject(error);
+        return;
+      }
 
-    this.client.publish(topic, JSON.stringify(command), { qos: 1 }, (error?: Error) => {
-      if (error) {
-        console.error('❌ Failed to publish buzz command:', error);
-      } else {
-        console.log('✅ Buzz command sent successfully');
+      if (!this.isConnected) {
+        const error = new Error('MQTT client not connected. Please check connection status.');
+        console.error('❌ Cannot send buzz command:', error.message);
+        reject(error);
+        return;
+      }
+      
+      // Topic must be: pet-collar/<id>/command/buzz
+      const topic = `pet-collar/${collarId}/command/buzz`;
+      const payload = JSON.stringify({
+        duration_ms: command.duration_ms || 1200,
+        pattern: command.pattern || 'single',
+        intensity: command.intensity || 180
+      });
+      
+      console.log('📡 Sending buzz command:', {
+        topic,
+        payload,
+        connected: this.isConnected,
+        clientId: this.client.options.clientId
+      });
+      
+      try {
+        this.client.publish(topic, payload, { qos: 1 }, (error?: Error) => {
+          if (error) {
+            console.error('❌ MQTT publish error:', error);
+            reject(error);
+          } else {
+            console.log('✅ Buzz command sent successfully');
+            resolve(true);
+          }
+        });
+      } catch (error) {
+        console.error('❌ MQTT publish exception:', error);
+        reject(error);
       }
     });
-
-    return true;
   }
 
   public sendLEDCommand(collarId: string, command: CollarCommandLED): boolean {
