@@ -32,6 +32,13 @@ private:
   unsigned long alertDurationMs = 0;
   AlertMode activeMode = AlertMode::NONE;
   
+  // Hardware timer for reliable auto-stop
+  hw_timer_t* stopTimer = nullptr;
+  static void IRAM_ATTR onStopTimer(void* arg);  // Timer ISR
+  void setupStopTimer();                         // Initialize timer
+  void scheduleAutoStop(unsigned long ms);       // Schedule auto-stop
+  void cancelAutoStop();                         // Cancel pending stop
+  
   // Helpers
   void buzzOn(uint16_t freq, uint8_t duty);
   void buzzOff();

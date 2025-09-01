@@ -45,6 +45,49 @@ void AlertManager_Enhanced::buzzOff() {
     Serial.println("🔇 Buzzer stopped and detached");
 }
 
+// Static pointer to instance for timer callback
+static AlertManager_Enhanced* gAlertManager = nullptr;
+
+// Timer ISR - must be IRAM_ATTR for hardware timer
+void IRAM_ATTR AlertManager_Enhanced::onStopTimer(void* arg) {
+    // Note: Can't use Serial.print in ISR
+    // Just set a flag that loop() will check
+    if (gAlertManager) {
+        gAlertManager->autoStop = true;
+    }
+}
+
+void AlertManager_Enhanced::setupStopTimer() {
+    // Initialize hardware timer (1MHz, count up)
+    stopTimer = timerBegin(0, 80, true);  // Timer 0, 80MHz/80=1MHz, count up
+    
+    // Attach ISR
+    timerAttachInterrupt(stopTimer, &AlertManager_Enhanced::onStopTimer, true);
+    
+    // Store instance pointer for ISR
+    gAlertManager = this;
+}
+
+void AlertManager_Enhanced::scheduleAutoStop(unsigned long ms) {
+    if (!stopTimer) return;
+    
+    // Cancel any pending alarm
+    cancelAutoStop();
+    
+    // Set new alarm (convert ms to microseconds)
+    timerAlarmWrite(stopTimer, ms * 1000, false);  // false = one-shot
+    timerAlarmEnable(stopTimer);
+    
+    Serial.printf("⏰ Auto-stop scheduled for %lums\n", ms);
+}
+
+void AlertManager_Enhanced::cancelAutoStop() {
+    if (!stopTimer) return;
+    
+    timerAlarmDisable(stopTimer);
+    Serial.println("⏰ Auto-stop cancelled");
+}
+
 bool AlertManager_Enhanced::initialize() {
     pinMode(buzzerPin, OUTPUT);
     pinMode(vibrationPin, OUTPUT);
@@ -69,18 +112,26 @@ bool AlertManager_Enhanced::initialize() {
     channel_conf.hpoint = 0;
     ledc_channel_config(&channel_conf);
 
+    // Initialize hardware timer for auto-stop
+    setupStopTimer();
+
     Serial.printf("🚨 Enhanced AlertManager initialized (LEDC ready on GPIO %d)\n", buzzerPin);
     return true;
 }
 
 bool AlertManager_Enhanced::triggerAlert(const AlertConfig& config) {
+    // Stop any existing alert
+    if (alertActive) {
+        stopAlert(true);
+    }
+
     alertActive = true;
     activeMode = config.mode;
 
-    // Schedule auto-stop
+    // Schedule auto-stop via loop check
     alertStartMs = millis();
     alertDurationMs = (config.duration > 0) ? (unsigned long)config.duration : 1200; // default 1.2s
-    autoStop = true;
+    autoStop = false;  // Will be set by timer ISR
 
     // BUZZER / BOTH -> play PWM tone
     if (config.mode == AlertMode::BUZZER || config.mode == AlertMode::BOTH) {
@@ -93,6 +144,9 @@ bool AlertManager_Enhanced::triggerAlert(const AlertConfig& config) {
     if (config.mode == AlertMode::VIBRATION || config.mode == AlertMode::BOTH) {
         digitalWrite(vibrationPin, HIGH);
     }
+
+    // Schedule hardware timer backup
+    scheduleAutoStop(alertDurationMs);
 
     Serial.printf("🚨 Enhanced alert triggered: mode=%d, intensity=%d, duration=%lums\n",
                  (int)config.mode, config.intensity, alertDurationMs);
@@ -117,17 +171,26 @@ bool AlertManager_Enhanced::startAlert(AlertReason reason, AlertMode mode, int p
 }
 
 bool AlertManager_Enhanced::update() {
-    if (alertActive && autoStop) {
-        unsigned long now = millis();
-        if (now - alertStartMs >= alertDurationMs) {
+    if (alertActive) {
+        // Check if timer ISR has set the auto-stop flag
+        if (autoStop) {
             Serial.printf("⏱️ Alert duration elapsed (%lums) - auto-stopping\n", alertDurationMs);
             stopAlert(/*force=*/true);
-        } else {
-            // For debugging: show remaining time
-            unsigned long remaining = alertEndTime - now;
-            if (remaining % 100 == 0) { // Log every 100ms
-                Serial.printf("⏳ Alert time remaining: %lums\n", remaining);
-            }
+            return false;
+        }
+
+        // Backup: also check millis() in case timer fails
+        unsigned long now = millis();
+        if (now - alertStartMs >= alertDurationMs) {
+            Serial.printf("⏱️ Alert duration elapsed (%lums) - loop auto-stop\n", alertDurationMs);
+            stopAlert(/*force=*/true);
+            return false;
+        }
+
+        // For debugging: show remaining time
+        unsigned long remaining = alertDurationMs - (now - alertStartMs);
+        if (remaining % 100 == 0) { // Log every 100ms
+            Serial.printf("⏳ Alert time remaining: %lums\n", remaining);
         }
     }
     return alertActive;
@@ -137,6 +200,9 @@ bool AlertManager_Enhanced::stopAlert(bool force) {
     if (alertActive || force) {
         alertActive = false;
         autoStop = false;
+        
+        // Cancel hardware timer
+        cancelAutoStop();
         
         // Stop PWM buzzer with LEDC
         buzzOff();
