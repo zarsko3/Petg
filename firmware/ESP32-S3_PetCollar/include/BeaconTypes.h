@@ -95,15 +95,18 @@ struct BeaconConfig {
  */
 struct AlertConfig {
     AlertMode mode;
-    uint8_t intensity;
-    uint16_t duration;
+    uint8_t intensity;      // 0-255 for PWM duty cycle
+    uint16_t duration;      // Duration in milliseconds
+    uint8_t pattern;        // 0=steady, 1=single, 2=double, etc.
     AlertReason reason;
+    String customReason;    // Optional description
     
     AlertConfig() : 
         mode(AlertMode::BOTH), 
-        intensity(128), 
-        duration(1000), 
-        reason(AlertReason::PROXIMITY_DETECTED) {}
+        intensity(180),     // Default ~70% duty cycle
+        duration(1200),     // Default 1.2s duration
+        pattern(0),         // Default steady pattern
+        reason(AlertReason::NONE) {}
 };
 
 /**

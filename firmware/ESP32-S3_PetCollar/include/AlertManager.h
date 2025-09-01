@@ -9,16 +9,7 @@
 // Forward declarations
 class AlertManager_Enhanced;
 
-/**
- * @brief Alert configuration structure
- */
-struct AlertConfig {
-  AlertMode mode;
-  int intensity = 180;  // Default ~70% duty cycle (0-255)
-  int duration = 1200;  // Default 1.2s duration
-  int pattern = 0;      // 0=steady, 1=single, 2=double, etc. (future)
-  AlertReason reason = AlertReason::NONE;
-};
+// AlertConfig is now defined in BeaconTypes.h
 
 /**
  * @brief Enhanced Alert Manager with simplified interface
