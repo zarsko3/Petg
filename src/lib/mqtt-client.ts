@@ -49,7 +49,7 @@ export class CollarMQTTClient {
   private client: MqttClient | null = null;
   private isConnected: boolean = false;
   private isConnecting: boolean = false;
-  private reconnectTimeout: NodeJS.Timeout | null = null;
+  private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempts: number = 0;
   private readonly maxReconnectAttempts: number = 5;
 
