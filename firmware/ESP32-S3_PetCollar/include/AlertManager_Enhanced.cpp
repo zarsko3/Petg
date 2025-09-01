@@ -25,6 +25,9 @@ void AlertManager_Enhanced::buzzOn(uint16_t freq, uint8_t duty) {
     channel_conf.duty = duty;  // 0-255 for 8-bit resolution
     channel_conf.hpoint = 0;
     ledc_channel_config(&channel_conf);
+    
+    Serial.printf("🔊 Buzzer PWM: freq=%dHz, duty=%d, pin=%d\n", 
+                 freq, duty, buzzerPin);
 }
 
 void AlertManager_Enhanced::buzzOff() {
@@ -74,22 +77,16 @@ bool AlertManager_Enhanced::triggerAlert(const AlertConfig& config) {
     alertActive = true;
     activeMode = config.mode;
 
-    // duration (ms)
-    currentDuration = (config.duration > 0) ? config.duration : 500; // default 500ms
-    alertEndTime = millis() + currentDuration;
+    // Schedule auto-stop
+    alertStartMs = millis();
+    alertDurationMs = (config.duration > 0) ? (unsigned long)config.duration : 1200; // default 1.2s
+    autoStop = true;
 
-    // BUZZER / BOTH -> play PWM tone using LEDC
+    // BUZZER / BOTH -> play PWM tone
     if (config.mode == AlertMode::BUZZER || config.mode == AlertMode::BOTH) {
         // Map intensity (1-255) to a reasonable duty cycle range
-        // Avoid 0 duty which would be silent
-        uint8_t intensity = (config.intensity > 0) ? config.intensity : defaultDuty; // 0..255
-        uint8_t duty = intensity; // Direct mapping for 8-bit resolution
-        
-        // Use LEDC to generate tone
-        buzzOn(defaultFreq, duty);
-        
-        Serial.printf("🔊 Buzzer PWM: freq=%dHz, duty=%d, pin=%d, channel=%d\n", 
-                     defaultFreq, duty, buzzerPin, buzzerChannel);
+        uint8_t intensity = (config.intensity > 0) ? config.intensity : defaultDuty;
+        buzzOn(defaultFreq, intensity);
     }
 
     // VIBRATION / BOTH -> drive motor pin
@@ -97,38 +94,39 @@ bool AlertManager_Enhanced::triggerAlert(const AlertConfig& config) {
         digitalWrite(vibrationPin, HIGH);
     }
 
-    Serial.printf("🚨 Enhanced alert triggered (PWM): mode=%d, intensity=%d, duration=%ums\n",
-                 (int)config.mode, config.intensity, currentDuration);
+    Serial.printf("🚨 Enhanced alert triggered: mode=%d, intensity=%d, duration=%lums\n",
+                 (int)config.mode, config.intensity, alertDurationMs);
     return true;
 }
 
-bool AlertManager_Enhanced::startAlert(
-    AlertReason reason,
-    AlertMode mode,
-    int pattern,
-    int priority,
-    const String& customReason
-) {
+bool AlertManager_Enhanced::startAlertDuration(AlertReason reason, AlertMode mode, int duration_ms, int intensity) {
     AlertConfig cfg;
     cfg.mode = mode;
-    cfg.intensity = 180; // Default intensity (~70%)
-    cfg.duration = 5000; // Default 5 seconds
+    cfg.intensity = intensity > 0 ? intensity : defaultDuty;
+    cfg.duration = duration_ms > 0 ? duration_ms : 1200;
     cfg.reason = reason;
     
-    Serial.printf("🚨 Starting alert: reason=%d, mode=%d\n", (int)reason, (int)mode);
+    Serial.printf("🚨 Starting alert: reason=%d, mode=%d, duration=%dms, intensity=%d\n", 
+                 (int)reason, (int)mode, duration_ms, intensity);
     return triggerAlert(cfg);
 }
 
+bool AlertManager_Enhanced::startAlert(AlertReason reason, AlertMode mode, int pattern, int priority, const String& customReason) {
+    // Keep backward compatibility; default 1.2s duration and 70% intensity
+    return startAlertDuration(reason, mode, /*duration_ms=*/1200, /*intensity=*/180);
+}
+
 bool AlertManager_Enhanced::update() {
-    if (alertActive) {
-        if (millis() >= alertEndTime) {
-            Serial.printf("⏱️ Alert duration elapsed (%ums) - auto-stopping\n", currentDuration);
-            stopAlert(false);
+    if (alertActive && autoStop) {
+        unsigned long now = millis();
+        if (now - alertStartMs >= alertDurationMs) {
+            Serial.printf("⏱️ Alert duration elapsed (%lums) - auto-stopping\n", alertDurationMs);
+            stopAlert(/*force=*/true);
         } else {
             // For debugging: show remaining time
-            unsigned long remaining = alertEndTime - millis();
+            unsigned long remaining = alertEndTime - now;
             if (remaining % 100 == 0) { // Log every 100ms
-                Serial.printf("⏳ Alert time remaining: %ums\n", remaining);
+                Serial.printf("⏳ Alert time remaining: %lums\n", remaining);
             }
         }
     }
@@ -138,6 +136,7 @@ bool AlertManager_Enhanced::update() {
 bool AlertManager_Enhanced::stopAlert(bool force) {
     if (alertActive || force) {
         alertActive = false;
+        autoStop = false;
         
         // Stop PWM buzzer with LEDC
         buzzOff();
@@ -145,7 +144,7 @@ bool AlertManager_Enhanced::stopAlert(bool force) {
         // Stop vibration motor
         digitalWrite(vibrationPin, LOW);
         
-        Serial.println("🛑 Enhanced alert stopped (PWM off)");
+        Serial.println("🛑 Enhanced alert stopped");
         return true;
     }
     return false;
