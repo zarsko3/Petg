@@ -10,7 +10,7 @@ AlertManager_Enhanced::AlertManager_Enhanced(uint8_t buzPin, uint8_t vibPin)
 void AlertManager_Enhanced::buzzOn(uint16_t freq, uint8_t duty) {
     // Configure LEDC timer
     ledc_timer_config_t timer_conf;
-    timer_conf.speed_mode = LEDC_HIGH_SPEED_MODE;
+    timer_conf.speed_mode = LEDC_LOW_SPEED_MODE;
     timer_conf.duty_resolution = LEDC_TIMER_8_BIT;  // 8-bit resolution
     timer_conf.timer_num = LEDC_TIMER_0;
     timer_conf.freq_hz = freq;
@@ -19,7 +19,7 @@ void AlertManager_Enhanced::buzzOn(uint16_t freq, uint8_t duty) {
     // Configure LEDC channel
     ledc_channel_config_t channel_conf;
     channel_conf.gpio_num = buzzerPin;
-    channel_conf.speed_mode = LEDC_HIGH_SPEED_MODE;
+    channel_conf.speed_mode = LEDC_LOW_SPEED_MODE;
     channel_conf.channel = LEDC_CHANNEL_0;
     channel_conf.timer_sel = LEDC_TIMER_0;
     channel_conf.duty = duty;  // 0-255 for 8-bit resolution
@@ -28,8 +28,8 @@ void AlertManager_Enhanced::buzzOn(uint16_t freq, uint8_t duty) {
 }
 
 void AlertManager_Enhanced::buzzOff() {
-    ledc_set_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_0, 0);
-    ledc_update_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_0);
+    ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 0);
+    ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
 }
 
 bool AlertManager_Enhanced::initialize() {
@@ -40,7 +40,7 @@ bool AlertManager_Enhanced::initialize() {
 
     // Initial LEDC setup with default frequency
     ledc_timer_config_t timer_conf;
-    timer_conf.speed_mode = LEDC_HIGH_SPEED_MODE;
+    timer_conf.speed_mode = LEDC_LOW_SPEED_MODE;
     timer_conf.duty_resolution = LEDC_TIMER_8_BIT;
     timer_conf.timer_num = LEDC_TIMER_0;
     timer_conf.freq_hz = defaultFreq;
@@ -49,7 +49,7 @@ bool AlertManager_Enhanced::initialize() {
     // Initial channel configuration
     ledc_channel_config_t channel_conf;
     channel_conf.gpio_num = buzzerPin;
-    channel_conf.speed_mode = LEDC_HIGH_SPEED_MODE;
+    channel_conf.speed_mode = LEDC_LOW_SPEED_MODE;
     channel_conf.channel = LEDC_CHANNEL_0;
     channel_conf.timer_sel = LEDC_TIMER_0;
     channel_conf.duty = 0;  // Start with buzzer off
