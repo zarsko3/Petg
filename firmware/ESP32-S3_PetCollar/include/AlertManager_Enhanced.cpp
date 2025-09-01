@@ -28,8 +28,18 @@ void AlertManager_Enhanced::buzzOn(uint16_t freq, uint8_t duty) {
 }
 
 void AlertManager_Enhanced::buzzOff() {
+    // First set duty to 0 to stop the sound
     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 0);
     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
+    
+    // Then detach the channel to ensure it's completely stopped
+    ledc_stop(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 0);
+    
+    // Set pin back to output low for safety
+    pinMode(buzzerPin, OUTPUT);
+    digitalWrite(buzzerPin, LOW);
+    
+    Serial.println("🔇 Buzzer stopped and detached");
 }
 
 bool AlertManager_Enhanced::initialize() {
@@ -110,9 +120,17 @@ bool AlertManager_Enhanced::startAlert(
 }
 
 bool AlertManager_Enhanced::update() {
-    if (alertActive && millis() >= alertEndTime) {
-        Serial.printf("⏱️ Alert duration elapsed (%ums) - auto-stopping\n", currentDuration);
-        stopAlert(false);
+    if (alertActive) {
+        if (millis() >= alertEndTime) {
+            Serial.printf("⏱️ Alert duration elapsed (%ums) - auto-stopping\n", currentDuration);
+            stopAlert(false);
+        } else {
+            // For debugging: show remaining time
+            unsigned long remaining = alertEndTime - millis();
+            if (remaining % 100 == 0) { // Log every 100ms
+                Serial.printf("⏳ Alert time remaining: %ums\n", remaining);
+            }
+        }
     }
     return alertActive;
 }

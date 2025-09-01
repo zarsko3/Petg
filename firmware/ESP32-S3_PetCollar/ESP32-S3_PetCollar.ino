@@ -1318,9 +1318,14 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
                     
                     delay(durationMs);
                     
-                    // Turn off buzzer
+                    // Turn off buzzer completely
                     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 0);
                     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
+                    ledc_stop(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 0);
+                    
+                    // Set pin back to output low for safety
+                    pinMode(BUZZER_PIN, OUTPUT);
+                    digitalWrite(BUZZER_PIN, LOW);
                     
                     Serial.println("✅ Buzzer test completed");
                 }
@@ -2757,9 +2762,14 @@ void testBuzzer(int frequency = 2000, int duration = 500) {
     
     delay(duration);
     
-    // Turn off buzzer
+    // Turn off buzzer completely
     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 0);
     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
+    ledc_stop(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 0);
+    
+    // Set pin back to output low for safety
+    pinMode(BUZZER_PIN, OUTPUT);
+    digitalWrite(BUZZER_PIN, LOW);
     
     Serial.printf("✅ Buzzer test complete on GPIO %d\n", BUZZER_PIN);
 }
