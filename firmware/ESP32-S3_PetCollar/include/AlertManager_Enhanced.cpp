@@ -27,7 +27,8 @@ bool AlertManager_Enhanced::initialize() {
     ledcAttachPin(buzzerPin, buzzerChannel);
     buzzOff();
 
-    Serial.println("🚨 Enhanced AlertManager initialized (LEDC ready)");
+    Serial.printf("🚨 Enhanced AlertManager initialized (LEDC ready on GPIO %d, channel %d)\n", 
+                 buzzerPin, buzzerChannel);
     return true;
 }
 
@@ -39,10 +40,18 @@ bool AlertManager_Enhanced::triggerAlert(const AlertConfig& config) {
     currentDuration = (config.duration > 0) ? config.duration : 500; // default 500ms
     alertEndTime = millis() + currentDuration;
 
-    // BUZZER / BOTH -> play PWM tone
+    // BUZZER / BOTH -> play PWM tone using LEDC
     if (config.mode == AlertMode::BUZZER || config.mode == AlertMode::BOTH) {
-        uint8_t duty = (config.intensity > 0) ? config.intensity : defaultDuty; // 0..255
+        // Map intensity (1-255) to a reasonable duty cycle range
+        // Avoid 0 duty which would be silent
+        uint8_t intensity = (config.intensity > 0) ? config.intensity : defaultDuty; // 0..255
+        uint8_t duty = intensity; // Direct mapping for 8-bit resolution
+        
+        // Use LEDC to generate tone
         buzzOn(defaultFreq, duty);
+        
+        Serial.printf("🔊 Buzzer PWM: freq=%dHz, duty=%d, pin=%d, channel=%d\n", 
+                     defaultFreq, duty, buzzerPin, buzzerChannel);
     }
 
     // VIBRATION / BOTH -> drive motor pin
@@ -74,6 +83,7 @@ bool AlertManager_Enhanced::startAlert(
 
 bool AlertManager_Enhanced::update() {
     if (alertActive && millis() >= alertEndTime) {
+        Serial.printf("⏱️ Alert duration elapsed (%ums) - auto-stopping\n", currentDuration);
         stopAlert(false);
     }
     return alertActive;
@@ -82,8 +92,13 @@ bool AlertManager_Enhanced::update() {
 bool AlertManager_Enhanced::stopAlert(bool force) {
     if (alertActive || force) {
         alertActive = false;
-        buzzOff(); // stop PWM
+        
+        // Stop PWM buzzer with LEDC
+        buzzOff();
+        
+        // Stop vibration motor
         digitalWrite(vibrationPin, LOW);
+        
         Serial.println("🛑 Enhanced alert stopped (PWM off)");
         return true;
     }

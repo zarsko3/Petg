@@ -1293,20 +1293,25 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
             // Trigger alert with test command
             alertManager.triggerAlert(cfg);
             
-            // Also trigger buzzer directly for immediate feedback
-            if (alertMode == "buzzer" || alertMode == "both") {
-                Serial.printf("🔊 Direct buzzer test on GPIO %d\n", BUZZER_PIN);
-                pinMode(BUZZER_PIN, OUTPUT);
-                
-                // Generate tone for test duration
-                ledcAttach(BUZZER_PIN, 1000, 8);  // 1kHz frequency, 8-bit resolution
-                ledcWrite(BUZZER_PIN, intensity / 2);  // Convert 0-255 to 0-127 for 8-bit
-                delay(durationMs);
-                ledcWrite(BUZZER_PIN, 0);  // Turn off
-                ledcDetach(BUZZER_PIN);
-                
-                Serial.println("✅ Buzzer test completed");
-            }
+                            // Also trigger buzzer directly for immediate feedback
+                if (alertMode == "buzzer" || alertMode == "both") {
+                    Serial.printf("🔊 Direct buzzer test on GPIO %d\n", BUZZER_PIN);
+                    
+                    // Generate tone for test duration using LEDC
+                    // Use same method as AlertManager_Enhanced and boot test
+                    ledcSetup(0, 2000, 8);         // Channel 0, 2kHz, 8-bit resolution
+                    ledcAttachPin(BUZZER_PIN, 0);  // Attach pin to channel
+                    ledcWriteTone(0, 2000);        // Set frequency (2kHz)
+                    ledcWrite(0, intensity);        // Use intensity directly (0-255)
+                    
+                    delay(durationMs);
+                    
+                    // Turn off buzzer
+                    ledcWrite(0, 0);               // Set duty to 0 (off)
+                    ledcDetach(BUZZER_PIN);
+                    
+                    Serial.println("✅ Buzzer test completed");
+                }
             
         } else if (cmd == "configure_beacon") {
             // 🚀 PROXIMITY-BASED BEACON CONFIGURATION
@@ -2720,15 +2725,17 @@ void printSystemStatus() {
 void testBuzzer(int frequency = 2000, int duration = 500) {
     Serial.printf("🔊 Testing buzzer on GPIO %d: %dHz for %dms\n", BUZZER_PIN, frequency, duration);
     
-    // Method 1: Using ESP32 tone() function
-    tone(BUZZER_PIN, frequency, duration);
-    delay(duration + 100);
+    // Using LEDC for passive buzzer (same method as AlertManager_Enhanced)
+    // This ensures consistency between boot test and MQTT alerts
+    ledcSetup(0, frequency, 8);     // Channel 0, frequency, 8-bit resolution
+    ledcAttachPin(BUZZER_PIN, 0);   // Attach pin to channel
+    ledcWriteTone(0, frequency);    // Set frequency
+    ledcWrite(0, 180);              // ~70% duty cycle (0-255)
     
-    // Method 2: Using LEDC for confirmation (ESP32 Arduino Core 3.x compatible)
-    ledcAttach(BUZZER_PIN, frequency, 8);  // pin, frequency, resolution
-    ledcWrite(BUZZER_PIN, 128); // 50% duty cycle
     delay(duration);
-    ledcWrite(BUZZER_PIN, 0);   // Turn off
+    
+    // Turn off buzzer
+    ledcWrite(0, 0);                // Set duty to 0 (off)
     ledcDetach(BUZZER_PIN);
     
     Serial.printf("✅ Buzzer test complete on GPIO %d\n", BUZZER_PIN);
