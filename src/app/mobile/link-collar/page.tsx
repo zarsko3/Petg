@@ -12,6 +12,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { DeviceStatus } from '@/lib/schema';
 import { getMQTTClient } from '@/lib/mqtt-client';
 
+// Force dynamic rendering to prevent SSR issues with Clerk
+export const dynamic = 'force-dynamic';
+
 interface Device {
   id: string;
   status: string;
@@ -24,7 +27,14 @@ interface Device {
 
 export default function LinkCollarPage() {
   const router = useRouter();
+  // Initialize auth state
+  const [isClient, setIsClient] = useState(false);
   const { isSignedIn, user } = useUser();
+
+  // Only run client-side code after mount
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
   const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
@@ -33,6 +43,9 @@ export default function LinkCollarPage() {
 
   // Fetch available devices
   useEffect(() => {
+    // Only fetch devices on the client side
+    if (!isClient) return;
+
     async function fetchDevices() {
       try {
         const params = new URLSearchParams({
@@ -55,30 +68,36 @@ export default function LinkCollarPage() {
     }
 
     fetchDevices();
-  }, []);
+  }, [isClient]);
 
   // Subscribe to MQTT presence for live device status
   useEffect(() => {
-    const mqttClient = getMQTTClient();
-    
-    // Subscribe to all device status topics
-    mqttClient.subscribeToDeviceStatus('*', (deviceId, status) => {
-      setDevices(prev => prev.map(device => {
-        if (device.id === deviceId) {
-          return {
-            ...device,
-            mqtt_connected: status === 'online',
-            last_seen_at: new Date().toISOString()
-          };
-        }
-        return device;
-      }));
-    });
+    if (!isClient) return;
 
-    return () => {
-      mqttClient.unsubscribeFromDeviceStatus('*');
-    };
-  }, []);
+    try {
+      const mqttClient = getMQTTClient();
+      
+      // Subscribe to all device status topics
+      mqttClient.subscribeToDeviceStatus('*', (deviceId, status) => {
+        setDevices(prev => prev.map(device => {
+          if (device.id === deviceId) {
+            return {
+              ...device,
+              mqtt_connected: status === 'online',
+              last_seen_at: new Date().toISOString()
+            };
+          }
+          return device;
+        }));
+      });
+
+      return () => {
+        mqttClient.unsubscribeFromDeviceStatus('*');
+      };
+    } catch (error) {
+      console.warn('MQTT client not available:', error);
+    }
+  }, [isClient]);
 
   // Handle device selection
   const handleDeviceSelect = (device: Device) => {
@@ -115,7 +134,8 @@ export default function LinkCollarPage() {
     }
   };
 
-  if (loading) {
+  // Show loading state during initial client-side render
+  if (!isClient || loading) {
     return (
       <div className="p-4 space-y-4">
         <Skeleton className="h-12 w-full" />
