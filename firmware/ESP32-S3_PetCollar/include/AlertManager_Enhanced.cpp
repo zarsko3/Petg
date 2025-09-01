@@ -8,12 +8,28 @@ AlertManager_Enhanced::AlertManager_Enhanced(uint8_t buzPin, uint8_t vibPin)
 }
 
 void AlertManager_Enhanced::buzzOn(uint16_t freq, uint8_t duty) {
-    ledcWriteTone(buzzerChannel, freq); // set frequency
-    ledcWrite(buzzerChannel, duty);     // non-zero duty => sound
+    // Configure LEDC timer
+    ledc_timer_config_t timer_conf;
+    timer_conf.speed_mode = LEDC_HIGH_SPEED_MODE;
+    timer_conf.duty_resolution = LEDC_TIMER_8_BIT;  // 8-bit resolution
+    timer_conf.timer_num = LEDC_TIMER_0;
+    timer_conf.freq_hz = freq;
+    ledc_timer_config(&timer_conf);
+
+    // Configure LEDC channel
+    ledc_channel_config_t channel_conf;
+    channel_conf.gpio_num = buzzerPin;
+    channel_conf.speed_mode = LEDC_HIGH_SPEED_MODE;
+    channel_conf.channel = LEDC_CHANNEL_0;
+    channel_conf.timer_sel = LEDC_TIMER_0;
+    channel_conf.duty = duty;  // 0-255 for 8-bit resolution
+    channel_conf.hpoint = 0;
+    ledc_channel_config(&channel_conf);
 }
 
 void AlertManager_Enhanced::buzzOff() {
-    ledcWrite(buzzerChannel, 0);        // duty 0 => silent
+    ledc_set_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_0, 0);
+    ledc_update_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_0);
 }
 
 bool AlertManager_Enhanced::initialize() {
@@ -22,13 +38,25 @@ bool AlertManager_Enhanced::initialize() {
     digitalWrite(buzzerPin, LOW);
     digitalWrite(vibrationPin, LOW);
 
-    // Setup LEDC for passive buzzer
-    ledcSetup(buzzerChannel, defaultFreq, pwmResolution);
-    ledcAttachPin(buzzerPin, buzzerChannel);
-    buzzOff();
+    // Initial LEDC setup with default frequency
+    ledc_timer_config_t timer_conf;
+    timer_conf.speed_mode = LEDC_HIGH_SPEED_MODE;
+    timer_conf.duty_resolution = LEDC_TIMER_8_BIT;
+    timer_conf.timer_num = LEDC_TIMER_0;
+    timer_conf.freq_hz = defaultFreq;
+    ledc_timer_config(&timer_conf);
 
-    Serial.printf("🚨 Enhanced AlertManager initialized (LEDC ready on GPIO %d, channel %d)\n", 
-                 buzzerPin, buzzerChannel);
+    // Initial channel configuration
+    ledc_channel_config_t channel_conf;
+    channel_conf.gpio_num = buzzerPin;
+    channel_conf.speed_mode = LEDC_HIGH_SPEED_MODE;
+    channel_conf.channel = LEDC_CHANNEL_0;
+    channel_conf.timer_sel = LEDC_TIMER_0;
+    channel_conf.duty = 0;  // Start with buzzer off
+    channel_conf.hpoint = 0;
+    ledc_channel_config(&channel_conf);
+
+    Serial.printf("🚨 Enhanced AlertManager initialized (LEDC ready on GPIO %d)\n", buzzerPin);
     return true;
 }
 

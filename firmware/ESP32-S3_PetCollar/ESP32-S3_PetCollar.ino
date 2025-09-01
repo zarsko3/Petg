@@ -45,6 +45,7 @@
 #include <esp_system.h>
 #include <ESPmDNS.h>
 #include <WiFiUdp.h>
+#include <driver/ledc.h>  // Required for LEDC PWM functions
 
 // ==================== MQTT CLOUD INTEGRATION ====================
 #include <WiFiClientSecure.h>
@@ -1299,16 +1300,27 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
                     
                     // Generate tone for test duration using LEDC
                     // Use same method as AlertManager_Enhanced and boot test
-                    ledcSetup(0, 2000, 8);         // Channel 0, 2kHz, 8-bit resolution
-                    ledcAttachPin(BUZZER_PIN, 0);  // Attach pin to channel
-                    ledcWriteTone(0, 2000);        // Set frequency (2kHz)
-                    ledcWrite(0, intensity);        // Use intensity directly (0-255)
+                    ledc_timer_config_t timer_conf;
+                    timer_conf.speed_mode = LEDC_HIGH_SPEED_MODE;
+                    timer_conf.duty_resolution = LEDC_TIMER_8_BIT;  // 8-bit resolution
+                    timer_conf.timer_num = LEDC_TIMER_0;
+                    timer_conf.freq_hz = 2000;  // 2kHz
+                    ledc_timer_config(&timer_conf);
+
+                    ledc_channel_config_t channel_conf;
+                    channel_conf.gpio_num = BUZZER_PIN;
+                    channel_conf.speed_mode = LEDC_HIGH_SPEED_MODE;
+                    channel_conf.channel = LEDC_CHANNEL_0;
+                    channel_conf.timer_sel = LEDC_TIMER_0;
+                    channel_conf.duty = intensity;  // Use intensity directly (0-255)
+                    channel_conf.hpoint = 0;
+                    ledc_channel_config(&channel_conf);
                     
                     delay(durationMs);
                     
                     // Turn off buzzer
-                    ledcWrite(0, 0);               // Set duty to 0 (off)
-                    ledcDetach(BUZZER_PIN);
+                    ledc_set_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_0, 0);
+                    ledc_update_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_0);
                     
                     Serial.println("✅ Buzzer test completed");
                 }
@@ -2727,16 +2739,27 @@ void testBuzzer(int frequency = 2000, int duration = 500) {
     
     // Using LEDC for passive buzzer (same method as AlertManager_Enhanced)
     // This ensures consistency between boot test and MQTT alerts
-    ledcSetup(0, frequency, 8);     // Channel 0, frequency, 8-bit resolution
-    ledcAttachPin(BUZZER_PIN, 0);   // Attach pin to channel
-    ledcWriteTone(0, frequency);    // Set frequency
-    ledcWrite(0, 180);              // ~70% duty cycle (0-255)
+    ledc_timer_config_t timer_conf;
+    timer_conf.speed_mode = LEDC_HIGH_SPEED_MODE;
+    timer_conf.duty_resolution = LEDC_TIMER_8_BIT;  // 8-bit resolution
+    timer_conf.timer_num = LEDC_TIMER_0;
+    timer_conf.freq_hz = frequency;
+    ledc_timer_config(&timer_conf);
+
+    ledc_channel_config_t channel_conf;
+    channel_conf.gpio_num = BUZZER_PIN;
+    channel_conf.speed_mode = LEDC_HIGH_SPEED_MODE;
+    channel_conf.channel = LEDC_CHANNEL_0;
+    channel_conf.timer_sel = LEDC_TIMER_0;
+    channel_conf.duty = 180;  // ~70% duty cycle (0-255)
+    channel_conf.hpoint = 0;
+    ledc_channel_config(&channel_conf);
     
     delay(duration);
     
     // Turn off buzzer
-    ledcWrite(0, 0);                // Set duty to 0 (off)
-    ledcDetach(BUZZER_PIN);
+    ledc_set_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_0, 0);
+    ledc_update_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_0);
     
     Serial.printf("✅ Buzzer test complete on GPIO %d\n", BUZZER_PIN);
 }
