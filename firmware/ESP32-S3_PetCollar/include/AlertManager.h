@@ -26,7 +26,7 @@ private:
   uint8_t  pwmResolution   = 8;     // 8-bit resolution
   uint8_t  defaultDuty     = 180;   // 0..255 (~70%)
   
-  // Auto-stop state
+  // Auto-stop state (ISR-safe)
   volatile bool autoStop = false;  // written in ISR, read in loop
   unsigned long alertStartMs = 0;
   unsigned long alertDurationMs = 0;

@@ -8,23 +8,24 @@ AlertManager_Enhanced::AlertManager_Enhanced(uint8_t buzPin, uint8_t vibPin)
 }
 
 void AlertManager_Enhanced::buzzOn(uint16_t freq, uint8_t duty) {
-    // Configure LEDC timer
+    // Configure LEDC timer with zero-init
     ledc_timer_config_t timer_conf = {};
     timer_conf.speed_mode = LEDC_LOW_SPEED_MODE;
     timer_conf.duty_resolution = LEDC_TIMER_8_BIT;  // 8-bit resolution
     timer_conf.timer_num = LEDC_TIMER_0;
     timer_conf.freq_hz = freq;
-    timer_conf.clk_cfg = LEDC_AUTO_CLK;
+    timer_conf.clk_cfg = LEDC_AUTO_CLK;  // Let ESP-IDF handle clock
     ledc_timer_config(&timer_conf);
 
-    // Configure LEDC channel
-    ledc_channel_config_t channel_conf;
+    // Configure LEDC channel with zero-init
+    ledc_channel_config_t channel_conf = {};
     channel_conf.gpio_num = buzzerPin;
     channel_conf.speed_mode = LEDC_LOW_SPEED_MODE;
     channel_conf.channel = (ledc_channel_t)buzzerChannel;
     channel_conf.timer_sel = LEDC_TIMER_0;
     channel_conf.duty = duty;  // 0-255 for 8-bit resolution
     channel_conf.hpoint = 0;
+    channel_conf.intr_type = LEDC_INTR_DISABLE;  // No interrupts needed
     ledc_channel_config(&channel_conf);
     
     Serial.printf("🔊 Buzzer PWM: freq=%dHz, duty=%d, pin=%d\n", 
@@ -32,18 +33,15 @@ void AlertManager_Enhanced::buzzOn(uint16_t freq, uint8_t duty) {
 }
 
 void AlertManager_Enhanced::buzzOff() {
-    // First stop LEDC output (idle HIGH for active-LOW)
-    ledc_stop(LEDC_LOW_SPEED_MODE, (ledc_channel_t)buzzerChannel, 1);
+    // Stop PWM and keep pin parked HIGH (OFF for active-LOW)
+    ledc_stop(LEDC_LOW_SPEED_MODE, (ledc_channel_t)buzzerChannel, 1); // idle=HIGH
+    // IMPORTANT: do NOT call set_duty/update after ledc_stop; that re-enables PWM.
     
-    // Then detach LEDC from pin
-    ledc_set_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t)buzzerChannel, 0);
-    ledc_update_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t)buzzerChannel);
-    
-    // Finally, ensure pin is HIGH (OFF) with direct GPIO
+    // Ensure pin stays HIGH (OFF)
     pinMode(buzzerPin, OUTPUT);
-    digitalWrite(buzzerPin, HIGH);  // HIGH = OFF for active-LOW
+    digitalWrite(buzzerPin, HIGH); // OFF
     
-    Serial.println("🔇 Buzzer stopped, detached, and set HIGH");
+    Serial.println("🔇 Buzzer stopped and parked HIGH");
 }
 
 // Static pointer to instance for timer callback
@@ -101,6 +99,7 @@ void AlertManager_Enhanced::cancelAutoStop() {
 }
 
 bool AlertManager_Enhanced::initialize() {
+    // Set pins to safe state first
     pinMode(buzzerPin, OUTPUT);
     pinMode(vibrationPin, OUTPUT);
     digitalWrite(buzzerPin, HIGH);  // active-LOW buzzer: HIGH = OFF
@@ -112,21 +111,25 @@ bool AlertManager_Enhanced::initialize() {
     timer_conf.duty_resolution = LEDC_TIMER_8_BIT;
     timer_conf.timer_num = LEDC_TIMER_0;
     timer_conf.freq_hz = defaultFreq;
-    timer_conf.clk_cfg = LEDC_AUTO_CLK;
+    timer_conf.clk_cfg = LEDC_AUTO_CLK;  // Let ESP-IDF handle clock
     ledc_timer_config(&timer_conf);
 
-    // Initial channel configuration
+    // Initial channel configuration - start detached
     ledc_channel_config_t channel_conf = {};
     channel_conf.gpio_num = buzzerPin;
     channel_conf.speed_mode = LEDC_LOW_SPEED_MODE;
     channel_conf.channel = (ledc_channel_t)buzzerChannel;
     channel_conf.timer_sel = LEDC_TIMER_0;
-    channel_conf.duty = 255;  // Hold steady HIGH = OFF for active-LOW
+    channel_conf.intr_type = LEDC_INTR_DISABLE;  // No interrupts needed
+    channel_conf.duty = 0;  // Will be overridden by ledc_stop
     channel_conf.hpoint = 0;
     ledc_channel_config(&channel_conf);
     
-    // Ensure the channel is truly idle-high and detached until needed
+    // Immediately stop and park HIGH (OFF)
     ledc_stop(LEDC_LOW_SPEED_MODE, (ledc_channel_t)buzzerChannel, 1);  // idle=HIGH
+    
+    // Double-check pin is still HIGH
+    digitalWrite(buzzerPin, HIGH);  // Ensure OFF
 
     // Initialize hardware timer for auto-stop
     setupStopTimer();
@@ -182,7 +185,7 @@ bool AlertManager_Enhanced::startAlertDuration(AlertReason reason, AlertMode mod
 }
 
 bool AlertManager_Enhanced::startAlert(AlertReason reason, AlertMode mode, int pattern, int priority, const String& customReason) {
-    // Keep backward compatibility; default 1.2s duration and 70% intensity
+    // Default 1s duration and 70% intensity
     return startAlertDuration(reason, mode, /*duration_ms=*/1000, /*intensity=*/180);
 }
 
