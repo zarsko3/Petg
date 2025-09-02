@@ -1503,6 +1503,7 @@ void publishMQTTStatus(String status) {
     doc["timestamp"] = millis();
     doc["ip_address"] = WiFi.localIP().toString();
     doc["firmware_version"] = FIRMWARE_VERSION;
+    doc["model"] = "ESP32-S3_PetCollar";
     
     String message;
     serializeJson(doc, message);
@@ -1510,6 +1511,18 @@ void publishMQTTStatus(String status) {
     String topic = "pet-collar/" + String(DEVICE_ID) + "/status";
     mqttClient.publish(topic.c_str(), message.c_str(), true);
     mqttState.messagesPublished++;
+    
+    Serial.printf("📡 Published status: %s\n", message.c_str());
+    
+    // Trigger a small beep when going online
+    if (status == "online") {
+        AlertConfig statusBeep;
+        statusBeep.mode = AlertMode::BUZZER;
+        statusBeep.intensity = 100;
+        statusBeep.duration = 100;
+        statusBeep.reason = AlertReason::SYSTEM_NOTIFICATION;
+        alertManager.triggerAlert(statusBeep);
+    }
 }
 
 /**
@@ -2911,6 +2924,14 @@ void setup() {
     Serial.printf("📡 BLE Scanner: %s\n", bleOK ? "Active" : "Inactive");
     Serial.println("🔍 Scanning for proximity beacons...");
     Serial.println("═══════════════════════════════════════");
+    
+    // Send a connection notification beep
+    AlertConfig connectedBeep;
+    connectedBeep.mode = AlertMode::BUZZER;
+    connectedBeep.intensity = 128;
+    connectedBeep.duration = 200;
+    connectedBeep.reason = AlertReason::SYSTEM_NOTIFICATION;
+    alertManager.triggerAlert(connectedBeep);
 }
 
 /**

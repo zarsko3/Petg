@@ -130,12 +130,12 @@ export function CollarServiceProvider({ children }: CollarServiceProviderProps) 
           });
           
           // Handle both guest mode and PetCollar-001
-          if ((data.device_id === "001" || data.device_id === "PetCollar-001") && data.status === 'online') {
+          if ((data.device_id === "001" || data.device_id === "PetCollar-001")) {
             console.log('🎯 CollarServiceProvider: Device online - exiting demo mode');
             store.setDemoMode(false);
             
             // 🎉 ONLY show toast on real state transitions (no spam!)
-            if (shouldShowToast && !shouldDebounce) {
+            if (data.status === 'online' && shouldShowToast && !shouldDebounce) {
               toast.success('Live Mode Activated', {
                 description: `Collar ${data.device_id} is now online`
               });
