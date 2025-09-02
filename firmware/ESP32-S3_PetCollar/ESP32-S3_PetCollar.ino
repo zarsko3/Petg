@@ -1192,7 +1192,15 @@ void connectToMQTTCloud() {
     
     // Last Will and Testament
     String statusTopic = "pet-collar/" + String(DEVICE_ID) + "/status";
-    String offlineMessage = "{\"device_id\":\"" + String(DEVICE_ID) + "\",\"status\":\"offline\",\"timestamp\":" + String(millis()) + "}";
+    DynamicJsonDocument statusDoc(256);
+    statusDoc["device_id"] = DEVICE_ID;
+    statusDoc["status"] = "offline";
+    statusDoc["timestamp"] = millis();
+    statusDoc["model"] = "ESP32-S3_PetCollar";
+    statusDoc["firmware_version"] = FIRMWARE_VERSION;
+    
+    String offlineMessage;
+    serializeJson(statusDoc, offlineMessage);
     
     if (mqttClient.connect(clientId.c_str(), MQTT_USER, MQTT_PASSWORD,
                           statusTopic.c_str(), 1, true, offlineMessage.c_str())) {
@@ -3137,7 +3145,7 @@ void loop() {
     // Update display
     updateDisplay();
     
-    // Handle alert management
+    // CRITICAL: Handle alert management (must run frequently)
     alertManager.update();
     
     // System maintenance and monitoring
@@ -3155,6 +3163,6 @@ void loop() {
         lastBroadcast = currentTime;
     }
     
-    // Watchdog and system stability
-    delay(10); // Small delay for system stability
+    // Yield to allow other tasks to run
+    yield();
 } 
