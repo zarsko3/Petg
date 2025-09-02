@@ -34,7 +34,8 @@ enum class AlertReason : uint8_t {
     REMOTE_COMMAND,         ///< Remote command triggered alert
     ZONE_BREACH,            ///< Zone boundary breach
     LOCATE_REQUEST,         ///< Location request alert
-    PROXIMITY_TRIGGER       ///< Proximity-based triggering from transmitter
+    PROXIMITY_TRIGGER,      ///< Proximity-based triggering from transmitter
+    SYSTEM_NOTIFICATION     ///< System notification (startup, connection, etc.)
 };
 
 // ==================== SHARED STRUCTS ====================
