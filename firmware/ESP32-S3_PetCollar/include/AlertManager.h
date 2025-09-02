@@ -27,14 +27,14 @@ private:
   uint8_t  defaultDuty     = 180;   // 0..255 (~70%)
   
   // Auto-stop state
-  bool autoStop = false;
+  volatile bool autoStop = false;  // written in ISR, read in loop
   unsigned long alertStartMs = 0;
   unsigned long alertDurationMs = 0;
   AlertMode activeMode = AlertMode::NONE;
   
   // Hardware timer for reliable auto-stop
   hw_timer_t* stopTimer = nullptr;
-  static void IRAM_ATTR onStopTimer(void* arg);  // Timer ISR
+  static void IRAM_ATTR onStopTimer();  // Timer ISR (no args)
   void setupStopTimer();                         // Initialize timer
   void scheduleAutoStop(unsigned long ms);       // Schedule auto-stop
   void cancelAutoStop();                         // Cancel pending stop

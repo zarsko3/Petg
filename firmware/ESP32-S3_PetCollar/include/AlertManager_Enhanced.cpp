@@ -9,18 +9,19 @@ AlertManager_Enhanced::AlertManager_Enhanced(uint8_t buzPin, uint8_t vibPin)
 
 void AlertManager_Enhanced::buzzOn(uint16_t freq, uint8_t duty) {
     // Configure LEDC timer
-    ledc_timer_config_t timer_conf;
+    ledc_timer_config_t timer_conf = {};
     timer_conf.speed_mode = LEDC_LOW_SPEED_MODE;
     timer_conf.duty_resolution = LEDC_TIMER_8_BIT;  // 8-bit resolution
     timer_conf.timer_num = LEDC_TIMER_0;
     timer_conf.freq_hz = freq;
+    timer_conf.clk_cfg = LEDC_AUTO_CLK;
     ledc_timer_config(&timer_conf);
 
     // Configure LEDC channel
     ledc_channel_config_t channel_conf;
     channel_conf.gpio_num = buzzerPin;
     channel_conf.speed_mode = LEDC_LOW_SPEED_MODE;
-    channel_conf.channel = LEDC_CHANNEL_0;
+    channel_conf.channel = (ledc_channel_t)buzzerChannel;
     channel_conf.timer_sel = LEDC_TIMER_0;
     channel_conf.duty = duty;  // 0-255 for 8-bit resolution
     channel_conf.hpoint = 0;
@@ -32,12 +33,12 @@ void AlertManager_Enhanced::buzzOn(uint16_t freq, uint8_t duty) {
 
 void AlertManager_Enhanced::buzzOff() {
     // First set duty to 0 to stop the sound
-    ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 0);
-    ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
+    ledc_set_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t)buzzerChannel, 0);
+    ledc_update_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t)buzzerChannel);
     
     // Then detach the channel to ensure it's completely stopped
     // Use idle level HIGH for active-LOW buzzer
-    ledc_stop(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 1);  // idle HIGH = OFF
+    ledc_stop(LEDC_LOW_SPEED_MODE, (ledc_channel_t)buzzerChannel, 1);  // idle HIGH = OFF
     
     // Set pin back to HIGH for active-LOW buzzer
     pinMode(buzzerPin, OUTPUT);
@@ -50,7 +51,7 @@ void AlertManager_Enhanced::buzzOff() {
 static AlertManager_Enhanced* gAlertManager = nullptr;
 
 // Timer ISR - must be IRAM_ATTR for hardware timer
-void IRAM_ATTR AlertManager_Enhanced::onStopTimer(void* arg) {
+void IRAM_ATTR AlertManager_Enhanced::onStopTimer() {
     // Note: Can't use Serial.print in ISR
     // Just set a flag that loop() will check
     if (gAlertManager) {
@@ -96,22 +97,26 @@ bool AlertManager_Enhanced::initialize() {
     digitalWrite(vibrationPin, LOW);
 
     // Initial LEDC setup with default frequency
-    ledc_timer_config_t timer_conf;
+    ledc_timer_config_t timer_conf = {};
     timer_conf.speed_mode = LEDC_LOW_SPEED_MODE;
     timer_conf.duty_resolution = LEDC_TIMER_8_BIT;
     timer_conf.timer_num = LEDC_TIMER_0;
     timer_conf.freq_hz = defaultFreq;
+    timer_conf.clk_cfg = LEDC_AUTO_CLK;
     ledc_timer_config(&timer_conf);
 
     // Initial channel configuration
-    ledc_channel_config_t channel_conf;
+    ledc_channel_config_t channel_conf = {};
     channel_conf.gpio_num = buzzerPin;
     channel_conf.speed_mode = LEDC_LOW_SPEED_MODE;
-    channel_conf.channel = LEDC_CHANNEL_0;
+    channel_conf.channel = (ledc_channel_t)buzzerChannel;
     channel_conf.timer_sel = LEDC_TIMER_0;
-    channel_conf.duty = 0;  // Start with buzzer off
+    channel_conf.duty = 255;  // Hold steady HIGH = OFF for active-LOW
     channel_conf.hpoint = 0;
     ledc_channel_config(&channel_conf);
+    
+    // Ensure the channel is truly idle-high and detached until needed
+    ledc_stop(LEDC_LOW_SPEED_MODE, (ledc_channel_t)buzzerChannel, 1);  // idle=HIGH
 
     // Initialize hardware timer for auto-stop
     setupStopTimer();
@@ -131,7 +136,7 @@ bool AlertManager_Enhanced::triggerAlert(const AlertConfig& config) {
 
     // Schedule auto-stop via loop check
     alertStartMs = millis();
-    alertDurationMs = (config.duration > 0) ? (unsigned long)config.duration : 1200; // default 1.2s
+    alertDurationMs = (config.duration > 0) ? (unsigned long)config.duration : 1000; // default 1s
     autoStop = false;  // Will be set by timer ISR
 
     // BUZZER / BOTH -> play PWM tone
@@ -158,7 +163,7 @@ bool AlertManager_Enhanced::startAlertDuration(AlertReason reason, AlertMode mod
     AlertConfig cfg;
     cfg.mode = mode;
     cfg.intensity = intensity > 0 ? intensity : defaultDuty;
-    cfg.duration = duration_ms > 0 ? duration_ms : 1200;
+    cfg.duration = duration_ms > 0 ? duration_ms : 1000;
     cfg.reason = reason;
     
     Serial.printf("🚨 Starting alert: reason=%d, mode=%d, duration=%dms, intensity=%d\n", 
@@ -168,7 +173,7 @@ bool AlertManager_Enhanced::startAlertDuration(AlertReason reason, AlertMode mod
 
 bool AlertManager_Enhanced::startAlert(AlertReason reason, AlertMode mode, int pattern, int priority, const String& customReason) {
     // Keep backward compatibility; default 1.2s duration and 70% intensity
-    return startAlertDuration(reason, mode, /*duration_ms=*/1200, /*intensity=*/180);
+    return startAlertDuration(reason, mode, /*duration_ms=*/1000, /*intensity=*/180);
 }
 
 bool AlertManager_Enhanced::update() {
