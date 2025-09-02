@@ -1278,7 +1278,7 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
         
         if (cmd == "test-alert") {
             String alertMode = doc["alertMode"] | "buzzer";
-            int durationMs = doc["durationMs"] | 1200;
+            int durationMs = doc["durationMs"] | 1000;
             int intensity = doc["intensity"] | 128;
             
             Serial.printf("🧪 Test Alert Command: mode=%s, duration=%dms, intensity=%d, pin=%d\n", 
@@ -1329,11 +1329,11 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
                     // Turn off buzzer completely
                     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 0);
                     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
-                    ledc_stop(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 0);
+                    ledc_stop(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 1);
                     
-                    // Set pin back to output low for safety
+                    // Set pin back to output HIGH (off) for safety
                     pinMode(BUZZER_PIN, OUTPUT);
-                    digitalWrite(BUZZER_PIN, LOW);
+                    digitalWrite(BUZZER_PIN, HIGH);
                     
                     Serial.println("✅ Buzzer test completed");
                 }
@@ -1514,11 +1514,11 @@ void publishMQTTStatus(String status) {
     
     Serial.printf("📡 Published status: %s\n", message.c_str());
     
-    // Trigger a small beep when going online
+    // Trigger a beep when going online
     if (status == "online") {
         AlertConfig statusBeep;
         statusBeep.mode = AlertMode::BUZZER;
-        statusBeep.intensity = 100;
+        statusBeep.intensity = 128;  // 50% duty cycle
         statusBeep.duration = 1000;  // 1 second exactly
         statusBeep.reason = AlertReason::SYSTEM_NOTIFICATION;
         alertManager.triggerAlert(statusBeep);
@@ -2792,11 +2792,11 @@ void testBuzzer(int frequency = 2000, int duration = 500) {
     // Turn off buzzer completely
     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 0);
     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
-    ledc_stop(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 0);
+    ledc_stop(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 1);
     
-    // Set pin back to output low for safety
+    // Set pin back to output HIGH (off) for safety
     pinMode(BUZZER_PIN, OUTPUT);
-    digitalWrite(BUZZER_PIN, LOW);
+    digitalWrite(BUZZER_PIN, HIGH);
     
     Serial.printf("✅ Buzzer test complete on GPIO %d\n", BUZZER_PIN);
 }
@@ -2866,6 +2866,7 @@ void setup() {
     // Initialize hardware pins
     pinMode(BUZZER_PIN, OUTPUT);
     digitalWrite(BUZZER_PIN, HIGH);  // active-LOW buzzer: HIGH = OFF
+
     pinMode(VIBRATION_PIN, OUTPUT);
     pinMode(STATUS_LED_WIFI, OUTPUT);
     pinMode(STATUS_LED_BLE, OUTPUT);
@@ -2907,7 +2908,7 @@ void setup() {
     
     // Test buzzer to confirm GPIO 18 is working
     Serial.println("🔊 Testing buzzer on restored GPIO 18...");
-    testBuzzer(2000, 500); // 2kHz for 0.5 seconds
+    testBuzzer(2000, 1000); // 2kHz for 0.5 seconds
     
     // Run RSSI smoother unit tests if enabled
     #if DEBUG_BLE
@@ -2932,15 +2933,15 @@ void setup() {
     Serial.println("🔍 Scanning for proximity beacons...");
     Serial.println("═══════════════════════════════════════");
     
-    // Send a short connection notification beep
+    // Send a connection notification beep
     AlertConfig connectedBeep;
     connectedBeep.mode = AlertMode::BUZZER;
-    connectedBeep.intensity = 128;
+    connectedBeep.intensity = 128;  // 50% duty cycle
     connectedBeep.duration = 1000;  // 1 second exactly
     connectedBeep.reason = AlertReason::SYSTEM_NOTIFICATION;
     alertManager.triggerAlert(connectedBeep);
     
-    // Ensure alert manager is updated frequently
+    // Ensure alert manager is updated
     alertManager.update();
 }
 
@@ -3142,6 +3143,9 @@ void handleSerialCommands() {
 void loop() {
     unsigned long currentTime = millis();
     
+    // CRITICAL: Handle alert management (must run frequently)
+    alertManager.update();
+    
     // Handle serial commands for testing and debugging
     handleSerialCommands();
     
@@ -3175,9 +3179,6 @@ void loop() {
     
     // Update display
     updateDisplay();
-    
-    // CRITICAL: Handle alert management (must run frequently)
-    alertManager.update();
     
     // System maintenance and monitoring
     performSystemMaintenance();
