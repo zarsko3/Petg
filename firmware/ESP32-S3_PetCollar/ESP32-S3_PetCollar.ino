@@ -2865,6 +2865,7 @@ void setup() {
     
     // Initialize hardware pins
     pinMode(BUZZER_PIN, OUTPUT);
+    digitalWrite(BUZZER_PIN, HIGH);  // active-LOW buzzer: HIGH = OFF
     pinMode(VIBRATION_PIN, OUTPUT);
     pinMode(STATUS_LED_WIFI, OUTPUT);
     pinMode(STATUS_LED_BLE, OUTPUT);

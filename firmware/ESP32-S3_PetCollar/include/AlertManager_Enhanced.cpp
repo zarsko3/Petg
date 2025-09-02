@@ -36,11 +36,12 @@ void AlertManager_Enhanced::buzzOff() {
     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
     
     // Then detach the channel to ensure it's completely stopped
-    ledc_stop(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 0);
+    // Use idle level HIGH for active-LOW buzzer
+    ledc_stop(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 1);  // idle HIGH = OFF
     
-    // Set pin back to output low for safety
+    // Set pin back to HIGH for active-LOW buzzer
     pinMode(buzzerPin, OUTPUT);
-    digitalWrite(buzzerPin, LOW);
+    digitalWrite(buzzerPin, HIGH);  // OFF for active-LOW
     
     Serial.println("🔇 Buzzer stopped and detached");
 }
@@ -91,7 +92,7 @@ void AlertManager_Enhanced::cancelAutoStop() {
 bool AlertManager_Enhanced::initialize() {
     pinMode(buzzerPin, OUTPUT);
     pinMode(vibrationPin, OUTPUT);
-    digitalWrite(buzzerPin, LOW);
+    digitalWrite(buzzerPin, HIGH);  // active-LOW buzzer: HIGH = OFF
     digitalWrite(vibrationPin, LOW);
 
     // Initial LEDC setup with default frequency
