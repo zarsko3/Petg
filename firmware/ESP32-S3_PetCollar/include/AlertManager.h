@@ -16,10 +16,10 @@ class AlertManager_Enhanced;
  */
 class AlertManager_Enhanced {
 private:
-  uint8_t buzzerPin;
-  uint8_t vibrationPin;
-  bool alertActive;
-  
+    uint8_t buzzerPin;
+    uint8_t vibrationPin;
+    bool alertActive;
+    
   // LEDC / timing members
   uint8_t  buzzerChannel   = 0;     // pick a free LEDC channel (0..7)
   uint16_t defaultFreq     = 2000;  // 2 kHz is good for piezo
@@ -44,14 +44,14 @@ private:
   void buzzOff();
   
 public:
-  AlertManager_Enhanced(uint8_t buzzerPin, uint8_t vibrationPin);
-  
-  // Core functionality
+    AlertManager_Enhanced(uint8_t buzzerPin, uint8_t vibrationPin);
+    
+    // Core functionality
   bool initialize();
   bool update();                 // must be called from loop()
-  bool stopAlert(bool force = false);
-  bool isAlertActive() const;
-  bool triggerAlert(const AlertConfig& config);
+    bool stopAlert(bool force = false);
+    bool isAlertActive() const;
+    bool triggerAlert(const AlertConfig& config);
   
   // Start alert with explicit duration/intensity
   bool startAlertDuration(
@@ -69,9 +69,9 @@ public:
     int priority = 0,
     const String& customReason = ""
   );
-  
-  // Utility functions
-  AlertMode stringToAlertMode(const String& modeStr);
+    
+    // Utility functions
+    AlertMode stringToAlertMode(const String& modeStr);
 };
 
-#endif // ALERT_MANAGER_H
+#endif // ALERT_MANAGER_H 

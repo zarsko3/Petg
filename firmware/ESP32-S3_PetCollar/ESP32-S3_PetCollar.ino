@@ -1519,9 +1519,12 @@ void publishMQTTStatus(String status) {
         AlertConfig statusBeep;
         statusBeep.mode = AlertMode::BUZZER;
         statusBeep.intensity = 100;
-        statusBeep.duration = 100;
+        statusBeep.duration = 1000;  // 1 second exactly
         statusBeep.reason = AlertReason::SYSTEM_NOTIFICATION;
         alertManager.triggerAlert(statusBeep);
+        
+        // Ensure alert manager is updated
+        alertManager.update();
     }
 }
 
@@ -2543,14 +2546,17 @@ void handleData() {
 void testAlert(AlertMode mode, uint8_t clientNum) {
     AlertConfig testConfig;
     testConfig.mode = mode;
-    testConfig.intensity = 3;
-    testConfig.duration = 1000;
+    testConfig.intensity = 128;  // 50% duty cycle
+    testConfig.duration = 1000;  // Exactly 1 second
     testConfig.reason = AlertReason::MANUAL_TEST;
     
     if (alertManager.triggerAlert(testConfig)) {
         String modeStr = (mode == AlertMode::BUZZER) ? "buzzer" : "vibration";
         sendCommandResponse(clientNum, "test_" + modeStr, "triggered");
-        Serial.printf("🧪 %s test triggered\n", modeStr.c_str());
+        Serial.printf("🧪 %s test triggered (duration: %dms)\n", modeStr.c_str(), testConfig.duration);
+        
+        // Ensure alert manager is updated
+        alertManager.update();
     } else {
         sendErrorResponse(clientNum, "Alert test failed");
     }
@@ -2925,13 +2931,16 @@ void setup() {
     Serial.println("🔍 Scanning for proximity beacons...");
     Serial.println("═══════════════════════════════════════");
     
-    // Send a connection notification beep
+    // Send a short connection notification beep
     AlertConfig connectedBeep;
     connectedBeep.mode = AlertMode::BUZZER;
     connectedBeep.intensity = 128;
-    connectedBeep.duration = 200;
+    connectedBeep.duration = 1000;  // 1 second exactly
     connectedBeep.reason = AlertReason::SYSTEM_NOTIFICATION;
     alertManager.triggerAlert(connectedBeep);
+    
+    // Ensure alert manager is updated frequently
+    alertManager.update();
 }
 
 /**
@@ -3183,6 +3192,9 @@ void loop() {
         broadcastCollarPresence();
         lastBroadcast = currentTime;
     }
+    
+    // CRITICAL: Check alert manager again before yielding
+    alertManager.update();
     
     // Yield to allow other tasks to run
     yield();
