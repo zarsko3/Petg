@@ -1,6 +1,8 @@
 #include "AlertManager.h"
 #include "driver/ledc.h"
 #include "esp_timer.h"
+#include "hal/gpio_hal.h"
+#include "driver/gpio.h"
 
 // Global instance for timer ISR
 static AlertManager_Enhanced* gAlertManager = nullptr;
@@ -38,15 +40,23 @@ void AlertManager_Enhanced::buzzOn(uint16_t freq, uint8_t duty) {
 }
 
 void AlertManager_Enhanced::buzzOff() {
-    // Stop PWM and keep pin parked HIGH (OFF for active-LOW)
-    ledc_stop(LEDC_LOW_SPEED_MODE, (ledc_channel_t)buzzerChannel, 1); // idle=HIGH
-    // IMPORTANT: do NOT call set_duty/update after ledc_stop; that re-enables PWM.
+    // CRITICAL FIX: Completely shut down LEDC and force pin HIGH
     
-    // Ensure pin stays HIGH (OFF)
+    // First stop LEDC with idle HIGH
+    ledc_stop(LEDC_LOW_SPEED_MODE, (ledc_channel_t)buzzerChannel, 1); // idle=HIGH
+    
+    // Detach pin from LEDC completely
+    gpio_hal_iomux_func_sel(GPIO_PIN_MUX_REG[buzzerPin], PIN_FUNC_GPIO);
+    
+    // Force pin HIGH directly (buzzer OFF for active-LOW)
+    gpio_set_direction((gpio_num_t)buzzerPin, GPIO_MODE_OUTPUT);
+    gpio_set_level((gpio_num_t)buzzerPin, 1); // HIGH = OFF
+    
+    // Double-check with Arduino API too
     pinMode(buzzerPin, OUTPUT);
     digitalWrite(buzzerPin, HIGH); // OFF
     
-    Serial.println("🔇 Buzzer stopped and parked HIGH");
+    Serial.println("🔇 Buzzer FORCIBLY stopped and detached from LEDC");
 }
 
 // Static pointer to instance for timer callback
@@ -108,10 +118,19 @@ void AlertManager_Enhanced::cancelAutoStop() {
 }
 
 bool AlertManager_Enhanced::initialize() {
-    // Set pins to safe state first
+    // CRITICAL FIX: Ensure buzzer is OFF before anything else
+    
+    // First, ensure pin is in GPIO mode and HIGH (OFF for active-LOW)
+    gpio_hal_iomux_func_sel(GPIO_PIN_MUX_REG[buzzerPin], PIN_FUNC_GPIO);
+    gpio_set_direction((gpio_num_t)buzzerPin, GPIO_MODE_OUTPUT);
+    gpio_set_level((gpio_num_t)buzzerPin, 1); // HIGH = OFF
+    
+    // Also set with Arduino API
     pinMode(buzzerPin, OUTPUT);
-    pinMode(vibrationPin, OUTPUT);
     digitalWrite(buzzerPin, HIGH);  // active-LOW buzzer: HIGH = OFF
+    
+    // Set vibration pin to safe state
+    pinMode(vibrationPin, OUTPUT);
     digitalWrite(vibrationPin, LOW);
 
     // Initial LEDC setup with default frequency
@@ -123,22 +142,24 @@ bool AlertManager_Enhanced::initialize() {
     timer_conf.clk_cfg = LEDC_AUTO_CLK;  // Let ESP-IDF handle clock
     ledc_timer_config(&timer_conf);
 
-    // Initial channel configuration - start detached
+    // Initial channel configuration - start with duty=255 (HIGH) for active-LOW buzzer
     ledc_channel_config_t channel_conf = {};
     channel_conf.gpio_num = buzzerPin;
     channel_conf.speed_mode = LEDC_LOW_SPEED_MODE;
     channel_conf.channel = (ledc_channel_t)buzzerChannel;
     channel_conf.timer_sel = LEDC_TIMER_0;
     channel_conf.intr_type = LEDC_INTR_DISABLE;  // No interrupts needed
-    channel_conf.duty = 0;  // Will be overridden by ledc_stop
+    channel_conf.duty = 255;  // Start with HIGH output (buzzer OFF)
     channel_conf.hpoint = 0;
     ledc_channel_config(&channel_conf);
     
-    // Immediately stop and park HIGH (OFF)
+    // Immediately stop and detach from LEDC
     ledc_stop(LEDC_LOW_SPEED_MODE, (ledc_channel_t)buzzerChannel, 1);  // idle=HIGH
     
-    // Double-check pin is still HIGH
-    digitalWrite(buzzerPin, HIGH);  // Ensure OFF
+    // Force back to GPIO mode and HIGH
+    gpio_hal_iomux_func_sel(GPIO_PIN_MUX_REG[buzzerPin], PIN_FUNC_GPIO);
+    gpio_set_direction((gpio_num_t)buzzerPin, GPIO_MODE_OUTPUT);
+    gpio_set_level((gpio_num_t)buzzerPin, 1); // HIGH = OFF
 
     // Initialize hardware timer for auto-stop
     setupStopTimer();
