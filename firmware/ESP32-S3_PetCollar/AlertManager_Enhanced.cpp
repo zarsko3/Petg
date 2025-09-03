@@ -1,4 +1,6 @@
 #include "AlertManager.h"
+#include "driver/ledc.h"
+#include "esp_timer.h"
 
 // Global instance for timer ISR
 static AlertManager_Enhanced* gAlertManager = nullptr;
@@ -48,7 +50,6 @@ void AlertManager_Enhanced::buzzOff() {
 }
 
 // Static pointer to instance for timer callback
-static AlertManager_Enhanced* gAlertManager = nullptr;
 
 // Timer ISR - must be IRAM_ATTR for hardware timer
 void IRAM_ATTR AlertManager_Enhanced::onStopTimer() {
@@ -63,20 +64,16 @@ void AlertManager_Enhanced::setupStopTimer() {
     // Store instance pointer for ISR first
     gAlertManager = this;
     
-    // Initialize hardware timer (1MHz, count up)
-    stopTimer = timerBegin(0, 80, true);  // Timer 0, 80MHz/80=1MHz, count up
+    // Initialize hardware timer (1MHz)
+    stopTimer = timerBegin(1000000);  // 1MHz timer frequency
     
     if (!stopTimer) {
         Serial.println("❌ Failed to initialize hardware timer");
         return;
     }
     
-    // Attach ISR (edge-triggered)
-    timerAttachInterrupt(stopTimer, &AlertManager_Enhanced::onStopTimer, true);
-    
-    // Set auto-reload OFF, count UP
-    timerSetAutoReload(stopTimer, false);
-    timerSetCountUp(stopTimer, true);
+    // Attach ISR - API changed in 3.2.0
+    timerAttachInterrupt(stopTimer, &AlertManager_Enhanced::onStopTimer);
     
     // Start counter from 0
     timerWrite(stopTimer, 0);
@@ -93,9 +90,9 @@ void AlertManager_Enhanced::scheduleAutoStop(unsigned long ms) {
     // Always reset counter to 0 so the alarm time is relative to "now"
     timerWrite(stopTimer, 0);
     
-    // Set new alarm (convert ms to microseconds)
-    timerAlarmWrite(stopTimer, ms * 1000, false);  // false = one-shot
-    timerAlarmEnable(stopTimer);
+    // In ESP32 Arduino 3.2.0, we use timerAlarm instead
+    // Convert ms to microseconds
+    timerAlarm(stopTimer, ms * 1000, false);
     
     Serial.printf("⏰ Auto-stop scheduled for %lums\n", ms);
 }
@@ -103,7 +100,8 @@ void AlertManager_Enhanced::scheduleAutoStop(unsigned long ms) {
 void AlertManager_Enhanced::cancelAutoStop() {
     if (!stopTimer) return;
     
-    timerAlarmDisable(stopTimer);
+    // In ESP32 Arduino 3.2.0, there's no timerAlarmDisable
+    // We just reset the timer
     timerWrite(stopTimer, 0);  // clear counter so the next arm is clean
     Serial.println("⏰ Auto-stop cancelled");
 }
