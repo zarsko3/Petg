@@ -90,9 +90,10 @@ void AlertManager_Enhanced::scheduleAutoStop(unsigned long ms) {
     // Always reset counter to 0 so the alarm time is relative to "now"
     timerWrite(stopTimer, 0);
     
-    // In ESP32 Arduino 3.2.0, we use timerAlarm instead
+    // In ESP32 Arduino 3.2.0, timerAlarm requires 4 parameters
     // Convert ms to microseconds
-    timerAlarm(stopTimer, ms * 1000, false);
+    // Parameters: timer, alarm_value, autoreload, reload_count
+    timerAlarm(stopTimer, ms * 1000, false, 0);
     
     Serial.printf("⏰ Auto-stop scheduled for %lums\n", ms);
 }
