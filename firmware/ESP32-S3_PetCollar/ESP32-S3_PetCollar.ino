@@ -121,10 +121,14 @@ BLEScan* pBLEScan = nullptr;
 #define BUZZER_ACTIVE_LOW 0  // set to 1 if your buzzer is wired active-LOW
 #endif
 static inline void buzzerOff() {
+  ledcDetachPin(BUZZER_PIN);
   pinMode(BUZZER_PIN, OUTPUT);
-  // Make LEDC idle level match hardware polarity, then drive the pin to the "off" level.
-  ledc_stop(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, BUZZER_ACTIVE_LOW ? 1 : 0);
   digitalWrite(BUZZER_PIN, BUZZER_ACTIVE_LOW ? HIGH : LOW);
+}
+static inline void buzzerOnTone(uint32_t freq, uint8_t duty = 128) {
+  ledcAttachPin(BUZZER_PIN, LEDC_CHANNEL_0);
+  ledcSetup(LEDC_CHANNEL_0, freq, 10);
+  ledcWrite(LEDC_CHANNEL_0, duty);
 }
 
 // ==================== SIMPLE RSSI SMOOTHER IMPLEMENTATION ====================
@@ -2749,23 +2753,8 @@ void printSystemStatus() {
 void testBuzzer(int frequency = 2000, int duration = 500) {
     Serial.printf("🔊 Testing buzzer on GPIO %d: %dHz for %dms\n", BUZZER_PIN, frequency, duration);
     
-    // Using LEDC for passive buzzer (same method as AlertManager_Enhanced)
-    // This ensures consistency between boot test and MQTT alerts
-    ledc_timer_config_t timer_conf;
-    timer_conf.speed_mode = LEDC_LOW_SPEED_MODE;
-    timer_conf.duty_resolution = LEDC_TIMER_8_BIT;  // 8-bit resolution
-    timer_conf.timer_num = LEDC_TIMER_0;
-    timer_conf.freq_hz = frequency;
-    ledc_timer_config(&timer_conf);
-
-    ledc_channel_config_t channel_conf;
-    channel_conf.gpio_num = BUZZER_PIN;
-    channel_conf.speed_mode = LEDC_LOW_SPEED_MODE;
-    channel_conf.channel = LEDC_CHANNEL_0;
-    channel_conf.timer_sel = LEDC_TIMER_0;
-    channel_conf.duty = 180;  // ~70% duty cycle (0-255)
-    channel_conf.hpoint = 0;
-    ledc_channel_config(&channel_conf);
+    // Use the unified helper function
+    buzzerOnTone(frequency, 180);  // ~70% duty cycle (0-255)
     
     delay(duration);
     
@@ -2823,6 +2812,11 @@ void printGlobalRSSIStats() {
  * @brief Arduino setup function - Initialize all systems
  */
 void setup() {
+    // Force silent boot immediately
+    pinMode(BUZZER_PIN, OUTPUT);
+    digitalWrite(BUZZER_PIN, BUZZER_ACTIVE_LOW ? HIGH : LOW);
+    ledcDetachPin(BUZZER_PIN);
+    
     Serial.begin(115200);
     delay(2000); // Allow serial to stabilize
     
@@ -2878,10 +2872,7 @@ void setup() {
     // Add default beacon configurations for testing
     beaconManager.addDefaultConfigurations();
     
-    // Test buzzer using alert manager
-    Serial.println("🔊 Testing buzzer on GPIO 18...");
-    alertManager.startAlertDuration(AlertReason::MANUAL_TEST, AlertMode::BUZZER, 1000, 180);
-    alertManager.update();
+    // No startup beep - ensure silent boot
     
     // Run RSSI smoother unit tests if enabled
     #if DEBUG_BLE
