@@ -1,0 +1,34 @@
+{
+    "C_Cpp.intelliSenseEngine": "default",
+    "C_Cpp.default.includePath": [
+        "${workspaceFolder}/**",
+        "${env:USERPROFILE}/AppData/Local/Arduino15/packages/esp32/hardware/esp32/3.2.0/**",
+        "${env:USERPROFILE}/Documents/Arduino/libraries/**"
+    ],
+    "C_Cpp.default.browse.path": [
+        "${workspaceFolder}/**",
+        "${env:USERPROFILE}/AppData/Local/Arduino15/packages/esp32/hardware/esp32/3.2.0/**",
+        "${env:USERPROFILE}/Documents/Arduino/libraries/**"
+    ],
+    "C_Cpp.default.compilerPath": "${env:USERPROFILE}/AppData/Local/Arduino15/packages/esp32/tools/esp-x32/2411/bin/xtensa-esp32s3-elf-gcc.exe",
+    "C_Cpp.default.intelliSenseMode": "gcc-x86",
+    "C_Cpp.default.cStandard": "c11",
+    "C_Cpp.default.cppStandard": "c++17",
+    "C_Cpp.default.defines": [
+        "ESP32=1",
+        "ESP_PLATFORM=1",
+        "ARDUINO=10800",
+        "ARDUINO_ESP32_DEV",
+        "ARDUINO_ARCH_ESP32"
+    ],
+    "arduino.path": "C:\\Program Files (x86)\\Arduino",
+    "arduino.commandPath": "arduino_debug.exe",
+    "arduino.logLevel": "info",
+    "arduino.enableUSBDetection": true,
+    "arduino.disableTestingOpen": false,
+    "arduino.skipHeaderProvider": false,
+    "arduino.useArduinoCli": true,
+    "files.associations": {
+        "*.ino": "cpp"
+    }
+}
