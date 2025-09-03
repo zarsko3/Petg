@@ -116,6 +116,17 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET_PIN);
 Preferences preferences;
 BLEScan* pBLEScan = nullptr;
 
+// === Buzzer polarity & helper ===
+#ifndef BUZZER_ACTIVE_LOW
+#define BUZZER_ACTIVE_LOW 0  // set to 1 if your buzzer is wired active-LOW
+#endif
+static inline void buzzerOff() {
+  pinMode(BUZZER_PIN, OUTPUT);
+  // Make LEDC idle level match hardware polarity, then drive the pin to the "off" level.
+  ledc_stop(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, BUZZER_ACTIVE_LOW ? 1 : 0);
+  digitalWrite(BUZZER_PIN, BUZZER_ACTIVE_LOW ? HIGH : LOW);
+}
+
 // ==================== SIMPLE RSSI SMOOTHER IMPLEMENTATION ====================
 
 /**
@@ -1301,42 +1312,7 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
             
             // Trigger alert with test command
             alertManager.triggerAlert(cfg);
-            
-                            // Also trigger buzzer directly for immediate feedback
-                if (alertMode == "buzzer" || alertMode == "both") {
-                    Serial.printf("🔊 Direct buzzer test on GPIO %d\n", BUZZER_PIN);
-                    
-                    // Generate tone for test duration using LEDC
-                    // Use same method as AlertManager_Enhanced and boot test
-                    ledc_timer_config_t timer_conf;
-                    timer_conf.speed_mode = LEDC_LOW_SPEED_MODE;
-                    timer_conf.duty_resolution = LEDC_TIMER_8_BIT;  // 8-bit resolution
-                    timer_conf.timer_num = LEDC_TIMER_0;
-                    timer_conf.freq_hz = 2000;  // 2kHz
-                    ledc_timer_config(&timer_conf);
-
-                    ledc_channel_config_t channel_conf;
-                    channel_conf.gpio_num = BUZZER_PIN;
-                    channel_conf.speed_mode = LEDC_LOW_SPEED_MODE;
-                    channel_conf.channel = LEDC_CHANNEL_0;
-                    channel_conf.timer_sel = LEDC_TIMER_0;
-                    channel_conf.duty = intensity;  // Use intensity directly (0-255)
-                    channel_conf.hpoint = 0;
-                    ledc_channel_config(&channel_conf);
-                    
-                    delay(durationMs);
-                    
-                    // Turn off buzzer completely
-                    ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 0);
-                    ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
-                    ledc_stop(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 1);
-                    
-                    // Set pin back to output HIGH (off) for safety
-                    pinMode(BUZZER_PIN, OUTPUT);
-                    digitalWrite(BUZZER_PIN, HIGH);
-                    
-                    Serial.println("✅ Buzzer test completed");
-                }
+            Serial.println("✅ Alert test triggered through AlertManager");
             
         } else if (cmd == "configure_beacon") {
             // 🚀 PROXIMITY-BASED BEACON CONFIGURATION
@@ -1738,9 +1714,8 @@ public:
         // Update beacon manager with smoothed detection
         beaconManager.updateBeacon(beacon);
         
-        // 🚨 CRITICAL: Check for proximity alerts using smoothed data
-        // This provides more stable and reliable proximity detection
-        checkProximityAlerts(beacon);
+        // Proximity alerts are handled centrally in
+        // beaconManager.processProximityTriggers() in loop().
         
         // Update system statistics
         systemStateManager.updateBeaconStats(1);
@@ -2274,6 +2249,11 @@ void checkProximityAlerts(const BeaconData& beacon) {
 void triggerProximityAlert(BeaconConfig& config, const BeaconData& beacon) {
     unsigned long currentTime = millis();
     
+    // Normalize cooldown (ensure it's longer than alert duration)
+    if (config.cooldownPeriodMs < (unsigned long)(config.alertDurationMs + 250)) {
+        config.cooldownPeriodMs = config.alertDurationMs + 250;
+    }
+    
     // 🕐 COOLDOWN CHECK
     // Ensure we don't spam alerts
     if (config.lastAlertTime > 0 && 
@@ -2789,14 +2769,7 @@ void testBuzzer(int frequency = 2000, int duration = 500) {
     
     delay(duration);
     
-    // Turn off buzzer completely
-    ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 0);
-    ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
-    ledc_stop(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 1);
-    
-    // Set pin back to output HIGH (off) for safety
-    pinMode(BUZZER_PIN, OUTPUT);
-    digitalWrite(BUZZER_PIN, HIGH);
+    buzzerOff();
     
     Serial.printf("✅ Buzzer test complete on GPIO %d\n", BUZZER_PIN);
 }
@@ -2864,8 +2837,7 @@ void setup() {
     Serial.println("═══════════════════════════════════════");
     
     // Initialize hardware pins
-    pinMode(BUZZER_PIN, OUTPUT);
-    digitalWrite(BUZZER_PIN, HIGH);  // active-LOW buzzer: HIGH = OFF
+    buzzerOff();
 
     pinMode(VIBRATION_PIN, OUTPUT);
     pinMode(STATUS_LED_WIFI, OUTPUT);
