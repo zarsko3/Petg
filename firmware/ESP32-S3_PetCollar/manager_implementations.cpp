@@ -439,75 +439,7 @@ void BeaconManager_Enhanced::processProximityTriggers() {
 }
 
 // ==================== ENHANCED ALERT MANAGER IMPLEMENTATIONS ====================
-
-// Constructor
-AlertManager_Enhanced::AlertManager_Enhanced(uint8_t buzzerPin, uint8_t vibrationPin) 
-    : buzzerPin(buzzerPin), vibrationPin(vibrationPin), alertActive(false) {
-    // Constructor implementation
-}
-
-bool AlertManager_Enhanced::update() {
-    // Update alert states, handle timeouts, etc.
-    return alertActive;
-}
-
-bool AlertManager_Enhanced::stopAlert(bool force) {
-    if (alertActive || force) {
-        alertActive = false;
-        digitalWrite(buzzerPin, LOW);
-        digitalWrite(vibrationPin, LOW);
-        Serial.println("🛑 Enhanced alert stopped");
-        return true;
-    }
-    return false;
-}
-
-bool AlertManager_Enhanced::isAlertActive() const {
-    return alertActive;
-}
-
-bool AlertManager_Enhanced::initialize() {
-    pinMode(buzzerPin, OUTPUT);
-    pinMode(vibrationPin, OUTPUT);
-    digitalWrite(buzzerPin, LOW);
-    digitalWrite(vibrationPin, LOW);
-    Serial.println("🚨 Enhanced AlertManager initialized");
-    return true;
-}
-
-bool AlertManager_Enhanced::triggerAlert(const AlertConfig& config) {
-    alertActive = true;
-    
-    // Activate outputs based on mode
-    if (config.mode == AlertMode::BUZZER || config.mode == AlertMode::BOTH) {
-        digitalWrite(buzzerPin, HIGH);
-    }
-    if (config.mode == AlertMode::VIBRATION || config.mode == AlertMode::BOTH) {
-        digitalWrite(vibrationPin, HIGH);
-    }
-    
-    Serial.printf("🚨 Enhanced alert triggered: mode=%d, intensity=%d\n", 
-                 (int)config.mode, config.intensity);
-    return true;
-}
-
-// Add missing startAlert method
-bool AlertManager_Enhanced::startAlert(AlertReason reason, AlertMode mode, int pattern, int priority, const String& customReason) {
-    AlertConfig config;
-    config.mode = mode;
-    config.intensity = 128; // Default intensity
-    config.duration = 5000; // Default 5 seconds
-    
-    Serial.printf("🚨 Starting alert: reason=%d, mode=%d\n", (int)reason, (int)mode);
-    return triggerAlert(config);
-}
-
-AlertMode AlertManager_Enhanced::stringToAlertMode(const String& modeStr) {
-    if (modeStr == "buzzer") return AlertMode::BUZZER;
-    if (modeStr == "vibration") return AlertMode::VIBRATION;
-    if (modeStr == "both") return AlertMode::BOTH;
-    return AlertMode::NONE;
-}
+// AlertManager_Enhanced implementation moved to AlertManager_Enhanced.cpp
 
 // ==================== ENHANCED SYSTEM STATE MANAGER IMPLEMENTATIONS ====================
 
@@ -540,7 +472,7 @@ void SystemStateManager::updateBatteryStatus() {
     // Read battery voltage and update percentage
     // Stub implementation for now
     systemStateImpl.lastBatteryUpdate = millis();
-} 
+}
 
 void SystemStateManager::updateProximityAlerts(int count) {
     systemStateImpl.proximityAlertCount += count;
