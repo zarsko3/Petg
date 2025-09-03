@@ -121,14 +121,32 @@ BLEScan* pBLEScan = nullptr;
 #define BUZZER_ACTIVE_LOW 0  // set to 1 if your buzzer is wired active-LOW
 #endif
 static inline void buzzerOff() {
-  ledcDetachPin(BUZZER_PIN);
+  // Stop LEDC output and set idle level based on polarity
+  ledc_stop(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, BUZZER_ACTIVE_LOW ? 1 : 0);
+  // Force GPIO mode for safety
   pinMode(BUZZER_PIN, OUTPUT);
   digitalWrite(BUZZER_PIN, BUZZER_ACTIVE_LOW ? HIGH : LOW);
 }
 static inline void buzzerOnTone(uint32_t freq, uint8_t duty = 128) {
-  ledcAttachPin(BUZZER_PIN, LEDC_CHANNEL_0);
-  ledcSetup(LEDC_CHANNEL_0, freq, 10);
-  ledcWrite(LEDC_CHANNEL_0, duty);
+  // Configure LEDC timer
+  ledc_timer_config_t timer_conf = {};
+  timer_conf.speed_mode = LEDC_LOW_SPEED_MODE;
+  timer_conf.duty_resolution = LEDC_TIMER_8_BIT;
+  timer_conf.timer_num = LEDC_TIMER_0;
+  timer_conf.freq_hz = freq;
+  timer_conf.clk_cfg = LEDC_AUTO_CLK;
+  ledc_timer_config(&timer_conf);
+  
+  // Configure LEDC channel
+  ledc_channel_config_t channel_conf = {};
+  channel_conf.gpio_num = BUZZER_PIN;
+  channel_conf.speed_mode = LEDC_LOW_SPEED_MODE;
+  channel_conf.channel = LEDC_CHANNEL_0;
+  channel_conf.timer_sel = LEDC_TIMER_0;
+  channel_conf.duty = duty;
+  channel_conf.hpoint = 0;
+  channel_conf.intr_type = LEDC_INTR_DISABLE;
+  ledc_channel_config(&channel_conf);
 }
 
 // ==================== SIMPLE RSSI SMOOTHER IMPLEMENTATION ====================
@@ -2815,7 +2833,7 @@ void setup() {
     // Force silent boot immediately
     pinMode(BUZZER_PIN, OUTPUT);
     digitalWrite(BUZZER_PIN, BUZZER_ACTIVE_LOW ? HIGH : LOW);
-    ledcDetachPin(BUZZER_PIN);
+    // No need to detach LEDC as it's not attached yet at boot
     
     Serial.begin(115200);
     delay(2000); // Allow serial to stabilize
