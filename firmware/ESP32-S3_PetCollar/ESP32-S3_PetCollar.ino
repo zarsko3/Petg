@@ -70,7 +70,7 @@
 #include "include/MicroConfig.h"
 #include "include/BeaconTypes.h"
 #include "include/WiFiManager.h"
-#include "include/AlertManager.h"
+#include "AlertManager.h"
 #include "include/BeaconManager.h"
 #include "include/ZoneManager.h"
 #include "include/SystemStateManager.h"
