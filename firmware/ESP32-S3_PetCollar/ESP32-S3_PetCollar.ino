@@ -2906,9 +2906,10 @@ void setup() {
     // Add default beacon configurations for testing
     beaconManager.addDefaultConfigurations();
     
-    // Test buzzer to confirm GPIO 18 is working
-    Serial.println("🔊 Testing buzzer on restored GPIO 18...");
-    testBuzzer(2000, 1000); // 2kHz for 0.5 seconds
+    // Test buzzer using alert manager
+    Serial.println("🔊 Testing buzzer on GPIO 18...");
+    alertManager.startAlertDuration(AlertReason::MANUAL_TEST, AlertMode::BUZZER, 1000, 180);
+    alertManager.update();
     
     // Run RSSI smoother unit tests if enabled
     #if DEBUG_BLE

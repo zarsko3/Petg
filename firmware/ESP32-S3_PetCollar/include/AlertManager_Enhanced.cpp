@@ -75,6 +75,9 @@ void AlertManager_Enhanced::setupStopTimer() {
     timerSetAutoReload(stopTimer, false);
     timerSetCountUp(stopTimer, true);
     
+    // Start counter from 0
+    timerWrite(stopTimer, 0);
+    
     Serial.println("⏰ Hardware timer initialized for auto-stop");
 }
 
@@ -83,6 +86,9 @@ void AlertManager_Enhanced::scheduleAutoStop(unsigned long ms) {
     
     // Cancel any pending alarm
     cancelAutoStop();
+    
+    // Always reset counter to 0 so the alarm time is relative to "now"
+    timerWrite(stopTimer, 0);
     
     // Set new alarm (convert ms to microseconds)
     timerAlarmWrite(stopTimer, ms * 1000, false);  // false = one-shot
@@ -95,6 +101,7 @@ void AlertManager_Enhanced::cancelAutoStop() {
     if (!stopTimer) return;
     
     timerAlarmDisable(stopTimer);
+    timerWrite(stopTimer, 0);  // clear counter so the next arm is clean
     Serial.println("⏰ Auto-stop cancelled");
 }
 
