@@ -2,9 +2,9 @@
 #define ALERT_MANAGER_H
 
 #include <Arduino.h>
-#include "ESP32_S3_Config.h"
-#include "MicroConfig.h"
-#include "BeaconTypes.h"
+#include "include/ESP32_S3_Config.h"
+#include "include/MicroConfig.h"
+#include "include/BeaconTypes.h"
 
 // Forward declarations
 class AlertManager_Enhanced;
