@@ -1,6 +1,6 @@
 #include "include/BeaconTypes.h"
 #include "include/BeaconManager.h"
-#include "include/AlertManager.h"
+#include "AlertManager.h"
 #include "include/WiFiManager.h"
 #include "include/SystemStateManager.h"
 #include "include/ZoneManager.h"
